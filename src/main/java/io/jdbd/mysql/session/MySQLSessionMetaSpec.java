@@ -1,6 +1,7 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.JdbdException;
+import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.session.DatabaseMetaSpec;
 import io.jdbd.session.Option;
@@ -68,6 +69,15 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
         return this.protocol.supportOutParameter();
     }
 
+    @Override
+    public final String factoryVendor() {
+        return MySQLDriver.MY_SQL;
+    }
+
+    @Override
+    public final String driverVendor() {
+        return MySQLDriver.MY_SQL;
+    }
 
     /**
      * <p>

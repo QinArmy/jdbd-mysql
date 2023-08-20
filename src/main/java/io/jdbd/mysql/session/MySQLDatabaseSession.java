@@ -9,13 +9,12 @@ import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
-import io.jdbd.session.DatabaseSession;
-import io.jdbd.session.SavePoint;
-import io.jdbd.session.TransactionStatus;
+import io.jdbd.session.*;
 import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.statement.StaticStatement;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.result.NamedSavePoint;
 import io.jdbd.vendor.stmt.ParamStmt;
@@ -131,14 +130,22 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return this.protocol.executeAsFlux(Stmts.multiStmt(multiStmt));
     }
 
-    @Override
-    public final Publisher<RefCursor> declareCursor(String sql) {
-        return Mono.error(MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL));
-    }
 
     @Override
     public final Publisher<TransactionStatus> transactionStatus() {
         return this.protocol.transactionStatus();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public final Publisher<S> setTransactionCharacteristics(TransactionOption option) {
+        return this.protocol.setTransactionCharacteristics(option)
+                .thenReturn((S) this);
+    }
+
+    @Override
+    public final boolean inTransaction() throws JdbdException {
+        return this.protocol.inTransaction();
     }
 
     @Override
@@ -185,6 +192,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return MySQLDatabaseMetadata.create(this.protocol);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
 
     @Override
     public final Publisher<SavePoint> setSavePoint() {
@@ -194,11 +204,23 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .append(this.savePointIndex.getAndIncrement())
                 .append('-')
                 .append(ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE));
-        return this.setSavePoint(builder.toString());
+        return this.setSavePoint(builder.toString(), DatabaseProtocol.OPTION_FUNC);
     }
 
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
     @Override
     public final Publisher<SavePoint> setSavePoint(final String name) {
+        return this.setSavePoint(name, DatabaseProtocol.OPTION_FUNC);
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
+    @Override
+    public final Publisher<SavePoint> setSavePoint(final String name, final Function<Option<?>, ?> optionFunc) {
         if (!MySQLStrings.hasText(name)) {
             return Mono.error(MySQLExceptions.savePointNameIsEmpty());
         }
@@ -208,9 +230,21 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .thenReturn(NamedSavePoint.fromName(name));
     }
 
-    @SuppressWarnings("unchecked")
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
     @Override
     public final Publisher<S> releaseSavePoint(final SavePoint savepoint) {
+        return this.releaseSavePoint(savepoint, DatabaseProtocol.OPTION_FUNC);
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public final Publisher<S> releaseSavePoint(SavePoint savepoint, Function<Option<?>, ?> optionFunc) {
         if (!(savepoint instanceof NamedSavePoint && MySQLStrings.hasText(savepoint.name()))) {
             return Mono.error(MySQLExceptions.unknownSavePoint(savepoint));
         }
@@ -221,9 +255,21 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .thenReturn((S) this);
     }
 
-    @SuppressWarnings("unchecked")
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
     @Override
     public final Publisher<S> rollbackToSavePoint(final SavePoint savepoint) {
+        return this.rollbackToSavePoint(savepoint, DatabaseProtocol.OPTION_FUNC);
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public final Publisher<S> rollbackToSavePoint(SavePoint savepoint, Function<Option<?>, ?> optionFunc) {
         if (!(savepoint instanceof NamedSavePoint && MySQLStrings.hasText(savepoint.name()))) {
             return Mono.error(MySQLExceptions.unknownSavePoint(savepoint));
         }
@@ -234,6 +280,26 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .thenReturn((S) this);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/identifiers.html">Schema Object Names</a>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public final S bindIdentifier(StringBuilder builder, String identifier) {
+        this.protocol.bindIdentifier(builder, identifier);
+        return (S)this;
+    }
+
+    @Override
+    public final RefCursor refCursor(String name) {
+        throw MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL);
+    }
+
+    @Override
+    public final RefCursor refCursor(String name, Function<Option<?>, ?> optionFunc) {
+        throw MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL);
+    }
+
     @Override
     public final boolean isClosed() {
         return this.protocol.isClosed();
@@ -242,7 +308,8 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final boolean isSameFactory(DatabaseSession session) {
-        return session instanceof MySQLDatabaseSession && ((MySQLDatabaseSession<?>) session).factory == this.factory;
+        return session instanceof MySQLDatabaseSession
+                && ((MySQLDatabaseSession<?>) session).factory == this.factory;
     }
 
 

@@ -462,10 +462,6 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
 
     /*################################## blow private static method ##################################*/
 
-    private static MySQLJdbdException createResponseNullBinaryError(MySQLColumnMeta meta) {
-        String m = String.format("MySQL server response null value in binary protocol,meta:%s", meta);
-        return new MySQLJdbdException(m);
-    }
 
 
     private static final class BinaryCurrentRow extends MySQLCurrentRow {

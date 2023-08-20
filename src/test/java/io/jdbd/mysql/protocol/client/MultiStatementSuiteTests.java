@@ -3,7 +3,6 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.mysql.Groups;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.conf.MyKey;
-import io.jdbd.mysql.session.SessionAdjutant;
 import io.jdbd.result.MultiResult;
 import io.jdbd.result.NoMoreResultException;
 import io.jdbd.result.ResultRow;

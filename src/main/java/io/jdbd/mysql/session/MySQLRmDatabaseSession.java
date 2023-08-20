@@ -20,6 +20,8 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * <p>
@@ -46,18 +48,16 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     @Override
-    public final Publisher<RmDatabaseSession> setTransactionOption(TransactionOption option) {
-        return this.setTransactionOption(option, HandleMode.ERROR_IF_EXISTS);
+    public final Publisher<RmDatabaseSession> start(final Xid xid, final int flags) {
+        return this.start(xid, flags, TransactionOption.option(null, false));
     }
 
-    @Override
-    public final Publisher<RmDatabaseSession> setTransactionOption(TransactionOption option, HandleMode mode) {
-        return this.protocol.setTransactionOption(option, mode)
-                .thenReturn(this);
-    }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
     @Override
-    public final Mono<RmDatabaseSession> start(final Xid xid, final int flags) {
+    public final Publisher<RmDatabaseSession> start(Xid xid, int flags, TransactionOption option) {
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA START");
         try {
@@ -108,6 +108,14 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 .thenReturn(this);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Override
+    public final Publisher<RmDatabaseSession> end(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
+        return null;
+    }
+
     @Override
     public final Mono<Integer> prepare(final Xid xid) {
         final StringBuilder builder = new StringBuilder(140);
@@ -122,6 +130,13 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Override
+    public final Publisher<Integer> prepare(Xid xid, Function<Option<?>, ?> optionFunc) {
+        return null;
+    }
 
     @Override
     public final Mono<RmDatabaseSession> commit(Xid xid, final boolean onePhase) {
@@ -140,6 +155,14 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 .thenReturn(this);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Override
+    public final Publisher<RmDatabaseSession> commit(Xid xid, boolean onePhase, Function<Option<?>, ?> optionFunc) {
+        return null;
+    }
+
     @Override
     public final Mono<RmDatabaseSession> rollback(final Xid xid) {
         final StringBuilder builder = new StringBuilder(140);
@@ -154,26 +177,73 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 .thenReturn(this);
     }
 
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Override
+    public final Publisher<RmDatabaseSession> rollback(Xid xid, Function<Option<?>, ?> optionFunc) {
+        return null;
+    }
+
+
+
     @Override
     public final Mono<RmDatabaseSession> forget(final Xid xid) {
         // mysql doesn't support this
         return Mono.just(this);
     }
 
+
     @Override
-    public final Flux<Xid> recover(final int flags) {
-        final Flux<Xid> flux;
+    public final Publisher<RmDatabaseSession> forget(Xid xid, Function<Option<?>, ?> optionFunc) {
+        return null;
+    }
+
+    @Override
+    public final Publisher<Optional<Xid>> recover(final int flags) {
+        final Flux<Optional<Xid>> flux;
         if (flags != TM_NO_FLAGS && ((flags & TM_START_RSCAN) | (flags & TM_END_RSCAN)) == 0) {
             flux = Flux.error(MySQLExceptions.xaInvalidFlagForRecover(flags));
         } else if ((flags & TM_START_RSCAN) == 0) {
             flux = Flux.empty();
         } else {
             flux = this.protocol.query(Stmts.stmt("XA RECOVER"), CurrentRow::asResultRow)
-                    .map(this::mapRecoverResult);
+                    .map(this::mapRecoverResult)
+            ;
         }
         return flux;
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Override
+    public final Publisher<Optional<Xid>> recover(int flags, Function<Option<?>, ?> optionFunc) {
+        return null;
+    }
+
+
+
+    @Override
+    public final boolean isSupportForget() {
+        return false;
+    }
+
+    @Override
+    public final int startSupportFlags() {
+        return 0;
+    }
+
+    @Override
+    public final int endSupportFlags() {
+        return 0;
+    }
+
+    @Override
+    public final int recoverSupportFlags() {
+        return 0;
+    }
 
     private void appendXid(final StringBuilder cmdBuilder, final Xid xid) throws JdbdException {
         Objects.requireNonNull(xid, "xid");
