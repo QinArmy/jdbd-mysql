@@ -13,6 +13,7 @@ import io.jdbd.session.*;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.task.PrepareTask;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -31,11 +32,9 @@ final class ClientProtocol implements MySQLProtocol {
 
     }
 
-    private static final String COMMIT = "COMMIT";
+    static final String COMMIT = "COMMIT";
 
-    private static final String ROLLBACK = "ROLLBACK";
-
-    private static final Option<Boolean> WITH_CONSISTENT_SNAPSHOT = Option.from("WITH CONSISTENT SNAPSHOT", Boolean.class);
+    static final String ROLLBACK = "ROLLBACK";
 
 
     final TaskAdjutant adjutant;
@@ -206,24 +205,7 @@ final class ClientProtocol implements MySQLProtocol {
 
     @Override
     public Mono<TransactionStatus> transactionStatus() {
-        final MySQLServerVersion version = this.adjutant.handshake10().serverVersion;
-        final StringBuilder builder = new StringBuilder(139);
-        if (version.meetsMinimum(8, 0, 3)
-                || (version.meetsMinimum(5, 7, 20) && !version.meetsMinimum(8, 0, 0))) {
-            builder.append("SELECT @@session.transaction_isolation AS txLevel")
-                    .append(",@@session.transaction_read_only AS txReadOnly");
-        } else {
-            builder.append("SELECT @@session.tx_isolation AS txLevel")
-                    .append(",@@session.tx_read_only AS txReadOnly");
-        }
-
-        final ResultStates[] statesHolder = new ResultStates[1];
-
-        final StaticStmt stmt;
-        stmt = Stmts.stmt(builder.toString(), states -> statesHolder[0] = states);
-        return ComQueryTask.query(stmt, CurrentRow::asResultRow, this.adjutant)
-                .last() // must wait for last ,because statesHolder
-                .map(row -> mapTxStatus(row, statesHolder[0]));
+       return ((TransactionController)this.adjutant).transactionStatus();
     }
 
 
@@ -232,37 +214,7 @@ final class ClientProtocol implements MySQLProtocol {
      */
     @Override
     public Mono<ResultStates> startTransaction(final TransactionOption option, final HandleMode mode) {
-
-        final StringBuilder builder = new StringBuilder(50);
-
-        final JdbdException error;
-        if (this.inTransaction() && (error = handleInTransaction(mode, builder)) != null) {
-            return Mono.error(error);
-        }
-
-        final Isolation isolation = option.isolation();
-
-        if (isolation != null) {
-            builder.append("SET TRANSACTION ISOLATION LEVEL ");
-            if (MySQLProtocolUtil.appendIsolation(isolation, builder)) {
-                return Mono.error(MySQLExceptions.unknownIsolation(isolation));
-            }
-            builder.append(Constants.SPACE_SEMICOLON_SPACE);
-        }
-
-        builder.append("START TRANSACTION ");
-        if (option.isReadOnly()) {
-            builder.append("READ ONLY");
-        } else {
-            builder.append("READ WRITE");
-        }
-        if (Boolean.TRUE.equals(option.valueOf(WITH_CONSISTENT_SNAPSHOT))) {
-            builder.append(Constants.SPACE_COMMA_SPACE)
-                    .append(WITH_CONSISTENT_SNAPSHOT.name());
-        }
-        return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
-                .last()
-                .map(ResultStates.class::cast);
+        return ((TransactionController) this.adjutant).startTransaction(option, mode);
     }
 
 
@@ -300,6 +252,32 @@ final class ClientProtocol implements MySQLProtocol {
 
     @Override
     public void bindIdentifier(StringBuilder builder, String identifier) {
+
+    }
+
+    @Override
+    public Mono<ResultStates> start(Xid xid, int flags, TransactionOption option) {
+        return ((TransactionController) this.adjutant).start(xid, flags, option);
+    }
+
+    @Override
+    public Mono<ResultStates> end(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
+        return ((TransactionController) this.adjutant).end(xid, flags, optionFunc);
+    }
+
+    @Override
+    public Mono<Integer> prepare(Xid xid, Function<Option<?>, ?> optionFunc) {
+        return ((TransactionController) this.adjutant).prepare(xid, optionFunc);
+    }
+
+    @Override
+    public Mono<ResultStates> commit(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
+        return ((TransactionController) this.adjutant).commit(xid, flags, optionFunc);
+    }
+
+    @Override
+    public Mono<RmDatabaseSession> rollback(Xid xid, Function<Option<?>, ?> optionFunc) {
+        return ((TransactionController) this.adjutant).rollback(xid, optionFunc);
     }
 
     @SuppressWarnings("unchecked")
@@ -371,58 +349,7 @@ final class ClientProtocol implements MySQLProtocol {
     /*################################## blow private method ##################################*/
 
 
-    /**
-     * @see #startTransaction(TransactionOption, HandleMode)
-     * @see #setTransactionCharacteristics(TransactionOption)
-     */
-    @Nullable
-    private JdbdException handleInTransaction(final HandleMode mode, final StringBuilder builder) {
-        JdbdException error = null;
-        switch (mode) {
-            case ERROR_IF_EXISTS:
-                error = MySQLExceptions.transactionExistsRejectStart(this.sessionIdentifier());
-                break;
-            case COMMIT_IF_EXISTS:
-                builder.append(COMMIT)
-                        .append(Constants.SPACE_SEMICOLON_SPACE);
-                break;
-            case ROLLBACK_IF_EXISTS:
-                builder.append(ROLLBACK)
-                        .append(Constants.SPACE_SEMICOLON_SPACE);
-                break;
-            default:
-                error = MySQLExceptions.unexpectedEnum(mode);
 
-        }
-        return error;
-    }
-
-
-    /**
-     * @see #transactionStatus()
-     */
-    private TransactionStatus mapTxStatus(final ResultRow row, final ResultStates states) {
-        Objects.requireNonNull(states, "states");
-
-        final String txLevel;
-        txLevel = row.getNonNull("txLevel", String.class);
-
-        final Isolation isolation;
-        if (txLevel.equalsIgnoreCase("READ-COMMITTED")) {
-            isolation = Isolation.READ_COMMITTED;
-        } else if (txLevel.equalsIgnoreCase("REPEATABLE-READ")) {
-            isolation = Isolation.REPEATABLE_READ;
-        } else if (txLevel.equalsIgnoreCase("SERIALIZABLE")) {
-            isolation = Isolation.SERIALIZABLE;
-        } else if (txLevel.equalsIgnoreCase("READ-UNCOMMITTED")) {
-            isolation = Isolation.READ_UNCOMMITTED;
-        } else {
-            final String m;
-            m = String.format("transaction_isolation[%s] couldn't map to %s", txLevel, Isolation.class.getName());
-            throw new JdbdException(m);
-        }
-        return JdbdTransactionStatus.txStatus(isolation, row.getNonNull("txReadOnly", Boolean.class), states.inTransaction());
-    }
 
 
 }

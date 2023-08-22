@@ -5,6 +5,7 @@ import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultRowMeta;
+import io.jdbd.session.Isolation;
 import io.jdbd.type.PathParameter;
 import io.jdbd.vendor.result.ColumnConverts;
 import io.jdbd.vendor.result.ColumnMeta;
@@ -14,6 +15,7 @@ import org.reactivestreams.Publisher;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.IntFunction;
@@ -76,7 +78,9 @@ abstract class MySQLRow extends VendorDataRow {
 
         final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
         final T value;
-        if (!(source instanceof Duration)) {
+        if (columnClass == Isolation.class) {
+            value = (T)toIsolation(meta,source);
+        } else if (!(source instanceof Duration)) {
             value = ColumnConverts.convertToTarget(meta, source, columnClass, rowMeta.serverZone);
         } else if (columnClass == String.class) {
             value = (T) MySQLTimes.durationToTimeText((Duration) source);
@@ -114,6 +118,31 @@ abstract class MySQLRow extends VendorDataRow {
     @Override
     protected final ColumnMeta getColumnMeta(final int safeIndex) {
         return this.rowMeta.columnMetaArray[safeIndex];
+    }
+
+
+    static Isolation toIsolation(final MySQLColumnMeta meta, final Object source) {
+        if (!(source instanceof String)) {
+            throw JdbdExceptions.cannotConvertColumnValue(meta, source, Isolation.class, null);
+        }
+        final Isolation isolation;
+        switch (((String) source).toUpperCase(Locale.ROOT)) {
+            case "READ-COMMITTED":
+                isolation = Isolation.READ_COMMITTED;
+                break;
+            case "REPEATABLE-READ":
+                isolation = Isolation.REPEATABLE_READ;
+                break;
+            case "SERIALIZABLE":
+                isolation = Isolation.SERIALIZABLE;
+                break;
+            case "READ-UNCOMMITTED":
+                isolation = Isolation.READ_UNCOMMITTED;
+                break;
+            default:
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Isolation.class, null);
+        }
+        return isolation;
     }
 
     static abstract class JdbdCurrentRow extends MySQLRow implements CurrentRow {
