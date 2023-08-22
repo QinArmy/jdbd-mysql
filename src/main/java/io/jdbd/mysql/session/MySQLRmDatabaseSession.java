@@ -2,15 +2,19 @@ package io.jdbd.mysql.session;
 
 
 import io.jdbd.JdbdException;
+import io.jdbd.lang.Nullable;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLBuffers;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLProtocolUtil;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.pool.PoolRmDatabaseSession;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.session.XidImpl;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
@@ -19,7 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -57,11 +61,29 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
-    public final Publisher<RmDatabaseSession> start(Xid xid, int flags, TransactionOption option) {
+    public final Publisher<RmDatabaseSession> start(final @Nullable Xid xid, final int flags, final TransactionOption option) {
         final StringBuilder builder = new StringBuilder(140);
-        builder.append("XA START");
+
         try {
-            appendXid(builder, xid);
+            builder.append("SET TRANSACTION ISOLATION LEVEL ");
+            final Isolation isolation = option.isolation();
+            if (isolation != null) {
+                if (MySQLProtocolUtil.appendIsolation(isolation, builder)) {
+                    throw MySQLExceptions.unknownIsolation(isolation);
+                }
+                builder.append(Constants.SPACE_COMMA_SPACE);
+            }
+
+            if (option.isReadOnly()) {
+                builder.append("READ ONLY");
+            } else {
+                builder.append("READ WRITE");
+            }
+
+            builder.append(Constants.SPACE_SEMICOLON_SPACE)
+                    .append("XA START");
+
+            xidToString(builder, xid);
             switch (flags) {
                 case TM_JOIN:
                     builder.append(" JOIN");
@@ -79,17 +101,24 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             return Mono.error(MySQLExceptions.wrap(e));
         }
         return this.protocol.update(Stmts.stmt(builder.toString()))
-                .map(this::mapStartResult)
                 .thenReturn(this);
     }
 
 
     @Override
-    public final Mono<RmDatabaseSession> end(final Xid xid, final int flags) {
+    public final Publisher<RmDatabaseSession> end(final Xid xid, final int flags) {
+        return this.end(xid, flags, DatabaseProtocol.OPTION_FUNC);
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Override
+    public final Publisher<RmDatabaseSession> end(final Xid xid,final int flags, Function<Option<?>, ?> optionFunc) {
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA END");
         try {
-            appendXid(builder, xid);
+            xidToString(builder, xid);
             switch (flags) {
                 case TM_SUCCESS:
                 case TM_FAIL:
@@ -108,20 +137,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 .thenReturn(this);
     }
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
-     */
-    @Override
-    public final Publisher<RmDatabaseSession> end(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
-
     @Override
     public final Mono<Integer> prepare(final Xid xid) {
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA PREPARE");
         try {
-            appendXid(builder, xid);
+            xidToString(builder, xid);
         } catch (Throwable e) {
             return Mono.error(e);
         }
@@ -143,7 +164,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA COMMIT");
         try {
-            appendXid(builder, xid);
+            xidToString(builder, xid);
         } catch (Throwable e) {
             return Mono.error(e);
         }
@@ -168,7 +189,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA ROLLBACK");
         try {
-            appendXid(builder, xid);
+            xidToString(builder, xid);
         } catch (Throwable e) {
             return Mono.error(e);
         }
@@ -185,7 +206,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     public final Publisher<RmDatabaseSession> rollback(Xid xid, Function<Option<?>, ?> optionFunc) {
         return null;
     }
-
 
 
     @Override
@@ -224,7 +244,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
 
-
     @Override
     public final boolean isSupportForget() {
         return false;
@@ -245,35 +264,42 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         return 0;
     }
 
-    private void appendXid(final StringBuilder cmdBuilder, final Xid xid) throws JdbdException {
-        Objects.requireNonNull(xid, "xid");
 
-        final String gtrid = xid.getGtrid();
-        if (MySQLStrings.hasText(gtrid)) {
-            final byte[] bytes;
-            bytes = gtrid.getBytes(StandardCharsets.UTF_8);
-            if (bytes.length > 64) {
-                throw MySQLExceptions.xaGtridBeyond64Bytes();
-            }
-            cmdBuilder.append(" 0x'")
-                    .append(MySQLBuffers.hexEscapesText(true, bytes, bytes.length))
-                    .append("'");
-        } else {
-            throw MySQLExceptions.xaGtridNoText();
+    /**
+     * @see #start(Xid, int, TransactionOption)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    @Nullable
+    private void xidToString(final StringBuilder cmdBuilder, final @Nullable Xid xid) throws XaException {
+        if (xid == null) {
+            throw MySQLExceptions.xidIsNull();
         }
 
-        final String bqual = xid.getBqual();
-        if (bqual != null) {
-            final byte[] bytes;
-            bytes = bqual.getBytes(StandardCharsets.UTF_8);
-            if (bytes.length > 64) {
+        final String gtrid, bqual;
+        gtrid = xid.getGtrid();
+        bqual = xid.getBqual();
+
+        final byte[] gtridBytes, bqualBytes;
+
+        if (!MySQLStrings.hasText(gtrid)) {
+            throw MySQLExceptions.xaGtridNoText();
+        } else if ((gtridBytes = gtrid.getBytes(StandardCharsets.UTF_8)).length > 64) {
+            throw MySQLExceptions.xaGtridBeyond64Bytes();
+        }
+
+        cmdBuilder.append(" 0x")
+                .append(MySQLBuffers.hexEscapesText(true, gtridBytes, gtridBytes.length));
+
+        cmdBuilder.append(',');
+        if(bqual != null){
+            if ((bqualBytes = bqual.getBytes(StandardCharsets.UTF_8)).length > 64) {
                 throw MySQLExceptions.xaBqualBeyond64Bytes();
             }
-            cmdBuilder.append(",0x'")
-                    .append(MySQLBuffers.hexEscapesText(true, bytes, bytes.length))
-                    .append("'");
+            cmdBuilder.append("0x")
+                    .append(MySQLBuffers.hexEscapesText(true, bqualBytes, bqualBytes.length));
         }
-        cmdBuilder.append(",")
+
+        cmdBuilder.append(',')
                 .append(Integer.toUnsignedString(xid.getFormatId()));
 
     }
@@ -357,8 +383,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         }
 
         @Override
-        public Publisher<PoolRmDatabaseSession> reconnect() {
-            return this.protocol.reconnect()
+        public Publisher<PoolRmDatabaseSession> reconnect(Duration duration) {
+            return this.protocol.reconnect(duration)
                     .thenReturn(this);
         }
 

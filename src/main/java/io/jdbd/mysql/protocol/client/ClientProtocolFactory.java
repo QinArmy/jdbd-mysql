@@ -30,6 +30,7 @@ import reactor.netty.tcp.TcpResources;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -143,8 +144,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
 
         @Override
-        public Mono<Void> reConnect() {
-            return this.executor.reConnect()
+        public Mono<Void> reConnect(Duration duration) {
+            return this.executor.reConnect(duration)
                     .then(Mono.defer(this::authenticate))
                     .then(Mono.defer(this::initializing))
                     .then();

@@ -11,6 +11,7 @@ import io.jdbd.session.TransactionOption;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
@@ -49,10 +50,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                 .flatMap(this::afterStartTransaction);
     }
 
-    @Override
-    public final boolean inTransaction() {
-        return this.protocol.inTransaction();
-    }
+
 
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
@@ -101,8 +99,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
         @Override
-        public Publisher<PoolLocalDatabaseSession> reconnect() {
-            return this.protocol.reconnect()
+        public Publisher<PoolLocalDatabaseSession> reconnect(Duration duration) {
+            return this.protocol.reconnect(duration)
                     .thenReturn(this);
         }
 

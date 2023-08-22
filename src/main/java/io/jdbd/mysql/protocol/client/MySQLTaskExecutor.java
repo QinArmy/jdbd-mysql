@@ -20,6 +20,7 @@ import reactor.util.annotation.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.Map;
@@ -113,7 +114,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
     }
 
-    Mono<Void> reConnect() {
+    Mono<Void> reConnect(Duration duration) {
         return Mono.empty();
     }
 

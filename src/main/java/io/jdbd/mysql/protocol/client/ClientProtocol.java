@@ -7,6 +7,7 @@ import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLProtocolUtil;
 import io.jdbd.result.*;
 import io.jdbd.session.*;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
@@ -15,7 +16,7 @@ import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -49,12 +50,10 @@ final class ClientProtocol implements MySQLProtocol {
 
     /*################################## blow ClientCommandProtocol method ##################################*/
 
-
     @Override
-    public long threadId() {
+    public long sessionIdentifier() {
         return this.adjutant.handshake10().threadId;
     }
-
 
     @Override
     public Mono<ResultStates> update(StaticStmt stmt) {
@@ -183,29 +182,15 @@ final class ClientProtocol implements MySQLProtocol {
         return ComPreparedTask.prepare(sql, this.adjutant);
     }
 
-    @Override
-    public Mono<RefCursor> declareCursor(StaticStmt stmt) {
-        return null;
-    }
 
     @Override
-    public Mono<RefCursor> paramDeclareCursor(ParamStmt stmt, boolean useServerPrepare) {
-        return null;
-    }
-
-    @Override
-    public Mono<Void> reconnect() {
-        return this.manager.reConnect();
+    public Mono<Void> reconnect(Duration duration) {
+        return this.manager.reConnect(duration);
     }
 
     @Override
     public boolean supportOutParameter() {
         return this.adjutant.handshake10().serverVersion.isSupportOutParameter();
-    }
-
-    @Override
-    public boolean supportSavePoints() {
-        return true;
     }
 
     @Override
@@ -259,7 +244,7 @@ final class ClientProtocol implements MySQLProtocol {
 
         if (isolation != null) {
             builder.append("SET TRANSACTION ISOLATION LEVEL ");
-            if (appendIsolation(isolation, builder)) {
+            if (MySQLProtocolUtil.appendIsolation(isolation, builder)) {
                 return Mono.error(MySQLExceptions.unknownIsolation(isolation));
             }
             builder.append(Constants.SPACE_SEMICOLON_SPACE);
@@ -285,52 +270,36 @@ final class ClientProtocol implements MySQLProtocol {
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/set-transaction.html">SET TRANSACTION Statement</a>
      */
     @Override
-    public Mono<Void> setTransactionOption(final TransactionOption option, final HandleMode mode) {
-        final StringBuilder builder = new StringBuilder(50);
+    public Mono<ResultStates> setTransactionCharacteristics(final TransactionOption option) {
+        final StringBuilder builder = new StringBuilder(128);
 
         final JdbdException error;
-        if (this.inTransaction() && (error = handleInTransaction(mode, builder)) != null) {
+        error = MySQLProtocolUtil.setTransactionOption(option, builder);
+        if (error != null) {
             return Mono.error(error);
         }
-
-        final Isolation isolation = option.isolation();
-
-        if (isolation != null) {
-            builder.append("SET TRANSACTION ISOLATION LEVEL ");
-            if (appendIsolation(isolation, builder)) {
-                return Mono.error(MySQLExceptions.unknownIsolation(isolation));
-            }
-            builder.append(Constants.SPACE_COMMA_SPACE);
-        }
-
-        if (option.isReadOnly()) {
-            builder.append("READ ONLY");
-        } else {
-            builder.append("READ WRITE");
-        }
         return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
-                .then();
+                .last()
+                .map(ResultStates.class::cast);
     }
 
 
     @Override
-    public Mono<ResultStates> commit(List<Option<?>> optionList) {
+    public Mono<ResultStates> commit(Function<Option<?>, ?> optionFunc) {
         return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(COMMIT), this.adjutant))
                 .last()
                 .map(ResultStates.class::cast);
     }
 
     @Override
-    public Mono<ResultStates> rollback(List<Option<?>> optionList) {
+    public Mono<ResultStates> rollback(Function<Option<?>, ?> optionFunc) {
         return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(ROLLBACK), this.adjutant))
                 .last()
                 .map(ResultStates.class::cast);
     }
 
-
     @Override
-    public <T> Mono<T> close() {
-        return QuitTask.quit(this.adjutant);
+    public void bindIdentifier(StringBuilder builder, String identifier) {
     }
 
     @SuppressWarnings("unchecked")
@@ -369,6 +338,11 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
+    public <T> Mono<T> close() {
+        return QuitTask.quit(this.adjutant);
+    }
+
+    @Override
     public Mono<Void> reset() {
         return Mono.defer(this.manager::reset);
     }
@@ -399,14 +373,14 @@ final class ClientProtocol implements MySQLProtocol {
 
     /**
      * @see #startTransaction(TransactionOption, HandleMode)
-     * @see #setTransactionOption(TransactionOption, HandleMode)
+     * @see #setTransactionCharacteristics(TransactionOption)
      */
     @Nullable
     private JdbdException handleInTransaction(final HandleMode mode, final StringBuilder builder) {
         JdbdException error = null;
         switch (mode) {
             case ERROR_IF_EXISTS:
-                error = MySQLExceptions.transactionExistsRejectStart(this.threadId());
+                error = MySQLExceptions.transactionExistsRejectStart(this.sessionIdentifier());
                 break;
             case COMMIT_IF_EXISTS:
                 builder.append(COMMIT)
@@ -448,24 +422,6 @@ final class ClientProtocol implements MySQLProtocol {
             throw new JdbdException(m);
         }
         return JdbdTransactionStatus.txStatus(isolation, row.getNonNull("txReadOnly", Boolean.class), states.inTransaction());
-    }
-
-
-    private static boolean appendIsolation(final Isolation isolation, final StringBuilder builder) {
-
-        boolean error = false;
-        if (isolation == Isolation.READ_COMMITTED) {
-            builder.append("READ COMMITTED");
-        } else if (isolation == Isolation.REPEATABLE_READ) {
-            builder.append("REPEATABLE READ");
-        } else if (isolation == Isolation.SERIALIZABLE) {
-            builder.append("SERIALIZABLE");
-        } else if (isolation == Isolation.READ_UNCOMMITTED) {
-            builder.append("READ UNCOMMITTED");
-        } else {
-            error = true;
-        }
-        return error;
     }
 
 
