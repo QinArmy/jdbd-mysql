@@ -5,26 +5,18 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHost;
-import io.jdbd.mysql.protocol.Constants;
-import io.jdbd.mysql.session.MySQLDatabaseSession;
 import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
-import io.jdbd.mysql.util.MySQLBuffers;
 import io.jdbd.mysql.util.MySQLCollections;
-import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.vendor.env.JdbdHost;
-import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
-import io.jdbd.vendor.util.JdbdExceptions;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 
@@ -153,39 +145,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
     /*################################## blow private method ##################################*/
 
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
-     */
-    private static void xidToString(final StringBuilder cmdBuilder, final Xid xid) throws XaException {
-        final String gtrid, bqual;
-        gtrid = xid.getGtrid();
-        bqual = xid.getBqual();
-
-        final byte[] gtridBytes, bqualBytes;
-
-        if (!MySQLStrings.hasText(gtrid)) {
-            throw MySQLExceptions.xaGtridNoText();
-        } else if ((gtridBytes = gtrid.getBytes(StandardCharsets.UTF_8)).length > 64) {
-            throw MySQLExceptions.xaGtridBeyond64Bytes();
-        }
-
-        cmdBuilder.append(" 0x")
-                .append(MySQLBuffers.hexEscapesText(true, gtridBytes, gtridBytes.length));
-
-        cmdBuilder.append(',');
-        if (bqual != null) {
-            if ((bqualBytes = bqual.getBytes(StandardCharsets.UTF_8)).length > 64) {
-                throw MySQLExceptions.xaBqualBeyond64Bytes();
-            }
-            cmdBuilder.append("0x")
-                    .append(MySQLBuffers.hexEscapesText(true, bqualBytes, bqualBytes.length));
-        }
-
-        cmdBuilder.append(',')
-                .append(Integer.toUnsignedString(xid.getFormatId()));
-
-    }
 
 
     private static final class MySQLTaskAdjutant extends JdbdTaskAdjutant
@@ -443,63 +402,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public Mono<ResultStates> start(final @Nullable Xid xid, final int flags, final @Nullable TransactionOption option) {
-            final StringBuilder builder = new StringBuilder(140);
-            final Isolation isolation;
-            try {
-                final CurrentTxOption currentTxOption = this.currentTxOption;
-                if (xid == null) {
-                    throw MySQLExceptions.xidIsNull();
-                } else if (option == null) {
-                    throw MySQLExceptions.xaTransactionOptionIsNull();
-                } else if (currentTxOption != null || this.inTransaction()) {
-                    throw MySQLExceptions.xaBusyOnOtherTransaction();
-                }
-                builder.append("SET TRANSACTION ");
-                isolation = option.isolation();
-                if (isolation != null) {
-                    builder.append("ISOLATION LEVEL ");
-                    if (MySQLDatabaseSession.appendIsolation(isolation, builder)) {
-                        throw MySQLExceptions.unknownIsolation(isolation);
-                    }
-                    builder.append(Constants.SPACE_COMMA_SPACE);
-                }
-
-                if (option.isReadOnly()) {
-                    builder.append("READ ONLY");
-                } else {
-                    builder.append("READ WRITE");
-                }
-
-                builder.append(Constants.SPACE_SEMICOLON_SPACE)
-                        .append("XA START");
-
-                xidToString(builder, xid);
-                switch (flags) {
-                    case RmDatabaseSession.TM_JOIN:
-                        builder.append(" JOIN");
-                        break;
-                    case RmDatabaseSession.TM_RESUME:
-                        builder.append(" RESUME");
-                        break;
-                    case RmDatabaseSession.TM_NO_FLAGS:
-                        // no-op
-                        break;
-                    default:
-                        throw JdbdExceptions.xaInvalidFlagForStart(flags);
-                }
-            } catch (Throwable e) {
-                return Mono.error(MySQLExceptions.wrap(e));
-            }
-            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this))
-                    .last()
-                    .map(ResultStates.class::cast)
-                    .doOnSuccess(states -> {
-                        if (states.inTransaction()) {
-                            CURRENT_TX_OPTION.set(this, new XaTxOption(isolation, xid, XaStates.ACTIVE, flags));
-                        } else {
-                            CURRENT_TX_OPTION.set(this, null);
-                        }
-                    }).doOnError(e -> CURRENT_TX_OPTION.set(this, null));
+           return null;
         }
 
         @Override

@@ -74,7 +74,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             return Mono.error(new NullPointerException());
         }
 
-        final StringBuilder builder = new StringBuilder(50);
+        final StringBuilder builder = new StringBuilder(128);
         final LocalTxOption currentTxOption = this.currentTxOption;
         final JdbdException error;
         if ((currentTxOption != null || this.protocol.inTransaction())
