@@ -76,7 +76,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (!MySQLStrings.hasText(sql)) {
             return Mono.error(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.update(Stmts.stmt(sql));
+        return this.protocol.update(Stmts.stmtWithSession(sql, this));
     }
 
     @Override
@@ -95,7 +95,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (!MySQLStrings.hasText(sql)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.query(Stmts.stmt(sql, consumer), function);
+        return this.protocol.query(Stmts.stmtWithSession(sql, consumer, this), function);
     }
 
     @Override
@@ -103,7 +103,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.batchQueryError(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.batchQuery(Stmts.batch(sqlGroup));
+        return this.protocol.batchQuery(Stmts.batchWithSession(sqlGroup, this));
     }
 
     @Override
@@ -111,7 +111,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.batchUpdate(Stmts.batch(sqlGroup));
+        return this.protocol.batchUpdate(Stmts.batchWithSession(sqlGroup, this));
     }
 
     @Override
@@ -119,7 +119,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.multiError(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.batchAsMulti(Stmts.batch(sqlGroup));
+        return this.protocol.batchAsMulti(Stmts.batchWithSession(sqlGroup, this));
     }
 
     @Override
@@ -127,7 +127,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.fluxError(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.batchAsFlux(Stmts.batch(sqlGroup));
+        return this.protocol.batchAsFlux(Stmts.batchWithSession(sqlGroup, this));
     }
 
     @Override
@@ -135,7 +135,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (!MySQLStrings.hasText(multiStmt)) {
             return MultiResults.fluxError(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.executeAsFlux(Stmts.multiStmt(multiStmt));
+        return this.protocol.executeAsFlux(Stmts.multiStmtWithSession(multiStmt, this));
     }
 
 
@@ -244,7 +244,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     public final Publisher<SavePoint> setSavePoint() {
         final StringBuilder builder;
         builder = MySQLStrings.builder()
-                .append("$jdbd-")
+                .append("jdbd-")
                 .append(this.savePointIndex.getAndIncrement())
                 .append('-')
                 .append(ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE));
@@ -324,15 +324,6 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .thenReturn((S) this);
     }
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/identifiers.html">Schema Object Names</a>
-     */
-    @SuppressWarnings("unchecked")
-    @Override
-    public final S bindIdentifier(StringBuilder builder, String identifier) {
-        this.protocol.bindIdentifier(builder, identifier);
-        return (S) this;
-    }
 
     @Override
     public final RefCursor refCursor(String name) {

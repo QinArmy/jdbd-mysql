@@ -193,11 +193,6 @@ final class ClientProtocol implements MySQLProtocol {
         return Terminator.inTransaction(this.adjutant.serverStatus());
     }
 
-    @Override
-    public void bindIdentifier(StringBuilder builder, String identifier) {
-        // TODO
-    }
-
 
     @SuppressWarnings("unchecked")
     @Override
