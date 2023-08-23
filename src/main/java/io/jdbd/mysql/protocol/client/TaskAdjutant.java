@@ -10,7 +10,6 @@ interface TaskAdjutant extends ITaskAdjutant, ClientProtocolAdjutant, MySQLParse
 
     int serverStatus();
 
-    boolean inTransaction();
 
     boolean isAuthenticated();
 
@@ -24,10 +23,9 @@ interface TaskAdjutant extends ITaskAdjutant, ClientProtocolAdjutant, MySQLParse
 
     ClientProtocolFactory getFactory();
 
+    void addSessionCloseListener(Runnable listener);
 
-
-
-
+    void addTransactionEndListener(Runnable listener);
 
 
 }

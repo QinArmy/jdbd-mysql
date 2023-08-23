@@ -27,7 +27,6 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
 
-
     final TaskAdjutant adjutant;
 
     private final ProtocolManager manager;
@@ -194,13 +193,10 @@ final class ClientProtocol implements MySQLProtocol {
         return Terminator.inTransaction(this.adjutant.serverStatus());
     }
 
-
-
     @Override
     public void bindIdentifier(StringBuilder builder, String identifier) {
-
+        // TODO
     }
-
 
 
     @SuppressWarnings("unchecked")
@@ -238,6 +234,17 @@ final class ClientProtocol implements MySQLProtocol {
         return (T) value;
     }
 
+
+    @Override
+    public void addSessionCloseListener(Runnable listener) {
+        this.adjutant.addSessionCloseListener(listener);
+    }
+
+    @Override
+    public void addTransactionEndListener(Runnable listener) {
+        this.adjutant.addTransactionEndListener(listener);
+    }
+
     @Override
     public <T> Mono<T> close() {
         return QuitTask.quit(this.adjutant);
@@ -270,9 +277,6 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     /*################################## blow private method ##################################*/
-
-
-
 
 
 }

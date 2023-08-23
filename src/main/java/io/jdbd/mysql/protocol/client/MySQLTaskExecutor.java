@@ -9,8 +9,10 @@ import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
 import io.jdbd.mysql.util.MySQLCollections;
-import io.jdbd.result.ResultStates;
-import io.jdbd.session.*;
+import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.session.Isolation;
+import io.jdbd.session.XaStates;
+import io.jdbd.session.Xid;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
@@ -25,10 +27,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.function.Function;
 
 final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
@@ -64,7 +66,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
     protected void updateServerStatus(Object serversStatus) {
-        ((MySQLTaskAdjutant) this.taskAdjutant).updateServerStatus((Terminator) serversStatus);
+        ((MySQLTaskAdjutant) this.taskAdjutant).onTerminator((Terminator) serversStatus);
     }
 
     @Override
@@ -146,9 +148,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
     /*################################## blow private method ##################################*/
 
 
-
-    private static final class MySQLTaskAdjutant extends JdbdTaskAdjutant
-            implements TaskAdjutant, TransactionController {
+    private static final class MySQLTaskAdjutant extends JdbdTaskAdjutant implements TaskAdjutant {
 
         private static final AtomicIntegerFieldUpdater<MySQLTaskAdjutant> SERVER_STATUS =
                 AtomicIntegerFieldUpdater.newUpdater(MySQLTaskAdjutant.class, "serverStatus");
@@ -157,6 +157,10 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         private final MySQLTaskExecutor taskExecutor;
 
         private final MySQLParser stmtParser;
+
+        private final List<Runnable> sessionCloseListenerList = MySQLCollections.arrayList(1);
+
+        private final List<Runnable> transactionEndListenerList = MySQLCollections.arrayList(1);
 
         private Handshake10 handshake10;
 
@@ -300,19 +304,16 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public int serverStatus() {
+            if (!this.taskExecutor.connection.channel().isActive()) {
+                throw MySQLExceptions.sessionHaveClosed();
+            }
             return this.serverStatus;
         }
 
-        @Override
-        public boolean inTransaction() {
-            if (!this.taskExecutor.connection.channel().isActive()) {
-                throw new SessionCloseException("session have closed");
-            }
-            return Terminator.inTransaction(this.serverStatus);
-        }
 
         @Override
         public boolean isAuthenticated() {
+
             return this.handshake10 != null;
         }
 
@@ -389,40 +390,21 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
         @Override
-        public Mono<ResultStates> startTransaction(final @Nullable TransactionOption option, final @Nullable HandleMode mode) {
-            return Mono.empty();
+        public void addSessionCloseListener(final Runnable listener) {
+            if (this.taskExecutor.eventLoop.inEventLoop()) {
+                this.sessionCloseListenerList.add(listener);
+            } else {
+                this.taskExecutor.eventLoop.execute(() -> this.sessionCloseListenerList.add(listener));
+            }
         }
 
         @Override
-        public Mono<TransactionStatus> transactionStatus() {
-            return null;
-
-        }
-
-
-        @Override
-        public Mono<ResultStates> start(final @Nullable Xid xid, final int flags, final @Nullable TransactionOption option) {
-           return null;
-        }
-
-        @Override
-        public Mono<ResultStates> end(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
-            return null;
-        }
-
-        @Override
-        public Mono<Integer> prepare(Xid xid, Function<Option<?>, ?> optionFunc) {
-            return null;
-        }
-
-        @Override
-        public Mono<ResultStates> commit(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
-            return null;
-        }
-
-        @Override
-        public Mono<RmDatabaseSession> rollback(Xid xid, Function<Option<?>, ?> optionFunc) {
-            return null;
+        public void addTransactionEndListener(final Runnable listener) {
+            if (this.taskExecutor.eventLoop.inEventLoop()) {
+                this.transactionEndListenerList.add(listener);
+            } else {
+                this.taskExecutor.eventLoop.execute(() -> this.transactionEndListenerList.add(listener));
+            }
         }
 
         private void setCustomCharsetMap(Map<String, MyCharset> customCharsetMap) {
@@ -440,6 +422,23 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         /**
          * <p>
+         * This method always run in {@link io.netty.channel.EventLoop}
+         * </p>
+         *
+         * @see MySQLTaskExecutor#updateServerStatus(Object)
+         */
+        private void onTerminator(final Terminator terminator) {
+            final int oldServerStatus = this.serverStatus;
+            if (Terminator.inTransaction(oldServerStatus) && !Terminator.inTransaction(terminator.statusFags)) {
+                for (Runnable listener : this.transactionEndListenerList) {
+                    listener.run(); // don't throw error
+                }
+            }
+            SERVER_STATUS.set(this, terminator.statusFags);
+        }
+
+        /**
+         * <p>
          * Just for {@link #stmtParser}
          * </p>
          */
@@ -453,15 +452,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
             }
             return match;
         }
-
-        private void updateServerStatus(final Terminator terminator) {
-            SERVER_STATUS.set(this, terminator.statusFags);
-            //TODO UPDATE session track
-        }
-
-
-
-
 
 
     }// MySQLTaskAdjutant

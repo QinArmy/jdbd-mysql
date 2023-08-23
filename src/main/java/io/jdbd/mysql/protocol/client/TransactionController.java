@@ -9,6 +9,7 @@ import java.util.function.Function;
 /**
  * @see ClientProtocol
  */
+@Deprecated
 interface TransactionController {
 
     Mono<ResultStates> startTransaction(TransactionOption option, HandleMode mode);
