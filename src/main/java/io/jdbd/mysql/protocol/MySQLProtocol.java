@@ -1,12 +1,8 @@
 package io.jdbd.mysql.protocol;
 
-import io.jdbd.result.ResultStates;
-import io.jdbd.session.*;
+import io.jdbd.session.DatabaseSession;
 import io.jdbd.vendor.protocol.DatabaseProtocol;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
-import java.util.function.Function;
 
 /**
  * <p>
@@ -18,14 +14,5 @@ import java.util.function.Function;
 public interface MySQLProtocol extends DatabaseProtocol {
 
 
-    Mono<ResultStates> start(Xid xid, int flags, TransactionOption option);
-
-    Mono<ResultStates> end(Xid xid, int flags, Function<Option<?>, ?> optionFunc);
-
-    Mono<Integer> prepare(Xid xid, Function<Option<?>, ?> optionFunc);
-
-    Mono<ResultStates> commit(Xid xid,  int flags, Function<Option<?>, ?> optionFunc);
-
-    Mono<RmDatabaseSession> rollback(Xid xid, Function<Option<?>, ?> optionFunc);
 
 }

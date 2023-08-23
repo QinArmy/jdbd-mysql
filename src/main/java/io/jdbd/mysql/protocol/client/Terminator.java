@@ -9,7 +9,7 @@ import java.util.Arrays;
  * @see EofPacket
  * @see OkPacket
  */
-abstract class Terminator implements MySQLPacket {
+public abstract class Terminator implements MySQLPacket {
 
 
     static Terminator fromCumulate(final ByteBuf cumulateBuffer, final int payloadLength,

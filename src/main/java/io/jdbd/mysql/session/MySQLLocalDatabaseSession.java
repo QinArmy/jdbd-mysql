@@ -50,6 +50,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
      */
     private MySQLLocalDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
         super(factory, protocol);
+        protocol.addSessionCloseListener(this::onSessionClose);
+        protocol.addTransactionEndListener(this::onTransactionEnd);
     }
 
 
@@ -58,9 +60,12 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         return this.startTransaction(option, HandleMode.ERROR_IF_EXISTS);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">START TRANSACTION Statement</a>
+     */
     @Override
-    public Publisher<LocalDatabaseSession> startTransaction(final @Nullable TransactionOption option,
-                                                            final @Nullable HandleMode mode) {
+    public final Publisher<LocalDatabaseSession> startTransaction(final @Nullable TransactionOption option,
+                                                                  final @Nullable HandleMode mode) {
         if (option == null || mode == null) {
             return Mono.error(new NullPointerException());
         }
@@ -111,16 +116,22 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                 .then(Mono.just(this));
     }
 
+    @Override
+    public final Publisher<TransactionStatus> transactionStatus() {
+        return null;
+    }
 
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
         return this.commit(DatabaseProtocol.OPTION_FUNC);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">COMMIT</a>
+     */
     @Override
-    public final Mono<LocalDatabaseSession> commit(Function<Option<?>, ?> optionFunc) {
-        return this.protocol.commit(optionFunc)
-                .thenReturn(this);
+    public final Publisher<LocalDatabaseSession> commit(final @Nullable Function<Option<?>, ?> optionFunc) {
+        return commitOrRollback(true, optionFunc);
     }
 
     @Override
@@ -129,17 +140,58 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
     @Override
-    public final Mono<LocalDatabaseSession> rollback(Function<Option<?>, ?> optionFunc) {
-        return this.protocol.rollback(optionList)
-                .thenReturn(this);
+    public final Publisher<LocalDatabaseSession> rollback(Function<Option<?>, ?> optionFunc) {
+        return commitOrRollback(false, optionFunc);
     }
 
 
-    private Mono<LocalDatabaseSession> afterStartTransaction(ResultStates states) {
-        if (states.inTransaction()) {
-            return Mono.just(this);
+    /**
+     * @see #commit(Function)
+     * @see #rollback(Function)
+     */
+    private Mono<LocalDatabaseSession> commitOrRollback(final boolean commit,
+                                                        final @Nullable Function<Option<?>, ?> optionFunc) {
+        if (optionFunc == null) {
+            return Mono.error(new NullPointerException());
         }
-        return Mono.error(MySQLExceptions.startTransactionFailure(this.protocol.threadId()));
+        final Object chain, release;
+        chain = optionFunc.apply(Option.CHAIN);
+        release = optionFunc.apply(Option.RELEASE);
+
+        if (Boolean.TRUE.equals(chain) && Boolean.TRUE.equals(release)) {
+            String m = String.format("%s[true] and %s[true] conflict", Option.CHAIN.name(), Option.RELEASE.name());
+            return Mono.error(new JdbdException(m));
+        }
+
+        final StringBuilder builder = new StringBuilder(20);
+        if (commit) {
+            builder.append(COMMIT);
+        } else {
+            builder.append(ROLLBACK);
+        }
+        if (chain instanceof Boolean) {
+            builder.append(" AND");
+            if (!((Boolean) chain)) {
+                builder.append(" NO");
+            }
+            builder.append(" CHAIN");
+        }
+
+        if (release instanceof Boolean) {
+            if (!((Boolean) release)) {
+                builder.append(" NO");
+            }
+            builder.append(" RELEASE");
+        }
+        final CurrentTxOption currentTxOption = this.currentTxOption;
+        return this.protocol.update(Stmts.stmt(builder.toString()))
+                .doOnSuccess(states -> {
+                    if (states.inTransaction()) {
+                        assert Boolean.TRUE.equals(chain) : "ResultStates bug";
+                        CURRENT_TX_OPTION.set(this, currentTxOption); // record old value. NOTE : this occur after this.onTransactionEnd().
+                    }
+                })
+                .thenReturn(this);
     }
 
 
@@ -184,6 +236,15 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                 throw new JdbdException("transaction start failure"); // no bug,never here
             }
         }
+    }
+
+
+    private void onSessionClose() {
+        CURRENT_TX_OPTION.set(this, null); // clear cache;
+    }
+
+    private void onTransactionEnd() {
+        CURRENT_TX_OPTION.set(this, null); // clear cache;
     }
 
 

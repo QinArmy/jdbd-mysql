@@ -1,13 +1,12 @@
 package io.jdbd.mysql.protocol.client;
 
-import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.MySQLProtocol;
-import io.jdbd.mysql.session.MySQLDatabaseSession;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.result.*;
-import io.jdbd.session.*;
+import io.jdbd.session.Option;
+import io.jdbd.session.ServerVersion;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
@@ -195,82 +194,14 @@ final class ClientProtocol implements MySQLProtocol {
         return Terminator.inTransaction(this.adjutant.serverStatus());
     }
 
-    @Override
-    public Mono<TransactionStatus> transactionStatus() {
-       return ((TransactionController)this.adjutant).transactionStatus();
-    }
 
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">START TRANSACTION Statement</a>
-     */
-    @Override
-    public Mono<ResultStates> startTransaction(final TransactionOption option, final HandleMode mode) {
-        return ((TransactionController) this.adjutant).startTransaction(option, mode);
-    }
-
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/set-transaction.html">SET TRANSACTION Statement</a>
-     */
-    @Override
-    public Mono<ResultStates> setTransactionCharacteristics(final TransactionOption option) {
-        final StringBuilder builder = new StringBuilder(128);
-
-        final JdbdException error;
-        error = MySQLDatabaseSession.setTransactionOption(option, builder);
-        if (error != null) {
-            return Mono.error(error);
-        }
-        return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
-                .last()
-                .map(ResultStates.class::cast);
-    }
-
-
-    @Override
-    public Mono<ResultStates> commit(Function<Option<?>, ?> optionFunc) {
-        return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(COMMIT), this.adjutant))
-                .last()
-                .map(ResultStates.class::cast);
-    }
-
-    @Override
-    public Mono<ResultStates> rollback(Function<Option<?>, ?> optionFunc) {
-        return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(ROLLBACK), this.adjutant))
-                .last()
-                .map(ResultStates.class::cast);
-    }
 
     @Override
     public void bindIdentifier(StringBuilder builder, String identifier) {
 
     }
 
-    @Override
-    public Mono<ResultStates> start(Xid xid, int flags, TransactionOption option) {
-        return ((TransactionController) this.adjutant).start(xid, flags, option);
-    }
 
-    @Override
-    public Mono<ResultStates> end(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
-        return ((TransactionController) this.adjutant).end(xid, flags, optionFunc);
-    }
-
-    @Override
-    public Mono<Integer> prepare(Xid xid, Function<Option<?>, ?> optionFunc) {
-        return ((TransactionController) this.adjutant).prepare(xid, optionFunc);
-    }
-
-    @Override
-    public Mono<ResultStates> commit(Xid xid, int flags, Function<Option<?>, ?> optionFunc) {
-        return ((TransactionController) this.adjutant).commit(xid, flags, optionFunc);
-    }
-
-    @Override
-    public Mono<RmDatabaseSession> rollback(Xid xid, Function<Option<?>, ?> optionFunc) {
-        return ((TransactionController) this.adjutant).rollback(xid, optionFunc);
-    }
 
     @SuppressWarnings("unchecked")
     @Override

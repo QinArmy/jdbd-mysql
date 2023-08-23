@@ -1,9 +1,11 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.JdbdException;
+import io.jdbd.lang.Nullable;
 import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.MySQLType;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
@@ -66,7 +68,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final long sessionIdentifier() {
-        return this.protocol.threadId();
+        return this.protocol.sessionIdentifier();
     }
 
     @Override
@@ -137,15 +139,32 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
 
-    @Override
-    public final Publisher<TransactionStatus> transactionStatus() {
-        return this.protocol.transactionStatus();
-    }
-
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/set-transaction.html">SET TRANSACTION Statement</a>
+     */
     @SuppressWarnings("unchecked")
     @Override
-    public final Publisher<S> setTransactionCharacteristics(TransactionOption option) {
-        return this.protocol.setTransactionCharacteristics(option)
+    public final Publisher<S> setTransactionCharacteristics(final @Nullable TransactionOption option) {
+        if (option == null) {
+            return Mono.error(new NullPointerException());
+        }
+        final StringBuilder builder = new StringBuilder(30);
+        builder.append("SET SESSION TRANSACTION ");
+
+        final Isolation isolation;
+        isolation = option.isolation();
+        if (isolation != null) {
+            if (appendIsolation(isolation, builder)) {
+                return Mono.error(MySQLExceptions.unknownIsolation(isolation));
+            }
+            builder.append(Constants.SPACE_COMMA_SPACE);
+        }
+        if (option.isReadOnly()) {
+            builder.append("READ ONLY");
+        } else {
+            builder.append("READ WRITE");
+        }
+        return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn((S) this);
     }
 
@@ -323,6 +342,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     public final <T> Publisher<T> close() {
         return this.protocol.close();
     }
+
 
 
 
