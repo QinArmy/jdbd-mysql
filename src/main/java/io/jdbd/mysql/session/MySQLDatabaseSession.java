@@ -169,6 +169,25 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
     @Override
+    public final Publisher<TransactionStatus> transactionStatus() {
+        final ServerVersion version = this.protocol.serverVersion();
+        final StringBuilder builder = new StringBuilder(139);
+        if (version.meetsMinimum(8, 0, 3)
+                || (version.meetsMinimum(5, 7, 20) && !version.meetsMinimum(8, 0, 0))) {
+            builder.append("SELECT @@session.transaction_isolation AS txLevel")
+                    .append(",@@session.transaction_read_only AS txReadOnly");
+        } else {
+            builder.append("SELECT @@session.tx_isolation AS txLevel")
+                    .append(",@@session.tx_read_only AS txReadOnly");
+        }
+        return Flux.from(this.protocol.executeAsFlux(Stmts.multiStmt(builder.toString())))
+                .filter(ResultItem::isRowOrStatesItem)
+                .collectList()
+                .flatMap(this::mapTransactionStatus);
+    }
+
+
+    @Override
     public final boolean inTransaction() throws JdbdException {
         return this.protocol.inTransaction();
     }
@@ -344,6 +363,10 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
 
+    /**
+     * @see #transactionStatus()
+     */
+    abstract Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list);
 
 
     /*################################## blow private method ##################################*/

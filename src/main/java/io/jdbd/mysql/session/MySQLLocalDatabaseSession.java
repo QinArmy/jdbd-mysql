@@ -4,6 +4,7 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.result.ResultItem;
@@ -11,12 +12,15 @@ import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.vendor.protocol.DatabaseProtocol;
+import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
@@ -38,11 +42,11 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
 
-    private static final AtomicReferenceFieldUpdater<MySQLLocalDatabaseSession, CurrentTxOption> CURRENT_TX_OPTION =
-            AtomicReferenceFieldUpdater.newUpdater(MySQLLocalDatabaseSession.class, CurrentTxOption.class, "currentTxOption");
+    private static final AtomicReferenceFieldUpdater<MySQLLocalDatabaseSession, LocalTxOption> CURRENT_TX_OPTION =
+            AtomicReferenceFieldUpdater.newUpdater(MySQLLocalDatabaseSession.class, LocalTxOption.class, "currentTxOption");
 
 
-    private volatile CurrentTxOption currentTxOption;
+    private volatile LocalTxOption currentTxOption;
 
 
     /**
@@ -71,7 +75,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         }
 
         final StringBuilder builder = new StringBuilder(50);
-        final CurrentTxOption currentTxOption = this.currentTxOption;
+        final LocalTxOption currentTxOption = this.currentTxOption;
         final JdbdException error;
         if ((currentTxOption != null || this.protocol.inTransaction())
                 && (error = handleInTransaction(mode, builder)) != null) {
@@ -116,10 +120,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                 .then(Mono.just(this));
     }
 
-    @Override
-    public final Publisher<TransactionStatus> transactionStatus() {
-        return null;
-    }
+
 
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
@@ -142,6 +143,45 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     @Override
     public final Publisher<LocalDatabaseSession> rollback(Function<Option<?>, ?> optionFunc) {
         return commitOrRollback(false, optionFunc);
+    }
+
+
+    /**
+     * @see #transactionStatus()
+     */
+    final Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list) {
+        final ResultRow row;
+        final ResultStates states;
+        row = (ResultRow) list.get(0);
+        states = (ResultStates) list.get(1);
+
+
+        final Boolean readOnly;
+        final LocalTxOption localTxOption;
+
+        final Mono<TransactionStatus> mono;
+        if ((readOnly = states.valueOf(Option.READ_ONLY)) == null) {
+            // no bug,never here
+            mono = Mono.error(new JdbdException("result status no read only"));
+        } else if (!states.inTransaction()) {
+            // session transaction characteristic
+            final Isolation isolation;
+            isolation = row.getNonNull(0, Isolation.class);
+            mono = Mono.just(JdbdTransactionStatus.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
+        } else if ((localTxOption = CURRENT_TX_OPTION.get(this)) == null) {
+            String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
+            mono = Mono.error(new JdbdException(m));
+        } else {
+            final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+
+            map.put(Option.IN_TRANSACTION, Boolean.TRUE);
+            map.put(Option.ISOLATION, localTxOption.isolation); // MySQL don't support get current isolation level
+            map.put(Option.READ_ONLY, readOnly);
+            map.put(Option.WITH_CONSISTENT_SNAPSHOT, localTxOption.consistentSnapshot);
+
+            mono = Mono.just(JdbdTransactionStatus.fromMap(map));
+        }
+        return mono;
     }
 
 
@@ -183,7 +223,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             }
             builder.append(" RELEASE");
         }
-        final CurrentTxOption currentTxOption = this.currentTxOption;
+        final LocalTxOption currentTxOption = this.currentTxOption;
         return this.protocol.update(Stmts.stmt(builder.toString()))
                 .doOnSuccess(states -> {
                     if (states.inTransaction()) {
@@ -230,7 +270,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             isolationHolder.set(((ResultRow) item).getNonNull(0, Isolation.class));
         } else if (item instanceof ResultStates && !((ResultStates) item).hasMoreResult()) {
             if (((ResultStates) item).inTransaction()) {
-                CURRENT_TX_OPTION.set(this, new CurrentTxOption(isolationHolder.get(), consistentSnapshot));
+                CURRENT_TX_OPTION.set(this, new LocalTxOption(isolationHolder.get(), consistentSnapshot));
             } else {
                 CURRENT_TX_OPTION.set(this, null);
                 throw new JdbdException("transaction start failure"); // no bug,never here
@@ -285,13 +325,13 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }// MySQLPoolLocalDatabaseSession
 
 
-    private static final class CurrentTxOption {
+    private static final class LocalTxOption {
 
         private final Isolation isolation;
 
         private final Boolean consistentSnapshot;
 
-        private CurrentTxOption(@Nullable Isolation isolation, @Nullable Boolean consistentSnapshot) {
+        private LocalTxOption(@Nullable Isolation isolation, @Nullable Boolean consistentSnapshot) {
             this.isolation = isolation;
             this.consistentSnapshot = consistentSnapshot;
         }

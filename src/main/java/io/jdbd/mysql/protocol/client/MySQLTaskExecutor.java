@@ -6,7 +6,6 @@ import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHost;
 import io.jdbd.mysql.protocol.Constants;
-import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.session.MySQLDatabaseSession;
 import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
@@ -15,12 +14,9 @@ import io.jdbd.mysql.util.MySQLBuffers;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
-import io.jdbd.result.ResultItem;
-import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.vendor.env.JdbdHost;
-import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
@@ -37,7 +33,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
@@ -441,21 +436,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public Mono<TransactionStatus> transactionStatus() {
-            final MySQLServerVersion version = this.handshake10.serverVersion;
-            final StringBuilder builder = new StringBuilder(139);
-            if (version.meetsMinimum(8, 0, 3)
-                    || (version.meetsMinimum(5, 7, 20) && !version.meetsMinimum(8, 0, 0))) {
-                builder.append("SELECT @@session.transaction_isolation AS txLevel")
-                        .append(",@@session.transaction_read_only AS txReadOnly");
-            } else {
-                builder.append("SELECT @@session.tx_isolation AS txLevel")
-                        .append(",@@session.tx_read_only AS txReadOnly");
-            }
-
-            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this))
-                    .filter(ResultItem::isRowOrStatesItem)
-                    .collectList()
-                    .flatMap(this::mapTransactionStatus);
+            return null;
 
         }
 
@@ -578,60 +559,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
 
-        /**
-         * @see #transactionStatus()
-         */
-        private Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list) {
-            final ResultRow row;
-            final ResultStates states;
-            row = (ResultRow) list.get(0);
-            states = (ResultStates) list.get(1);
-
-
-            final Boolean readOnly;
-            final CurrentTxOption currentTxOption;
-
-            final Mono<TransactionStatus> mono;
-            if ((readOnly = states.valueOf(Option.READ_ONLY)) == null) {
-                // no bug,never here
-                mono = Mono.error(new JdbdException("result status no read only"));
-            } else if (!states.inTransaction()) {
-                // session transaction characteristic
-                final Isolation isolation;
-                isolation = row.getNonNull(0, Isolation.class);
-                mono = Mono.just(JdbdTransactionStatus.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
-            } else if ((currentTxOption = CURRENT_TX_OPTION.get(this)) == null) {
-                String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
-                mono = Mono.error(new JdbdException(m));
-            } else if (currentTxOption instanceof LocalTxOption) {
-                final LocalTxOption option = (LocalTxOption) currentTxOption;
-                final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
-
-                map.put(Option.IN_TRANSACTION, Boolean.TRUE);
-                map.put(Option.ISOLATION, option.isolation); // MySQL don't support get current isolation level
-                map.put(Option.READ_ONLY, readOnly);
-                map.put(Option.WITH_CONSISTENT_SNAPSHOT, option.withConsistentSnapshot);
-
-                mono = Mono.just(JdbdTransactionStatus.fromMap(map));
-            } else if (currentTxOption instanceof XaTxOption) {
-                final XaTxOption option = (XaTxOption) currentTxOption;
-                final Map<Option<?>, Object> map = MySQLCollections.hashMap(11);
-
-                map.put(Option.IN_TRANSACTION, Boolean.TRUE);
-                map.put(Option.ISOLATION, option.isolation);
-                map.put(Option.READ_ONLY, readOnly);
-                map.put(Option.XID, option.xid);
-
-                map.put(Option.XA_STATES, option.xaStates);
-                map.put(Option.XA_FLAGS, option.flags);
-
-                mono = Mono.just(JdbdTransactionStatus.fromMap(map));
-            } else {
-                // no bug,never here
-                mono = Mono.error(new JdbdException(String.format("unknown current tx option %s", currentTxOption)));
-            }
-            return mono;
-        }
 
 
     }// MySQLTaskAdjutant
