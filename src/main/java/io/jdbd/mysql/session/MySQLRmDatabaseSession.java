@@ -2,18 +2,16 @@ package io.jdbd.mysql.session;
 
 
 import io.jdbd.JdbdException;
-import io.jdbd.lang.Nullable;
-import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
-import io.jdbd.mysql.util.MySQLBuffers;
 import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.mysql.util.MySQLProtocolUtil;
-import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.pool.PoolRmDatabaseSession;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
-import io.jdbd.session.*;
+import io.jdbd.session.Option;
+import io.jdbd.session.RmDatabaseSession;
+import io.jdbd.session.TransactionOption;
+import io.jdbd.session.Xid;
 import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.session.XidImpl;
 import io.jdbd.vendor.stmt.Stmts;
@@ -61,46 +59,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
-    public final Publisher<RmDatabaseSession> start(final @Nullable Xid xid, final int flags, final TransactionOption option) {
-        final StringBuilder builder = new StringBuilder(140);
-
-        try {
-            builder.append("SET TRANSACTION ISOLATION LEVEL ");
-            final Isolation isolation = option.isolation();
-            if (isolation != null) {
-                if (MySQLProtocolUtil.appendIsolation(isolation, builder)) {
-                    throw MySQLExceptions.unknownIsolation(isolation);
-                }
-                builder.append(Constants.SPACE_COMMA_SPACE);
-            }
-
-            if (option.isReadOnly()) {
-                builder.append("READ ONLY");
-            } else {
-                builder.append("READ WRITE");
-            }
-
-            builder.append(Constants.SPACE_SEMICOLON_SPACE)
-                    .append("XA START");
-
-            xidToString(builder, xid);
-            switch (flags) {
-                case TM_JOIN:
-                    builder.append(" JOIN");
-                    break;
-                case TM_RESUME:
-                    builder.append(" RESUME");
-                    break;
-                case TM_NO_FLAGS:
-                    // no-op
-                    break;
-                default:
-                    throw JdbdExceptions.xaInvalidFlagForStart(flags);
-            }
-        } catch (Throwable e) {
-            return Mono.error(MySQLExceptions.wrap(e));
-        }
-        return this.protocol.update(Stmts.stmt(builder.toString()))
+    public final Publisher<RmDatabaseSession> start(final Xid xid, final int flags, final TransactionOption option) {
+        return this.protocol.start(xid, flags, option)
                 .thenReturn(this);
     }
 
@@ -114,7 +74,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
-    public final Publisher<RmDatabaseSession> end(final Xid xid,final int flags, Function<Option<?>, ?> optionFunc) {
+    public final Publisher<RmDatabaseSession> end(final Xid xid, final int flags, Function<Option<?>, ?> optionFunc) {
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA END");
         try {
@@ -160,7 +120,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
     @Override
-    public final Mono<RmDatabaseSession> commit(Xid xid, final boolean onePhase) {
+    public final Mono<RmDatabaseSession> commit(Xid xid, final int flags) {
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA COMMIT");
         try {
@@ -180,7 +140,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
-    public final Publisher<RmDatabaseSession> commit(Xid xid, boolean onePhase, Function<Option<?>, ?> optionFunc) {
+    public final Publisher<RmDatabaseSession> commit(Xid xid, final int flags, Function<Option<?>, ?> optionFunc) {
         return null;
     }
 
@@ -265,44 +225,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
 
-    /**
-     * @see #start(Xid, int, TransactionOption)
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
-     */
-    @Nullable
-    private void xidToString(final StringBuilder cmdBuilder, final @Nullable Xid xid) throws XaException {
-        if (xid == null) {
-            throw MySQLExceptions.xidIsNull();
-        }
-
-        final String gtrid, bqual;
-        gtrid = xid.getGtrid();
-        bqual = xid.getBqual();
-
-        final byte[] gtridBytes, bqualBytes;
-
-        if (!MySQLStrings.hasText(gtrid)) {
-            throw MySQLExceptions.xaGtridNoText();
-        } else if ((gtridBytes = gtrid.getBytes(StandardCharsets.UTF_8)).length > 64) {
-            throw MySQLExceptions.xaGtridBeyond64Bytes();
-        }
-
-        cmdBuilder.append(" 0x")
-                .append(MySQLBuffers.hexEscapesText(true, gtridBytes, gtridBytes.length));
-
-        cmdBuilder.append(',');
-        if(bqual != null){
-            if ((bqualBytes = bqual.getBytes(StandardCharsets.UTF_8)).length > 64) {
-                throw MySQLExceptions.xaBqualBeyond64Bytes();
-            }
-            cmdBuilder.append("0x")
-                    .append(MySQLBuffers.hexEscapesText(true, bqualBytes, bqualBytes.length));
-        }
-
-        cmdBuilder.append(',')
-                .append(Integer.toUnsignedString(xid.getFormatId()));
-
-    }
 
     /**
      * @see #start(Xid, int)

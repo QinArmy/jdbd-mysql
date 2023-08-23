@@ -1,19 +1,25 @@
 package io.jdbd.mysql.session;
 
+import io.jdbd.JdbdException;
+import io.jdbd.lang.Nullable;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.pool.PoolLocalDatabaseSession;
+import io.jdbd.result.ResultItem;
+import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
-import io.jdbd.session.HandleMode;
-import io.jdbd.session.LocalDatabaseSession;
-import io.jdbd.session.Option;
-import io.jdbd.session.TransactionOption;
+import io.jdbd.session.*;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
+import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.function.Function;
 
 /**
  * <p>
@@ -31,6 +37,14 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         return new MySQLPoolLocalDatabaseSession(factory, protocol);
     }
 
+
+    private static final AtomicReferenceFieldUpdater<MySQLLocalDatabaseSession, CurrentTxOption> CURRENT_TX_OPTION =
+            AtomicReferenceFieldUpdater.newUpdater(MySQLLocalDatabaseSession.class, CurrentTxOption.class, "currentTxOption");
+
+
+    private volatile CurrentTxOption currentTxOption;
+
+
     /**
      * private constructor
      */
@@ -45,31 +59,77 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
     @Override
-    public Publisher<LocalDatabaseSession> startTransaction(final TransactionOption option, final HandleMode mode) {
-        return this.protocol.startTransaction(option, mode)
-                .flatMap(this::afterStartTransaction);
-    }
+    public Publisher<LocalDatabaseSession> startTransaction(final @Nullable TransactionOption option,
+                                                            final @Nullable HandleMode mode) {
+        if (option == null || mode == null) {
+            return Mono.error(new NullPointerException());
+        }
 
+        final StringBuilder builder = new StringBuilder(50);
+        final CurrentTxOption currentTxOption = this.currentTxOption;
+        final JdbdException error;
+        if ((currentTxOption != null || this.protocol.inTransaction())
+                && (error = handleInTransaction(mode, builder)) != null) {
+            return Mono.error(error);
+        }
+
+        final Isolation isolation;
+        isolation = option.isolation();
+
+        if (isolation == null) {
+            builder.append("SET @@transaction_isolation =  @@SESSION.transaction_isolation ; ") // here,must guarantee isolation is session isolation
+                    .append("SELECT @@SESSION.transaction_isolation AS txIsolationLevel ; ");
+        } else {
+            builder.append("SET TRANSACTION ISOLATION LEVEL ");
+            if (MySQLDatabaseSession.appendIsolation(isolation, builder)) {
+                return Mono.error(MySQLExceptions.unknownIsolation(isolation));
+            }
+            builder.append(Constants.SPACE_SEMICOLON_SPACE);
+        }
+
+        builder.append("START TRANSACTION ");
+        if (option.isReadOnly()) {
+            builder.append("READ ONLY");
+        } else {
+            builder.append("READ WRITE");
+        }
+
+        final Boolean consistentSnapshot;
+        consistentSnapshot = option.valueOf(Option.WITH_CONSISTENT_SNAPSHOT);
+
+
+        if (Boolean.TRUE.equals(consistentSnapshot)) {
+            builder.append(Constants.SPACE_COMMA_SPACE)
+                    .append("WITH CONSISTENT SNAPSHOT");
+        }
+
+        final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
+
+        return Flux.from(this.protocol.executeAsFlux(Stmts.multiStmt(builder.toString())))
+                .doOnNext(item -> handleStartTransactionResult(item, isolationHolder, consistentSnapshot))
+                .doOnError(e -> CURRENT_TX_OPTION.set(this, null))
+                .then(Mono.just(this));
+    }
 
 
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
-        return this.commit(Collections.emptyList());
+        return this.commit(DatabaseProtocol.OPTION_FUNC);
     }
 
     @Override
-    public final Mono<LocalDatabaseSession> commit(List<Option<?>> optionList) {
-        return this.protocol.commit(optionList)
+    public final Mono<LocalDatabaseSession> commit(Function<Option<?>, ?> optionFunc) {
+        return this.protocol.commit(optionFunc)
                 .thenReturn(this);
     }
 
     @Override
     public final Publisher<LocalDatabaseSession> rollback() {
-        return this.rollback(Collections.emptyList());
+        return this.rollback(DatabaseProtocol.OPTION_FUNC);
     }
 
     @Override
-    public final Mono<LocalDatabaseSession> rollback(List<Option<?>> optionList) {
+    public final Mono<LocalDatabaseSession> rollback(Function<Option<?>, ?> optionFunc) {
         return this.protocol.rollback(optionList)
                 .thenReturn(this);
     }
@@ -80,6 +140,50 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             return Mono.just(this);
         }
         return Mono.error(MySQLExceptions.startTransactionFailure(this.protocol.threadId()));
+    }
+
+
+    /**
+     * @see #startTransaction(TransactionOption, HandleMode)
+     */
+    @Nullable
+    private JdbdException handleInTransaction(final HandleMode mode, final StringBuilder builder) {
+        JdbdException error = null;
+        switch (mode) {
+            case ERROR_IF_EXISTS:
+                error = MySQLExceptions.transactionExistsRejectStart(this.protocol.sessionIdentifier());
+                break;
+            case COMMIT_IF_EXISTS:
+                builder.append(COMMIT)
+                        .append(Constants.SPACE_SEMICOLON_SPACE);
+                break;
+            case ROLLBACK_IF_EXISTS:
+                builder.append(ROLLBACK)
+                        .append(Constants.SPACE_SEMICOLON_SPACE);
+                break;
+            default:
+                error = MySQLExceptions.unexpectedEnum(mode);
+
+        }
+        return error;
+    }
+
+
+    /**
+     * @see #startTransaction(TransactionOption, HandleMode)
+     */
+    private void handleStartTransactionResult(final ResultItem item, final AtomicReference<Isolation> isolationHolder,
+                                              final @Nullable Boolean consistentSnapshot) {
+        if (item instanceof ResultRow) {
+            isolationHolder.set(((ResultRow) item).getNonNull(0, Isolation.class));
+        } else if (item instanceof ResultStates && !((ResultStates) item).hasMoreResult()) {
+            if (((ResultStates) item).inTransaction()) {
+                CURRENT_TX_OPTION.set(this, new CurrentTxOption(isolationHolder.get(), consistentSnapshot));
+            } else {
+                CURRENT_TX_OPTION.set(this, null);
+                throw new JdbdException("transaction start failure"); // no bug,never here
+            }
+        }
     }
 
 
@@ -118,6 +222,20 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     }// MySQLPoolLocalDatabaseSession
+
+
+    private static final class CurrentTxOption {
+
+        private final Isolation isolation;
+
+        private final Boolean consistentSnapshot;
+
+        private CurrentTxOption(@Nullable Isolation isolation, @Nullable Boolean consistentSnapshot) {
+            this.isolation = isolation;
+            this.consistentSnapshot = consistentSnapshot;
+        }
+
+    }// CurrentTxOption
 
 
 }

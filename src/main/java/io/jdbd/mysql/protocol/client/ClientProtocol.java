@@ -3,22 +3,17 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.env.MySQLKey;
-import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
-import io.jdbd.mysql.protocol.MySQLServerVersion;
+import io.jdbd.mysql.session.MySQLDatabaseSession;
 import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.mysql.util.MySQLProtocolUtil;
 import io.jdbd.result.*;
 import io.jdbd.session.*;
-import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.task.PrepareTask;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -32,9 +27,6 @@ final class ClientProtocol implements MySQLProtocol {
 
     }
 
-    static final String COMMIT = "COMMIT";
-
-    static final String ROLLBACK = "ROLLBACK";
 
 
     final TaskAdjutant adjutant;
@@ -226,7 +218,7 @@ final class ClientProtocol implements MySQLProtocol {
         final StringBuilder builder = new StringBuilder(128);
 
         final JdbdException error;
-        error = MySQLProtocolUtil.setTransactionOption(option, builder);
+        error = MySQLDatabaseSession.setTransactionOption(option, builder);
         if (error != null) {
             return Mono.error(error);
         }

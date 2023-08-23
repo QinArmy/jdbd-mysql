@@ -44,6 +44,11 @@ import java.util.function.Function;
  */
 abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSessionMetaSpec implements DatabaseSession {
 
+
+    static final String COMMIT = "COMMIT";
+
+    static final String ROLLBACK = "ROLLBACK";
+
     final MySQLDatabaseSessionFactory factory;
 
     private final AtomicInteger savePointIndex = new AtomicInteger(0);
@@ -52,6 +57,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         super(protocol);
         this.factory = factory;
     }
+
 
     @Override
     public final String factoryName() {
@@ -287,7 +293,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @Override
     public final S bindIdentifier(StringBuilder builder, String identifier) {
         this.protocol.bindIdentifier(builder, identifier);
-        return (S)this;
+        return (S) this;
     }
 
     @Override
@@ -324,6 +330,24 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     private PreparedStatement createPreparedStatement(final PrepareTask task) {
         return MySQLPreparedStatement.create(this, task);
+    }
+
+
+    static boolean appendIsolation(final Isolation isolation, final StringBuilder builder) {
+
+        boolean error = false;
+        if (isolation == Isolation.READ_COMMITTED) {
+            builder.append("READ COMMITTED");
+        } else if (isolation == Isolation.REPEATABLE_READ) {
+            builder.append("REPEATABLE READ");
+        } else if (isolation == Isolation.SERIALIZABLE) {
+            builder.append("SERIALIZABLE");
+        } else if (isolation == Isolation.READ_UNCOMMITTED) {
+            builder.append("READ UNCOMMITTED");
+        } else {
+            error = true;
+        }
+        return error;
     }
 
 

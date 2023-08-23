@@ -7,20 +7,24 @@ import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHost;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
+import io.jdbd.mysql.session.MySQLDatabaseSession;
 import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
+import io.jdbd.mysql.util.MySQLBuffers;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.mysql.util.MySQLProtocolUtil;
-import io.jdbd.result.*;
+import io.jdbd.mysql.util.MySQLStrings;
+import io.jdbd.result.ResultItem;
+import io.jdbd.result.ResultRow;
+import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
-import io.jdbd.vendor.stmt.StaticStmt;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
+import io.jdbd.vendor.util.JdbdExceptions;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,9 +36,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
 
 final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
@@ -153,14 +159,45 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
     /*################################## blow private method ##################################*/
 
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
+    private static void xidToString(final StringBuilder cmdBuilder, final Xid xid) throws XaException {
+        final String gtrid, bqual;
+        gtrid = xid.getGtrid();
+        bqual = xid.getBqual();
+
+        final byte[] gtridBytes, bqualBytes;
+
+        if (!MySQLStrings.hasText(gtrid)) {
+            throw MySQLExceptions.xaGtridNoText();
+        } else if ((gtridBytes = gtrid.getBytes(StandardCharsets.UTF_8)).length > 64) {
+            throw MySQLExceptions.xaGtridBeyond64Bytes();
+        }
+
+        cmdBuilder.append(" 0x")
+                .append(MySQLBuffers.hexEscapesText(true, gtridBytes, gtridBytes.length));
+
+        cmdBuilder.append(',');
+        if (bqual != null) {
+            if ((bqualBytes = bqual.getBytes(StandardCharsets.UTF_8)).length > 64) {
+                throw MySQLExceptions.xaBqualBeyond64Bytes();
+            }
+            cmdBuilder.append("0x")
+                    .append(MySQLBuffers.hexEscapesText(true, bqualBytes, bqualBytes.length));
+        }
+
+        cmdBuilder.append(',')
+                .append(Integer.toUnsignedString(xid.getFormatId()));
+
+    }
+
+
     private static final class MySQLTaskAdjutant extends JdbdTaskAdjutant
             implements TaskAdjutant, TransactionController {
 
         private static final AtomicIntegerFieldUpdater<MySQLTaskAdjutant> SERVER_STATUS =
                 AtomicIntegerFieldUpdater.newUpdater(MySQLTaskAdjutant.class, "serverStatus");
-
-        private static final AtomicReferenceFieldUpdater<MySQLTaskAdjutant, CurrentTxOption> CURRENT_TX_OPTION =
-                AtomicReferenceFieldUpdater.newUpdater(MySQLTaskAdjutant.class, CurrentTxOption.class, "currentTxOption");
 
 
         private final MySQLTaskExecutor taskExecutor;
@@ -184,6 +221,13 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         private volatile int serverStatus = 0;
 
+        /**
+         * <p>
+         *     <ul>
+         *         <li>c</li>
+         *     </ul>
+         * </p>
+         */
         private volatile CurrentTxOption currentTxOption;
 
         private MySQLTaskAdjutant(MySQLTaskExecutor taskExecutor) {
@@ -306,6 +350,14 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         }
 
         @Override
+        public boolean inTransaction() {
+            if (!this.taskExecutor.connection.channel().isActive()) {
+                throw new SessionCloseException("session have closed");
+            }
+            return Terminator.inTransaction(this.serverStatus);
+        }
+
+        @Override
         public boolean isAuthenticated() {
             return this.handshake10 != null;
         }
@@ -383,52 +435,8 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
         @Override
-        public Mono<ResultStates> startTransaction(final TransactionOption option, final HandleMode mode) {
-
-            final StringBuilder builder = new StringBuilder(50);
-
-            final JdbdException error;
-            if (Terminator.inTransaction(serverStatus()) && (error = handleInTransaction(mode, builder)) != null) {
-                return Mono.error(error);
-            }
-
-            final Isolation isolation;
-            isolation = option.isolation();
-
-            if (isolation != null) {
-                builder.append("SET TRANSACTION ISOLATION LEVEL ");
-                if (MySQLProtocolUtil.appendIsolation(isolation, builder)) {
-                    return Mono.error(MySQLExceptions.unknownIsolation(isolation));
-                }
-                builder.append(Constants.SPACE_SEMICOLON_SPACE);
-            }
-
-            builder.append("START TRANSACTION ");
-            if (option.isReadOnly()) {
-                builder.append("READ ONLY");
-            } else {
-                builder.append("READ WRITE");
-            }
-
-            final Boolean withConsistentSnapshot;
-            withConsistentSnapshot = option.valueOf(Option.WITH_CONSISTENT_SNAPSHOT);
-
-
-            if (Boolean.TRUE.equals(withConsistentSnapshot)) {
-                builder.append(Constants.SPACE_COMMA_SPACE)
-                        .append("WITH CONSISTENT SNAPSHOT");
-            }
-
-            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this))
-                    .last()
-                    .map(ResultStates.class::cast)
-                    .doOnSuccess(states -> {
-                        if (states.inTransaction()) {
-                            CURRENT_TX_OPTION.set(this, new LocalTxOption(isolation, withConsistentSnapshot));
-                        } else {
-                            CURRENT_TX_OPTION.set(this, null);
-                        }
-                    }).doOnError(e -> CURRENT_TX_OPTION.set(this, null));
+        public Mono<ResultStates> startTransaction(final @Nullable TransactionOption option, final @Nullable HandleMode mode) {
+            return Mono.empty();
         }
 
         @Override
@@ -453,9 +461,64 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
         @Override
-        public Mono<ResultStates> start(Xid xid, int flags, TransactionOption option) {
+        public Mono<ResultStates> start(final @Nullable Xid xid, final int flags, final @Nullable TransactionOption option) {
+            final StringBuilder builder = new StringBuilder(140);
+            final Isolation isolation;
+            try {
+                final CurrentTxOption currentTxOption = this.currentTxOption;
+                if (xid == null) {
+                    throw MySQLExceptions.xidIsNull();
+                } else if (option == null) {
+                    throw MySQLExceptions.xaTransactionOptionIsNull();
+                } else if (currentTxOption != null || this.inTransaction()) {
+                    throw MySQLExceptions.xaBusyOnOtherTransaction();
+                }
+                builder.append("SET TRANSACTION ");
+                isolation = option.isolation();
+                if (isolation != null) {
+                    builder.append("ISOLATION LEVEL ");
+                    if (MySQLDatabaseSession.appendIsolation(isolation, builder)) {
+                        throw MySQLExceptions.unknownIsolation(isolation);
+                    }
+                    builder.append(Constants.SPACE_COMMA_SPACE);
+                }
 
-            return null;
+                if (option.isReadOnly()) {
+                    builder.append("READ ONLY");
+                } else {
+                    builder.append("READ WRITE");
+                }
+
+                builder.append(Constants.SPACE_SEMICOLON_SPACE)
+                        .append("XA START");
+
+                xidToString(builder, xid);
+                switch (flags) {
+                    case RmDatabaseSession.TM_JOIN:
+                        builder.append(" JOIN");
+                        break;
+                    case RmDatabaseSession.TM_RESUME:
+                        builder.append(" RESUME");
+                        break;
+                    case RmDatabaseSession.TM_NO_FLAGS:
+                        // no-op
+                        break;
+                    default:
+                        throw JdbdExceptions.xaInvalidFlagForStart(flags);
+                }
+            } catch (Throwable e) {
+                return Mono.error(MySQLExceptions.wrap(e));
+            }
+            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this))
+                    .last()
+                    .map(ResultStates.class::cast)
+                    .doOnSuccess(states -> {
+                        if (states.inTransaction()) {
+                            CURRENT_TX_OPTION.set(this, new XaTxOption(isolation, xid, XaStates.ACTIVE, flags));
+                        } else {
+                            CURRENT_TX_OPTION.set(this, null);
+                        }
+                    }).doOnError(e -> CURRENT_TX_OPTION.set(this, null));
         }
 
         @Override
@@ -512,27 +575,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
             //TODO UPDATE session track
         }
 
-        @Nullable
-        private JdbdException handleInTransaction(final HandleMode mode, final StringBuilder builder) {
-            JdbdException error = null;
-            switch (mode) {
-                case ERROR_IF_EXISTS:
-                    error = MySQLExceptions.transactionExistsRejectStart(this.handshake10.threadId);
-                    break;
-                case COMMIT_IF_EXISTS:
-                    builder.append(ClientProtocol.COMMIT)
-                            .append(Constants.SPACE_SEMICOLON_SPACE);
-                    break;
-                case ROLLBACK_IF_EXISTS:
-                    builder.append(ClientProtocol.ROLLBACK)
-                            .append(Constants.SPACE_SEMICOLON_SPACE);
-                    break;
-                default:
-                    error = MySQLExceptions.unexpectedEnum(mode);
 
-            }
-            return error;
-        }
 
 
         /**
@@ -622,7 +665,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         private final int flags;
 
-        private XaTxOption(Isolation isolation, Xid xid, XaStates xaStates, int flags) {
+        private XaTxOption(@Nullable Isolation isolation, Xid xid, XaStates xaStates, int flags) {
             super(isolation);
             this.xid = xid;
             this.xaStates = xaStates;
