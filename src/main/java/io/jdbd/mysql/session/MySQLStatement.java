@@ -11,6 +11,7 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.session.ChunkOption;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
+import io.jdbd.statement.BindSingleStatement;
 import io.jdbd.statement.InOutParameter;
 import io.jdbd.statement.Statement;
 import io.jdbd.vendor.stmt.JdbdValues;
@@ -123,6 +124,21 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     @Override
     public final boolean isSupportStmtVar() {
         return this.session.isSupportStmtVar();
+    }
+
+    @Override
+    public final boolean isSupportPublisher() {
+        return this instanceof BindSingleStatement;
+    }
+
+    @Override
+    public final boolean isSupportPath() {
+        return this instanceof BindSingleStatement;
+    }
+
+    @Override
+    public final boolean isSupportOutParameter() {
+        return this instanceof BindSingleStatement;
     }
 
     @SuppressWarnings("unchecked")

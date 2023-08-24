@@ -6,7 +6,7 @@ import io.jdbd.result.CurrentRow;
 import io.netty.buffer.ByteBuf;
 
 
-abstract class MySQLCurrentRow extends MySQLRow.JdbdCurrentRow implements CurrentRow {
+abstract class MySQLCurrentRow extends MySQLResultSetReader.MySQLDataRow.JdbdCurrentRow implements CurrentRow {
 
     final StmtTask task;
 

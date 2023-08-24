@@ -1,6 +1,5 @@
 package io.jdbd.mysql.session;
 
-import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
@@ -124,24 +123,6 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
         return flux;
     }
 
-    @Override
-    public Publisher<RefCursor> declareCursor(String sql) {
-        return Mono.error(MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL));
-    }
-
-
-    /*################################## blow Statement method ##################################*/
-    @Override
-    public boolean isSupportPublisher() {
-        // always false,MySQL COM_QUERY protocol don't support Publisher
-        return false;
-    }
-
-    @Override
-    public boolean isSupportOutParameter() {
-        // always false,MySQL COM_QUERY protocol don't support.
-        return false;
-    }
 
     @Override
     public String toString() {

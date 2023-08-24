@@ -210,18 +210,6 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
     /*################################## blow Statement method ##################################*/
 
     @Override
-    public boolean isSupportPublisher() {
-        // always false,MySQL COM_QUERY protocol don't support Publisher
-        return false;
-    }
-
-    @Override
-    public boolean isSupportOutParameter() {
-        // always false,MySQL COM_QUERY protocol don't support.
-        return false;
-    }
-
-    @Override
     public String toString() {
         return MySQLStrings.builder()
                 .append(getClass().getName())

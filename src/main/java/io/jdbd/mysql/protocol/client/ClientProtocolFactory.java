@@ -107,7 +107,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         private static final String TIME_ZONE = "time_zone";
 
 
-        private static final List<String> KEY_VARIABLES = MySQLArrays.asUnmodifiableList(
+        private static final List<String> KEY_VARIABLES = MySQLArrays.unmodifiableListOf(
                 "sql_mode",
                 "time_zone",
                 "transaction_isolation",

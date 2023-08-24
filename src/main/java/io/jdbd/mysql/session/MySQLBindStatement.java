@@ -4,7 +4,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
-import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
@@ -344,27 +343,6 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         clearStatementToAvoidReuse();
         return flux;
     }
-
-    @Override
-    public Publisher<RefCursor> declareCursor() {
-        return Mono.error(MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL));
-    }
-
-
-    /*################################## blow Statement method ##################################*/
-
-    @Override
-    public boolean isSupportPublisher() {
-        // adapt to PreparedStatement
-        return true;
-    }
-
-    @Override
-    public boolean isSupportOutParameter() {
-        // adapt to PreparedStatement
-        return true;
-    }
-
 
     @Override
     public String toString() {

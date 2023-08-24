@@ -2,12 +2,24 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
+import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLTimes;
+import io.jdbd.result.BigColumnValue;
+import io.jdbd.result.CurrentRow;
+import io.jdbd.result.ResultRow;
+import io.jdbd.result.ResultRowMeta;
+import io.jdbd.session.Isolation;
 import io.jdbd.type.BlobPath;
 import io.jdbd.type.TextPath;
 import io.jdbd.vendor.env.Environment;
+import io.jdbd.vendor.result.ColumnConverts;
+import io.jdbd.vendor.result.ColumnMeta;
+import io.jdbd.vendor.result.VendorDataRow;
+import io.jdbd.vendor.util.JdbdExceptions;
 import io.netty.buffer.ByteBuf;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 
 import java.nio.channels.FileChannel;
@@ -15,8 +27,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 
 /**
  * <p>
@@ -467,8 +482,37 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         return states;
     }
 
+    /*-------------------below static method -------------------*/
 
-    static abstract class MySQLCurrentRow extends MySQLRow.JdbdCurrentRow {
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_transaction_isolation">transaction_isolation</a>
+     */
+    private static Isolation toIsolation(final MySQLColumnMeta meta, final Object source) {
+        if (!(source instanceof String)) {
+            throw JdbdExceptions.cannotConvertColumnValue(meta, source, Isolation.class, null);
+        }
+        final Isolation isolation;
+        switch (((String) source).toUpperCase(Locale.ROOT)) {
+            case "READ-COMMITTED":
+                isolation = Isolation.READ_COMMITTED;
+                break;
+            case "REPEATABLE-READ":
+                isolation = Isolation.REPEATABLE_READ;
+                break;
+            case "SERIALIZABLE":
+                isolation = Isolation.SERIALIZABLE;
+                break;
+            case "READ-UNCOMMITTED":
+                isolation = Isolation.READ_UNCOMMITTED;
+                break;
+            default:
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Isolation.class, null);
+        }
+        return isolation;
+    }
+
+
+    static abstract class MySQLCurrentRow extends MySQLDataRow.JdbdCurrentRow {
 
         private BigColumn bigColumn;
 
@@ -550,6 +594,211 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
 
     }// BigColumn
+
+
+    abstract static class MySQLDataRow extends VendorDataRow {
+
+        final MySQLRowMeta rowMeta;
+
+        final Object[] columnArray;
+
+
+        private MySQLDataRow(MySQLRowMeta rowMeta) {
+            this.rowMeta = rowMeta;
+            final int arrayLength;
+            arrayLength = rowMeta.columnMetaArray.length;
+            this.columnArray = new Object[arrayLength];
+        }
+
+        private MySQLDataRow(JdbdCurrentRow currentRow) {
+            this.rowMeta = currentRow.rowMeta;
+
+            final Object[] columnArray = new Object[currentRow.columnArray.length];
+            System.arraycopy(currentRow.columnArray, 0, columnArray, 0, columnArray.length);
+
+            this.columnArray = columnArray;
+        }
+
+        @Override
+        public final int getResultNo() {
+            return this.rowMeta.resultNo;
+        }
+
+        @Override
+        public final ResultRowMeta getRowMeta() {
+            return this.rowMeta;
+        }
+
+        @Override
+        public final boolean isBigColumn(final int indexBasedZero) {
+            return this.columnArray[this.rowMeta.checkIndex(indexBasedZero)] instanceof BigColumnValue;
+        }
+
+        @Override
+        public final boolean isNull(int indexBasedZero) throws JdbdException {
+            return this.columnArray[this.rowMeta.checkIndex(indexBasedZero)] == null;
+        }
+
+        @Override
+        public final Object get(int indexBasedZero) throws JdbdException {
+            return this.columnArray[this.rowMeta.checkIndex(indexBasedZero)];
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public final <T> T get(final int indexBasedZero, final Class<T> columnClass) throws JdbdException {
+            final MySQLRowMeta rowMeta = this.rowMeta;
+
+            final Object source;
+            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
+
+            if (source == null || columnClass.isInstance(source)) {
+                return (T) source;
+            }
+
+            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
+            final T value;
+            if (columnClass == Isolation.class) {
+                value = (T) toIsolation(meta, source);
+            } else if (!(source instanceof Duration)) {
+                value = ColumnConverts.convertToTarget(meta, source, columnClass, rowMeta.serverZone);
+            } else if (columnClass == String.class) {
+                value = (T) MySQLTimes.durationToTimeText((Duration) source);
+            } else {
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, columnClass, null);
+            }
+            return value;
+        }
+
+
+        @Override
+        public final <T> List<T> getList(int indexBasedZero, Class<T> elementClass, IntFunction<List<T>> constructor)
+                throws JdbdException {
+            final MySQLRowMeta rowMeta = this.rowMeta;
+
+            final Object source;
+            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
+            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
+
+            throw JdbdExceptions.cannotConvertColumnValue(meta, source, List.class, null);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public final <T> Set<T> getSet(int indexBasedZero, Class<T> elementClass, IntFunction<Set<T>> constructor)
+                throws JdbdException {
+            final MySQLRowMeta rowMeta = this.rowMeta;
+
+            final Object source;
+            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
+            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
+
+            if (meta.sqlType != MySQLType.SET
+                    || (elementClass != String.class && !Enum.class.isAssignableFrom(elementClass))) {
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Set.class, null);
+            }
+
+            if (source == null) {
+                return Collections.emptySet();
+            }
+
+            final String setString = (String) source;
+            final int length = setString.length();
+            int elementCount = 1;
+            for (int i = 0; i < length; i++) {
+                if (setString.charAt(i) == ',') {
+                    elementCount++;
+                }
+            }
+
+            final Class<?> actualClass;
+            if (elementClass == String.class) {
+                actualClass = elementClass;
+            } else if (!Enum.class.isAssignableFrom(elementClass)) {
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Set.class, null);
+            } else if (elementClass.isAnonymousClass()) {
+                actualClass = elementClass.getSuperclass();
+            } else {
+                actualClass = elementClass;
+            }
+
+            try {
+                final Set<T> set = constructor.apply((int) (elementCount / 0.75f));
+                for (int i = 0, offset = 0; i < length; i++) {
+                    if (setString.charAt(i) != ',') {
+                        continue;
+                    }
+                    if (actualClass == String.class) {
+                        set.add((T) setString.substring(offset, i));
+                    } else {
+                        set.add(ColumnConverts.convertToEnum(actualClass, setString.substring(offset, i)));
+                    }
+                    offset = i + 1;
+                }
+                return set;
+            } catch (Throwable e) {
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Set.class, e);
+            }
+        }
+
+        @Override
+        public final <K, V> Map<K, V> getMap(int indexBasedZero, Class<K> keyClass, Class<V> valueClass,
+                                             IntFunction<Map<K, V>> constructor) throws JdbdException {
+            final MySQLRowMeta rowMeta = this.rowMeta;
+
+            final Object source;
+            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
+            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
+
+            throw JdbdExceptions.cannotConvertColumnValue(meta, source, Map.class, null);
+        }
+
+        @Override
+        public final <T> Publisher<T> getPublisher(final int indexBasedZero, final Class<T> valueClass)
+                throws JdbdException {
+            return null;
+        }
+
+
+        @Override
+        protected final ColumnMeta getColumnMeta(final int safeIndex) {
+            return this.rowMeta.columnMetaArray[safeIndex];
+        }
+
+
+        static abstract class JdbdCurrentRow extends MySQLDataRow implements CurrentRow {
+
+            JdbdCurrentRow(MySQLRowMeta rowMeta) {
+                super(rowMeta);
+            }
+
+            @Override
+            public final ResultRow asResultRow() {
+                return new MySQLResultRow(this);
+            }
+
+
+        }//JdbdCurrentRow
+
+        private static final class MySQLResultRow extends MySQLDataRow implements ResultRow {
+
+            private final boolean bigRow;
+
+            private MySQLResultRow(JdbdCurrentRow currentRow) {
+                super(currentRow);
+                this.bigRow = currentRow.isBigRow();
+            }
+
+            @Override
+            public boolean isBigRow() {
+                return this.bigRow;
+            }
+
+
+        }//MySQLResultRow
+
+
+    }
 
 
 }
