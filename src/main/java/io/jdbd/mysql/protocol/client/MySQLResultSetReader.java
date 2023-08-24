@@ -4,6 +4,7 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
+import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.BigColumnValue;
@@ -21,8 +22,11 @@ import io.jdbd.vendor.util.JdbdExceptions;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
+import reactor.core.publisher.Flux;
 
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,6 +44,10 @@ import java.util.function.IntFunction;
  *         <li>{@link TextResultSetReader}</li>
  *         <li>{@link BinaryResultSetReader}</li>
  *     </ul>
+ * </p>
+ * <p>
+ * following is chinese signature:<br/>
+ * 当你在阅读这段代码时,我才真正在写这段代码,你阅读到哪里,我便写到哪里.
  * </p>
  *
  * @since 1.0
@@ -62,11 +70,13 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
     final Environment env;
 
+    Charset resultSetCharset;
+
     private Throwable error;
 
     private ByteBuf bigPayload;
 
-    private MySQLCurrentRow currentRow;
+    private MySQLMutableCurrentRow currentRow;
 
 
     MySQLResultSetReader(StmtTask task) {
@@ -80,10 +90,11 @@ abstract class MySQLResultSetReader implements ResultSetReader {
     @Override
     public final States read(ByteBuf cumulateBuffer, Consumer<Object> serverStatesConsumer)
             throws JdbdException {
-        MySQLCurrentRow currentRow = this.currentRow;
+        MySQLMutableCurrentRow currentRow = this.currentRow;
 
         if (currentRow == null && (currentRow = readRowMeta(cumulateBuffer, serverStatesConsumer)) != null) {
             this.currentRow = currentRow;
+            this.resultSetCharset = currentRow.rowMeta.resultSetCharset; // update
             this.task.next(currentRow.rowMeta); // emit ResultRowMeta as the header of query result.
         }
         final States states;
@@ -100,10 +111,10 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
 
     @Nullable
-    abstract MySQLCurrentRow readRowMeta(ByteBuf cumulateBuffer, Consumer<Object> serverStatesConsumer);
+    abstract MySQLMutableCurrentRow readRowMeta(ByteBuf cumulateBuffer, Consumer<Object> serverStatesConsumer);
 
 
-    abstract boolean readOneRow(ByteBuf cumulateBuffer, final boolean bigPayload, MySQLCurrentRow currentRow);
+    abstract boolean readOneRow(ByteBuf cumulateBuffer, final boolean bigPayload, MySQLMutableCurrentRow currentRow);
 
 
     abstract Logger getLogger();
@@ -119,7 +130,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
      * </ul>
      */
     final Object readLongText(final ByteBuf payload, final MySQLColumnMeta meta,
-                              final MySQLCurrentRow currentRow) {
+                              final MySQLMutableCurrentRow currentRow) {
         BigColumn bigColumn = currentRow.bigColumn;
         final Object value;
         final int readableBytes;
@@ -158,7 +169,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
      * <li>column value</li>
      * </ul>
      */
-    final Object readLongBlob(final ByteBuf payload, final MySQLColumnMeta meta, final MySQLCurrentRow currentRow) {
+    final Object readLongBlob(final ByteBuf payload, final MySQLColumnMeta meta, final MySQLMutableCurrentRow currentRow) {
         BigColumn bigColumn = currentRow.bigColumn;
         final Object value;
         final int readableBytes;
@@ -198,7 +209,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
      * <li>column value</li>
      * </ul>
      */
-    final Object readGeometry(final ByteBuf payload, final MySQLColumnMeta meta, final MySQLCurrentRow currentRow) {
+    final Object readGeometry(final ByteBuf payload, final MySQLColumnMeta meta, final MySQLMutableCurrentRow currentRow) {
         BigColumn bigColumn = currentRow.bigColumn;
         final Object value;
         final int readableBytes;
@@ -356,7 +367,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
      * @see #read(ByteBuf, Consumer)
      */
     private States readRowSet(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatesConsumer) {
-        final MySQLCurrentRow currentRow = this.currentRow;
+        final MySQLMutableCurrentRow currentRow = this.currentRow;
         assert currentRow != null;
         final StmtTask task = this.task;
 
@@ -460,7 +471,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             if (!(cancelled = this.error != null)) {
                 currentRow.rowCount++;
                 task.next(currentRow);
-                currentRow.reset();
+                currentRow.resetCurrentRow();
             }
 
         } // outer loop
@@ -475,6 +486,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             if (bigPayload != null && bigPayload.refCnt() > 0) {
                 bigPayload.release();
             }
+            this.resultSetCharset = null;
             this.bigPayload = null;
             this.currentRow = null;
             this.error = null;
@@ -511,49 +523,88 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         return isolation;
     }
 
+    @SuppressWarnings("all")
+    private static Flux<String> toStringFlux(final MySQLColumnMeta meta, final TextPath path) {
+        return Flux.create(sink -> {
+            final Charset charset;
+            charset = path.charset();
+            try (FileChannel channel = FileChannel.open(path.value(), MySQLBinds.openOptionSet(path))) {
+                final ByteBuffer buffer = ByteBuffer.allocate(2048);
 
-    static abstract class MySQLCurrentRow extends MySQLDataRow.JdbdCurrentRow {
+                for (int i = 0; channel.read(buffer) > 0; i++) {
+                    buffer.flip();
+                    sink.next(charset.decode(buffer).toString());
+                    buffer.clear();
 
-        private BigColumn bigColumn;
+                    if ((i & 31) == 0 && sink.isCancelled()) {
+                        break;
+                    }
+                }
 
-        private long rowCount = 0L;
-        private boolean bigRow;
-
-        MySQLCurrentRow(MySQLRowMeta rowMeta) {
-            super(rowMeta);
-        }
-
-        @Override
-        public final boolean isBigRow() {
-            return this.bigRow;
-        }
-
-        @Override
-        public final long rowNumber() {
-            return this.rowCount;
-        }
-
-        final boolean isBigColumnNull() {
-            return this.bigColumn == null;
-        }
-
-        final void setBigColumn(BigColumn bigColumn) {
-            if (this.bigColumn != null) {
-                throw new IllegalStateException();
+                sink.complete();
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrap(e));
             }
-            this.bigColumn = bigColumn;
-            this.bigRow = true;
-        }
 
-        final void reset() {
-            bigRow = false;
-            this.doRest();
-        }
+        });
+    }
 
-        abstract void doRest();
+    @SuppressWarnings("all")
+    private static Flux<byte[]> toBinaryFlux(final MySQLColumnMeta meta, final BlobPath path) {
+        return Flux.create(sink -> {
+            try (FileChannel channel = FileChannel.open(path.value(), MySQLBinds.openOptionSet(path))) {
 
+                final ByteBuffer buffer = ByteBuffer.allocate(2048);
+                byte[] dataBytes;
+                for (int i = 0; channel.read(buffer) > 0; i++) {
+                    buffer.flip();
+                    dataBytes = new byte[buffer.remaining()];
+                    buffer.get(dataBytes);
+                    sink.next(dataBytes);
+                    buffer.clear();
 
-    }//MySQLCurrentRow
+                    if ((i & 31) == 0 && sink.isCancelled()) {
+                        break;
+                    }
+                }
+
+                sink.complete();
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrap(e));
+            }
+
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> Flux<T> setTypeToFlux(final String source, final Class<T> elementClass) {
+        return Flux.create(sink -> {
+            final Class<?> actualClass;
+            if (Enum.class.isAssignableFrom(elementClass) && elementClass.isAnonymousClass()) {
+                actualClass = elementClass.getSuperclass();
+            } else {
+                actualClass = elementClass;
+            }
+            try {
+
+                final String[] elementArray;
+                elementArray = source.split(",");
+
+                for (String e : elementArray) {
+                    if (actualClass == String.class) {
+                        sink.next((T) e);
+                    } else {
+                        sink.next(ColumnConverts.convertToEnum(actualClass, e));
+                    }
+                }
+                sink.complete();
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrap(e));
+            }
+
+        });
+    }
+
 
     static final class BigColumn {
 
@@ -595,7 +646,15 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
     }// BigColumn
 
-
+    /**
+     * <p>
+     * This class is base class of following :
+     *     <ul>
+     *         <li>{@link MySQLCurrentRow}</li>
+     *         <li>{@link MySQLResultRow}</li>
+     *     </ul>
+     * </p>
+     */
     abstract static class MySQLDataRow extends VendorDataRow {
 
         final MySQLRowMeta rowMeta;
@@ -603,6 +662,9 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         final Object[] columnArray;
 
 
+        /**
+         * private constructor
+         */
         private MySQLDataRow(MySQLRowMeta rowMeta) {
             this.rowMeta = rowMeta;
             final int arrayLength;
@@ -610,13 +672,19 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             this.columnArray = new Object[arrayLength];
         }
 
-        private MySQLDataRow(JdbdCurrentRow currentRow) {
+        /**
+         * private constructor
+         */
+        private MySQLDataRow(final MySQLCurrentRow currentRow) {
             this.rowMeta = currentRow.rowMeta;
 
-            final Object[] columnArray = new Object[currentRow.columnArray.length];
-            System.arraycopy(currentRow.columnArray, 0, columnArray, 0, columnArray.length);
-
-            this.columnArray = columnArray;
+            if (currentRow instanceof MySQLImmutableCurrentRow) { // immutable
+                this.columnArray = currentRow.columnArray;
+            } else {
+                final Object[] columnArray = new Object[currentRow.columnArray.length];
+                System.arraycopy(currentRow.columnArray, 0, columnArray, 0, columnArray.length);
+                this.columnArray = columnArray;
+            }
         }
 
         @Override
@@ -679,7 +747,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             final Object source;
             source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
             final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
-
+            //TODO GEOMETRY
             throw JdbdExceptions.cannotConvertColumnValue(meta, source, List.class, null);
         }
 
@@ -693,29 +761,19 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
             final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
 
-            if (meta.sqlType != MySQLType.SET
-                    || (elementClass != String.class && !Enum.class.isAssignableFrom(elementClass))) {
-                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Set.class, null);
+            if (meta.sqlType != MySQLType.SET) {
+                throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, null);
             }
 
             if (source == null) {
                 return Collections.emptySet();
             }
 
-            final String setString = (String) source;
-            final int length = setString.length();
-            int elementCount = 1;
-            for (int i = 0; i < length; i++) {
-                if (setString.charAt(i) == ',') {
-                    elementCount++;
-                }
-            }
-
             final Class<?> actualClass;
             if (elementClass == String.class) {
                 actualClass = elementClass;
             } else if (!Enum.class.isAssignableFrom(elementClass)) {
-                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Set.class, null);
+                throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, null);
             } else if (elementClass.isAnonymousClass()) {
                 actualClass = elementClass.getSuperclass();
             } else {
@@ -723,22 +781,25 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             }
 
             try {
-                final Set<T> set = constructor.apply((int) (elementCount / 0.75f));
-                for (int i = 0, offset = 0; i < length; i++) {
-                    if (setString.charAt(i) != ',') {
-                        continue;
-                    }
+
+                final String[] elementArray;
+                elementArray = ((String) source).split(",");
+
+                final Set<T> set = constructor.apply((int) (elementArray.length / 0.75f));
+
+                for (String e : elementArray) {
                     if (actualClass == String.class) {
-                        set.add((T) setString.substring(offset, i));
+                        set.add((T) e);
                     } else {
-                        set.add(ColumnConverts.convertToEnum(actualClass, setString.substring(offset, i)));
+                        set.add(ColumnConverts.convertToEnum(actualClass, e));
                     }
-                    offset = i + 1;
                 }
+
                 return set;
             } catch (Throwable e) {
-                throw JdbdExceptions.cannotConvertColumnValue(meta, source, Set.class, e);
+                throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, e);
             }
+
         }
 
         @Override
@@ -753,10 +814,90 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             throw JdbdExceptions.cannotConvertColumnValue(meta, source, Map.class, null);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public final <T> Publisher<T> getPublisher(final int indexBasedZero, final Class<T> valueClass)
                 throws JdbdException {
-            return null;
+
+            final MySQLRowMeta rowMeta = this.rowMeta;
+
+            final Object source;
+            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
+            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
+
+            final Publisher<T> publisher;
+            switch (meta.sqlType) {
+                case CHAR:
+                case VARCHAR:
+                case TINYTEXT:
+                case TEXT:
+                case MEDIUMTEXT: {
+                    if (source == null) {
+                        publisher = Flux.empty();
+                    } else if (valueClass == String.class && source instanceof String) {
+                        publisher = Flux.just((T) source);
+                    } else {
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    }
+                }
+                break;
+                case LONGTEXT:
+                case JSON: {
+                    if (source == null) {
+                        publisher = Flux.empty();
+                    } else if (valueClass != String.class) {
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    } else if (source instanceof String) {
+                        publisher = Flux.just((T) source);
+                    } else if (source instanceof TextPath) {
+                        publisher = (Flux<T>) toStringFlux(meta, (TextPath) source);
+                    } else {
+                        // no bug,never here
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    }
+                }
+                break;
+                case BINARY:
+                case VARBINARY:
+                case TINYBLOB:
+                case BLOB:
+                case MEDIUMBLOB: {
+                    if (source == null) {
+                        publisher = Flux.empty();
+                    } else if (valueClass == byte[].class && source instanceof byte[]) {
+                        publisher = Flux.just((T) source);
+                    } else {
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    }
+                }
+                break;
+                case GEOMETRY:
+                case LONGBLOB: {
+                    if (source == null) {
+                        publisher = Flux.empty();
+                    } else if (valueClass != byte[].class) {
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    } else if (source instanceof byte[]) {
+                        publisher = Flux.just((T) source);
+                    } else if (source instanceof BlobPath) {
+                        publisher = (Flux<T>) toBinaryFlux(meta, (BlobPath) source);
+                    } else {
+                        // no bug,never here
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    }
+                }
+                break;
+                case SET: {
+                    if (valueClass != String.class && !Enum.class.isAssignableFrom(valueClass)) {
+                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    }
+                    publisher = setTypeToFlux((String) source, valueClass);
+                }
+                break;
+                default:
+                    throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+            }
+            return publisher;
         }
 
 
@@ -766,39 +907,150 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         }
 
 
-        static abstract class JdbdCurrentRow extends MySQLDataRow implements CurrentRow {
+    }// MySQLDataRow
 
-            JdbdCurrentRow(MySQLRowMeta rowMeta) {
-                super(rowMeta);
+
+    /**
+     * <p>
+     * This class is base class of following :
+     *     <ul>
+     *         <li>{@link MySQLMutableCurrentRow}</li>
+     *         <li>{@link MySQLImmutableCurrentRow}</li>
+     *     </ul>
+     * </p>
+     */
+    private static abstract class MySQLCurrentRow extends MySQLDataRow implements CurrentRow {
+
+        /**
+         * private constructor
+         */
+        private MySQLCurrentRow(MySQLRowMeta rowMeta) {
+            super(rowMeta);
+        }
+
+        /**
+         * private constructor
+         */
+        private MySQLCurrentRow(MySQLMutableCurrentRow currentRow) {
+            super(currentRow);
+        }
+
+        @Override
+        public final ResultRow asResultRow() {
+            return new MySQLResultRow(this);
+        }
+
+
+    }//MySQLCurrentRow
+
+
+    static abstract class MySQLMutableCurrentRow extends MySQLCurrentRow {
+
+        private BigColumn bigColumn;
+
+        private long rowCount = 0L;
+        private boolean bigRow;
+
+        /**
+         * <p>
+         * package constructor for following :
+         *     <ul>
+         *         <li>{@link TextResultSetReader.TextMutableCurrentRow}</li>
+         *         <li>{@link BinaryResultSetReader.BinaryMutableCurrentRow}</li>
+         *     </ul>
+         * </p>
+         */
+        MySQLMutableCurrentRow(MySQLRowMeta rowMeta) {
+            super(rowMeta);
+        }
+
+        @Override
+        public final boolean isBigRow() {
+            return this.bigRow;
+        }
+
+        @Override
+        public final long rowNumber() {
+            return this.rowCount;
+        }
+
+        @Override
+        protected final CurrentRow copyCurrentRowIfNeed() {
+            return new MySQLImmutableCurrentRow(this);
+        }
+
+        final void setBigColumn(BigColumn bigColumn) {
+            if (this.bigColumn != null) {
+                throw new IllegalStateException();
             }
+            this.bigColumn = bigColumn;
+            this.bigRow = true;
+        }
 
-            @Override
-            public final ResultRow asResultRow() {
-                return new MySQLResultRow(this);
-            }
+        abstract void reset();
 
-
-        }//JdbdCurrentRow
-
-        private static final class MySQLResultRow extends MySQLDataRow implements ResultRow {
-
-            private final boolean bigRow;
-
-            private MySQLResultRow(JdbdCurrentRow currentRow) {
-                super(currentRow);
-                this.bigRow = currentRow.isBigRow();
-            }
-
-            @Override
-            public boolean isBigRow() {
-                return this.bigRow;
-            }
+        private void resetCurrentRow() {
+            bigRow = false;
+            this.reset();
+        }
 
 
-        }//MySQLResultRow
+    }//MySQLMutableCurrentRow
+
+    private static final class MySQLImmutableCurrentRow extends MySQLCurrentRow {
+
+        private final long rowNumber;
+
+        private final boolean bigRow;
+
+        private MySQLImmutableCurrentRow(MySQLMutableCurrentRow currentRow) {
+            super(currentRow);
+            this.rowNumber = currentRow.rowCount;
+            this.bigRow = currentRow.bigRow;
+        }
+
+        @Override
+        public long rowNumber() {
+            return this.rowNumber;
+        }
+
+        @Override
+        public boolean isBigRow() {
+            return this.bigRow;
+        }
+
+        @Override
+        protected CurrentRow copyCurrentRowIfNeed() {
+            return this;
+        }
 
 
-    }
+    }//MySQLImmutableCurrentRow
+
+    /**
+     * private class
+     *
+     * @see MySQLCurrentRow#asResultRow()
+     */
+    private static final class MySQLResultRow extends MySQLDataRow implements ResultRow {
+
+        private final boolean bigRow;
+
+        /**
+         * private constructor
+         */
+        private MySQLResultRow(MySQLCurrentRow currentRow) {
+            super(currentRow);
+            this.bigRow = currentRow.isBigRow();
+        }
+
+        @Override
+        public boolean isBigRow() {
+            return this.bigRow;
+        }
+
+
+    }//MySQLResultRow
 
 
 }

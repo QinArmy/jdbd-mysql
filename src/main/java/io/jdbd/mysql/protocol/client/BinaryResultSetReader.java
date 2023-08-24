@@ -40,23 +40,23 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
 
 
     @Override
-    MySQLCurrentRow readRowMeta(ByteBuf cumulateBuffer, Consumer<Object> serverStatesConsumer) {
+    MySQLMutableCurrentRow readRowMeta(ByteBuf cumulateBuffer, Consumer<Object> serverStatesConsumer) {
         if (!MySQLRowMeta.canReadMeta(cumulateBuffer, false)) {
             return null;
         }
-        return new BinaryCurrentRow(MySQLRowMeta.readForRows(cumulateBuffer, this.task));
+        return new BinaryMutableCurrentRow(MySQLRowMeta.readForRows(cumulateBuffer, this.task));
     }
 
     /**
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html">Binary Protocol Resultset</a>
      */
     @Override
-    boolean readOneRow(final ByteBuf payload, final boolean bigPayload, final MySQLCurrentRow currentRow) {
+    boolean readOneRow(final ByteBuf payload, final boolean bigPayload, final MySQLMutableCurrentRow currentRow) {
         final MySQLColumnMeta[] metaArray = currentRow.rowMeta.columnMetaArray;
         if (payload.readByte() != BINARY_ROW_HEADER) {
             throw new IllegalArgumentException("cumulateBuffer isn't binary row");
         }
-        final BinaryCurrentRow binaryCurrentRow = (BinaryCurrentRow) currentRow;
+        final BinaryMutableCurrentRow binaryCurrentRow = (BinaryMutableCurrentRow) currentRow;
         final Object[] columnValues = currentRow.columnArray;
         final byte[] nullBitMap = binaryCurrentRow.nullBitMap;
 
@@ -106,7 +106,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
     @SuppressWarnings("deprecation")
     @Nullable
     private Object readOneColumn(final ByteBuf payload, final boolean bigPayload, final MySQLColumnMeta meta,
-                                 final BinaryCurrentRow currentRow) {
+                                 final BinaryMutableCurrentRow currentRow) {
         final int readableBytes;
         if (bigPayload) {
             readableBytes = payload.readableBytes();
@@ -325,7 +325,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
 
     /**
      * @return {@link LocalTime} or {@link Duration}
-     * @see #readOneColumn(ByteBuf, boolean, MySQLColumnMeta, BinaryCurrentRow)
+     * @see #readOneColumn(ByteBuf, boolean, MySQLColumnMeta, BinaryMutableCurrentRow)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_time">ProtocolBinary::MYSQL_TYPE_TIME</a>
      */
     private Object readBinaryTimeType(final ByteBuf byteBuf, final int readableBytes) {
@@ -367,7 +367,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
 
 
     /**
-     * @see #readOneColumn(ByteBuf, boolean, MySQLColumnMeta, BinaryCurrentRow)
+     * @see #readOneColumn(ByteBuf, boolean, MySQLColumnMeta, BinaryMutableCurrentRow)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_date">ProtocolBinary::MYSQL_TYPE_DATETIME</a>
      */
     @Nullable
@@ -426,7 +426,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
     }
 
     /**
-     * @see #readOneColumn(ByteBuf, boolean, MySQLColumnMeta, BinaryCurrentRow)
+     * @see #readOneColumn(ByteBuf, boolean, MySQLColumnMeta, BinaryMutableCurrentRow)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_date">ProtocolBinary::MYSQL_TYPE_DATE</a>
      */
     @Nullable
@@ -463,8 +463,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
     /*################################## blow private static method ##################################*/
 
 
-
-    private static final class BinaryCurrentRow extends MySQLCurrentRow {
+    static final class BinaryMutableCurrentRow extends MySQLMutableCurrentRow {
 
 
         private final byte[] nullBitMap;
@@ -473,15 +472,17 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
 
         private boolean readNullBitMap = true;
 
-
-        private BinaryCurrentRow(MySQLRowMeta rowMeta) {
+        /**
+         * private constructor
+         */
+        private BinaryMutableCurrentRow(MySQLRowMeta rowMeta) {
             super(rowMeta);
             this.nullBitMap = new byte[(rowMeta.columnMetaArray.length + 9) >> 3];
         }
 
 
         @Override
-        void doRest() {
+        void reset() {
             if (this.columnIndex != this.columnArray.length) {
                 throw new IllegalStateException();
             }
@@ -489,7 +490,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
             this.columnIndex = 0;
         }
 
-    }//BinaryCurrentRow
+    }//BinaryMutableCurrentRow
 
 
 }

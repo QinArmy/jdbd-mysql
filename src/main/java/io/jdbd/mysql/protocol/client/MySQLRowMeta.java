@@ -1,14 +1,12 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
-import io.jdbd.meta.DataType;
-import io.jdbd.meta.JdbdType;
-import io.jdbd.meta.KeyMode;
-import io.jdbd.meta.NullMode;
+import io.jdbd.meta.*;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.FieldType;
 import io.jdbd.result.ResultRowMeta;
+import io.jdbd.session.Option;
 import io.jdbd.vendor.result.VendorResultRowMeta;
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
@@ -90,10 +88,11 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     }
 
 
-
     final MySQLColumnMeta[] columnMetaArray;
 
     final Map<Integer, Charsets.CustomCollation> customCollationMap;
+
+    final Charset resultSetCharset;
 
 
     final ZoneOffset serverZone;
@@ -109,6 +108,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         this.columnMetaArray = columnMetaArray;
         this.customCollationMap = Collections.emptyMap();
         this.serverZone = PSEUDO_SERVER_ZONE;
+        this.resultSetCharset = null;
     }
 
     private MySQLRowMeta(final MySQLColumnMeta[] columnMetaArray, StmtTask stmtTask) {
@@ -120,6 +120,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         final TaskAdjutant adjutant = stmtTask.adjutant();
         this.customCollationMap = adjutant.obtainCustomCollationMap();
         this.serverZone = adjutant.serverZone();
+        this.resultSetCharset = adjutant.getCharsetResults();
     }
 
     @Override
@@ -132,10 +133,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         return this.columnMetaArray[checkIndex(indexBasedZero)].sqlType;
     }
 
-    @Override
-    public String getTypeName(int indexBasedZero) throws JdbdException {
-        return this.columnMetaArray[checkIndex(indexBasedZero)].sqlType.typeName();
-    }
 
     @Override
     public JdbdType getJdbdType(int indexBasedZero) throws JdbdException {
@@ -147,14 +144,15 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         return null;
     }
 
+
     @Override
-    public boolean isSigned(int indexBasedZero) throws JdbdException {
-        return false;
+    public BooleanMode getAutoIncrementMode(int indexBasedZero) throws JdbdException {
+        return null;
     }
 
     @Override
-    public boolean getAutoIncrementMode(int indexBasedZero) throws JdbdException {
-        return false;
+    public <T> T getOf(int indexBasedZero, Option<T> option) throws JdbdException {
+        return null;
     }
 
     @Override

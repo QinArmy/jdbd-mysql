@@ -45,7 +45,7 @@ final class TextResultSetReader extends MySQLResultSetReader {
 
 
     @Override
-    MySQLCurrentRow readRowMeta(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatesConsumer) {
+    MySQLMutableCurrentRow readRowMeta(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatesConsumer) {
         if ((this.capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) != 0) {
             throw new IllegalStateException("Not support CLIENT_OPTIONAL_RESULTSET_METADATA");
         }
@@ -54,8 +54,8 @@ final class TextResultSetReader extends MySQLResultSetReader {
         if (!MySQLRowMeta.canReadMeta(cumulateBuffer, eofEnd)) {
             return null;
         }
-        final TextCurrentRow currentRow;
-        currentRow = new TextCurrentRow(MySQLRowMeta.readForRows(cumulateBuffer, this.task));
+        final TextMutableCurrentRow currentRow;
+        currentRow = new TextMutableCurrentRow(MySQLRowMeta.readForRows(cumulateBuffer, this.task));
         if (eofEnd) {
             final int payloadLength;
             payloadLength = Packets.readInt3(cumulateBuffer);
@@ -66,11 +66,11 @@ final class TextResultSetReader extends MySQLResultSetReader {
     }
 
     @Override
-    boolean readOneRow(final ByteBuf cumulateBuffer, final boolean bigPayload, final MySQLCurrentRow currentRow) {
+    boolean readOneRow(final ByteBuf cumulateBuffer, final boolean bigPayload, final MySQLMutableCurrentRow currentRow) {
         final MySQLColumnMeta[] columnMetaArray = currentRow.rowMeta.columnMetaArray;
         final Object[] columnValues = currentRow.columnArray;
 
-        final TextCurrentRow textCurrentRow = (TextCurrentRow) currentRow;
+        final TextMutableCurrentRow textCurrentRow = (TextMutableCurrentRow) currentRow;
         final boolean[] firstBits = textCurrentRow.firstBits;
         int columnIndex = textCurrentRow.columnIndex;
         Object value;
@@ -108,7 +108,7 @@ final class TextResultSetReader extends MySQLResultSetReader {
     @SuppressWarnings("deprecation")
     @Nullable
     private Object readOneColumn(final ByteBuf payload, final boolean bigPayload, final MySQLColumnMeta meta,
-                                 final TextCurrentRow currentRow) {
+                                 final TextMutableCurrentRow currentRow) {
         final int readableBytes;
         if (bigPayload) {
             readableBytes = payload.readableBytes();
@@ -255,14 +255,17 @@ final class TextResultSetReader extends MySQLResultSetReader {
     /*################################## blow private method ##################################*/
 
 
-    private static final class TextCurrentRow extends MySQLCurrentRow {
+    static final class TextMutableCurrentRow extends MySQLMutableCurrentRow {
 
         private final boolean[] firstBits;
 
         private int columnIndex = 0;
 
 
-        private TextCurrentRow(MySQLRowMeta rowMeta) {
+        /**
+         * private constructor
+         */
+        private TextMutableCurrentRow(MySQLRowMeta rowMeta) {
             super(rowMeta);
             this.firstBits = new boolean[rowMeta.columnMetaArray.length];
             resetFirstBits(this.firstBits);
@@ -270,7 +273,7 @@ final class TextResultSetReader extends MySQLResultSetReader {
 
 
         @Override
-        void doRest() {
+        void reset() {
             if (this.columnIndex != this.columnArray.length) {
                 throw new IllegalStateException();
             }
@@ -290,7 +293,7 @@ final class TextResultSetReader extends MySQLResultSetReader {
         }
 
 
-    }//TextCurrentRow
+    }//TextMutableCurrentRow
 
 
 }

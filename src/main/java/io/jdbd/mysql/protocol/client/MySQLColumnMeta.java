@@ -109,7 +109,7 @@ final class MySQLColumnMeta implements ColumnMeta {
         this.fixedLength = Packets.readLenEnc(cumulateBuffer);
         // 8. character_set of column
         this.collationIndex = Packets.readInt2AsInt(cumulateBuffer);
-        this.columnCharset = Charsets.getJavaCharsetByCollationIndex(this.collationIndex, customCollationMap);
+        this.columnCharset = Charsets.getJavaCharsetByCollationIndex(this.collationIndex, customCollationMap); // TODO throw specified Exception for cleaning channel
         // 9. column_length,maximum length of the field
         this.length = Packets.readInt4AsLong(cumulateBuffer);
         // 10. type,type of the column as defined in enum_field_types,type of the column as defined in enum_field_types
