@@ -1,5 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
+import io.jdbd.meta.DataType;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
@@ -332,7 +333,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
     @Override
-    public List<MySQLType> getParamTypes() {
+    public List<? extends DataType> getParamTypes() {
         final MySQLColumnMeta[] paramMetas = this.paramMetas;
         if (paramMetas == null) {
             throw new IllegalStateException("this.paramMetas is null");
@@ -358,6 +359,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         return paramTypeList;
     }
 
+    @Override
+    public void suspendTask() {
+
+    }
+
     @Nullable
     @Override
     public ResultRowMeta getRowMeta() {
@@ -379,14 +385,12 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
     @Override
-    public Mono<Void> abandonBind() {
-        return Mono.create(sink -> {
-            if (this.adjutant.inEventLoop()) {
-                abandonBindInEventLoop(sink);
-            } else {
-                this.adjutant.execute(() -> abandonBindInEventLoop(sink));
-            }
-        });
+    public void abandonBind() {
+        if (this.adjutant.inEventLoop()) {
+            abandonBindInEventLoop();
+        } else {
+            this.adjutant.execute(this::abandonBindInEventLoop);
+        }
     }
 
     @Nullable
@@ -703,20 +707,19 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * @see #abandonBind()
      */
-    private void abandonBindInEventLoop(final MonoSink<Void> sink) {
+    private void abandonBindInEventLoop() {
         // error can't be emitted to sink ,because not actual sink now.
         switch (this.phase) {
             case WAIT_FOR_BINDING: {
                 this.phase = Phase.ABANDON_BINDING;
                 endTaskForErrorOnWaitForBinding();
-                sink.success();
             }
             break;
             case END: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("{} have ended,but reuse {}", this, PreparedStatement.class.getName());
                 }
-                sink.error(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
+                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
             break;
             case ERROR_ON_BINDING:
@@ -724,14 +727,14 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("this.phase is {},but reuse {}", this.phase, PreparedStatement.class.getName());
                 }
-                sink.error(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
+                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
             break;
             default: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("{} is executing,but reuse {}", this, PreparedStatement.class.getName());
                 }
-                sink.error(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
+                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
         } // switch
     }
@@ -876,7 +879,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 if (payloadLength > 12) {
                     final int warnings = Packets.readInt2AsInt(cumulateBuffer);//6. warning_count
                     if (warnings > 0) {
-                        this.warning = JdbdWarning.create(String.format("produce %s warnings", warnings));
+                        this.warning = JdbdWarning.create(String.format("produce %s warnings", warnings), Collections.emptyMap());
                     }
 
                     hasMeta = (capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) == 0
@@ -1144,7 +1147,17 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
             return getStmt().getExportFunction();
         }
 
-    }
+        @Override
+        public boolean isSessionCreated() {
+            return this.getStmt().isSessionCreated();
+        }
+
+        @Override
+        public DatabaseSession databaseSession() {
+            return this.getStmt().databaseSession();
+        }
+
+    }// MySQLPrepareStmt
 
     private static final class PrepareSink implements ResultSink {
 

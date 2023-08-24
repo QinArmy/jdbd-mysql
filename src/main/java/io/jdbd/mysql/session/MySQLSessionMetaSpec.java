@@ -4,7 +4,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.session.DatabaseMetaSpec;
-import io.jdbd.session.Option;
 import io.jdbd.session.ServerVersion;
 
 /**
@@ -79,25 +78,5 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
         return MySQLDriver.MY_SQL;
     }
 
-    /**
-     * <p>
-     * jdbd-mysql support following :
-     *     <ul>
-     *         <li>{@link Option#AUTO_COMMIT}</li>
-     *         <li>{@link Option#IN_TRANSACTION}</li>
-     *         <li>{@link Option#READ_ONLY},true :  representing exists transaction and is read only.</li>
-     *         <li>{@link Option#CLIENT_ZONE}</li>
-     *         <li>{@link Option#SERVER_ZONE} if support TRACK_SESSION_STATE enabled</li>
-     *         <li>{@link Option#CLIENT_CHARSET}</li>
-     *         <li>{@link Option#BACKSLASH_ESCAPES}</li>
-     *         <li>{@link Option#BINARY_HEX_ESCAPES}</li>
-     *         <li>{@link Option#AUTO_RECONNECT}</li>
-     *     </ul>
-     * </p>
-     */
-    @Override
-    public final <T> T valueOf(Option<T> option) throws JdbdException {
-        return this.protocol.valueOf(option);
-    }
 
 }

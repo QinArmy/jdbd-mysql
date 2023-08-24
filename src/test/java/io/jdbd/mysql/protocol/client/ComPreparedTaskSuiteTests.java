@@ -1,10 +1,13 @@
 package io.jdbd.mysql.protocol.client;
 
 
+import io.jdbd.JdbdException;
 import io.jdbd.mysql.Groups;
+import io.jdbd.mysql.MySQLType;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
-import io.jdbd.vendor.stmt.JdbdParamValue;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
+import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
@@ -37,13 +40,13 @@ public class ComPreparedTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     }
 
     @Override
-    Mono<ResultStates> executeUpdate(BindStmt stmt, TaskAdjutant adjutant) {
+    Mono<ResultStates> executeUpdate(ParamStmt stmt, TaskAdjutant adjutant) {
         return ComPreparedTask.update(stmt, adjutant);
     }
 
     @Override
-    Flux<ResultRow> executeQuery(BindStmt stmt, TaskAdjutant adjutant) {
-        return ComPreparedTask.query(stmt, adjutant);
+    Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
+        return ComPreparedTask.query(stmt, DatabaseProtocol.ROW_FUNC, adjutant);
     }
 
     @Override
@@ -64,10 +67,10 @@ public class ComPreparedTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
         sql = "UPDATE mysql_types as t SET t.my_tiny_text = ? WHERE t.id = ?";
         bindValueList = new ArrayList<>(2);
-        bindValueList.add(JdbdParamValue.wrap(0, "prepare update 1"));
-        bindValueList.add(JdbdParamValue.wrap(1, 80L));
+        bindValueList.add(JdbdValues.paramValue(0, MySQLType.TINYTEXT, "prepare update 1"));
+        bindValueList.add(JdbdValues.paramValue(1, MySQLType.BIGINT, 80L));
 
-        states = ComPreparedTask.update(Stmts.multiPrepare(sql, bindValueList), adjutant)
+        states = ComPreparedTask.update(Stmts.paramStmt(sql, bindValueList), adjutant)
                 .block();
 
         assertNotNull(states, "states");
@@ -114,8 +117,8 @@ public class ComPreparedTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     public void doBitBindAndExtract() {
         try {
             doBitBindAndExtract(LOG);
-        } catch (JdbdSQLException e) {
-            LOG.error("doBitBindAndExtract code:{},states:{}", e.getVendorCode(), e.getSQLState());
+        } catch (JdbdException e) {
+            LOG.error("doBitBindAndExtract code:{},states:{}", e.getVendorCode(), e.getSqlState());
             throw e;
         }
     }

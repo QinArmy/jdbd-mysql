@@ -173,7 +173,7 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         if (cause == null) {
             e = new JdbdException(message, sqlStates, MySQLCodes.ER_TRUNCATED_WRONG_VALUE);
         } else {
-            e = new JdbdException(message, sqlStates, MySQLCodes.ER_TRUNCATED_WRONG_VALUE, cause);
+            e = new JdbdException(message, cause, sqlStates, MySQLCodes.ER_TRUNCATED_WRONG_VALUE);
         }
         return e;
     }
@@ -203,8 +203,8 @@ public abstract class MySQLExceptions extends JdbdExceptions {
             e = new JdbdException("Got a packet bigger than 'max_allowed_packet' bytes",
                     MySQLStates.COMMUNICATION_LINK_FAILURE, MySQLCodes.ER_NET_PACKET_TOO_LARGE);
         } else {
-            e = new JdbdException("Got a packet bigger than 'max_allowed_packet' bytes",
-                    MySQLStates.COMMUNICATION_LINK_FAILURE, MySQLCodes.ER_NET_PACKET_TOO_LARGE, cause);
+            e = new JdbdException("Got a packet bigger than 'max_allowed_packet' bytes", cause,
+                    MySQLStates.COMMUNICATION_LINK_FAILURE, MySQLCodes.ER_NET_PACKET_TOO_LARGE);
         }
         return e;
     }

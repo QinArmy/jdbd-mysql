@@ -1,9 +1,20 @@
 package io.jdbd.mysql.protocol;
 
+import io.jdbd.JdbdException;
+import io.jdbd.session.Option;
 import io.jdbd.session.ServerVersion;
 
+import java.util.Locale;
 import java.util.Objects;
 
+/**
+ * <p>
+ * This class is a implementation of {@link ServerVersion} with MySQL.
+ * </p>
+ *
+ * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_handshake_v10.html">Protocol::HandshakeV10</a>
+ * @since 1.0
+ */
 public final class MySQLServerVersion implements Comparable<MySQLServerVersion>, ServerVersion {
 
     private static final MySQLServerVersion MIN_VERSION = new MySQLServerVersion("0.0.0", 0, 0, 0);
@@ -24,6 +35,11 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         return doCompareTo(other.major, other.minor, other.subMinor);
     }
 
+
+    @Override
+    public <T> T valueOf(Option<T> option) {
+        return null;
+    }
 
     /**
      * <p>
@@ -121,28 +137,46 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
      * @param versionString string version representation
      * @return {@link MySQLServerVersion}
      */
-    public static MySQLServerVersion from(final String versionString) {
-        final int index1 = versionString.indexOf('.');
-        if (index1 < 0) {
-            throw new IllegalArgumentException("versionString error");
-        }
-        int major = Integer.parseInt(versionString.substring(0, index1));
-        final int index2 = versionString.indexOf('.', index1 + 1);
-        if (index2 < 0) {
-            throw new IllegalArgumentException("versionString error");
-        }
-        int minor = Integer.parseInt(versionString.substring(index1 + 1, index2));
+    public static MySQLServerVersion from(final String versionString) throws JdbdException {
 
-        final int len = versionString.length();
-        for (int i = index2 + 1; i < len; i++) {
-            if ((versionString.charAt(i) < '0') || (versionString.charAt(i) > '9')) {
-                continue;
+        MySQLServerVersion serverVersion = null;
+
+        try {
+            final int major, minor, point1, pont2;
+            point1 = versionString.indexOf('.');
+            if (point1 < 0) {
+                throw serverVersionError(versionString);
             }
-            int subMinor = Integer.parseInt(versionString.substring(i));
-            return new MySQLServerVersion(versionString, major, minor, subMinor);
+            major = Integer.parseInt(versionString.substring(0, point1));
+            pont2 = versionString.indexOf('.', point1 + 1);
+            if (pont2 < 0) {
+                throw serverVersionError(versionString);
+            }
+            minor = Integer.parseInt(versionString.substring(point1 + 1, pont2));
+
+            final int len = versionString.length();
+
+            char ch;
+            for (int i = pont2 + 1, subMinor; i < len; i++) {
+                ch = versionString.charAt(i);
+                if (ch >= '0' && ch <= '9') {
+                    continue;
+                }
+                subMinor = Integer.parseInt(versionString.substring(pont2 + 1, i));
+                serverVersion = new MySQLServerVersion(versionString, major, minor, subMinor);
+                break;
+            }
+            if (serverVersion == null) {
+                // can't parse the server version
+                serverVersion = MIN_VERSION;
+            }
+        } catch (Throwable e) {
+            // can't parse the server version
+            serverVersion = MIN_VERSION;
         }
-        throw new IllegalArgumentException("versionString error");
+        return serverVersion;
     }
+
 
     public static MySQLServerVersion getMinVersion() {
         return MIN_VERSION;
@@ -153,10 +187,15 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
     }
 
     public static boolean isEnterpriseEdition(MySQLServerVersion serverVersion) {
-        String completeVersion = serverVersion.completeVersion;
+        final String completeVersion;
+        completeVersion = serverVersion.completeVersion.toLowerCase(Locale.ROOT);
         return completeVersion.contains("enterprise")
                 || completeVersion.contains("commercial")
                 || completeVersion.contains("advanced");
+    }
+
+    private static JdbdException serverVersionError(String versionString) {
+        return new JdbdException(String.format("versionString %s error", versionString));
     }
 
 }

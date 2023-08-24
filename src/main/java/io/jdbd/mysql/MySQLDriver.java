@@ -10,7 +10,6 @@ import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.vendor.util.DefaultDriverVersion;
 
 import java.util.Map;
-import java.util.Objects;
 
 public final class MySQLDriver implements Driver {
 
@@ -39,22 +38,18 @@ public final class MySQLDriver implements Driver {
     @Override
     public DatabaseSessionFactory forDeveloper(String url, Map<String, Object> properties)
             throws JdbdException {
-        Objects.requireNonNull(url, "url");
-        Objects.requireNonNull(properties, "properties");
-        return MySQLDatabaseSessionFactory.create(url, properties);
+        return MySQLDatabaseSessionFactory.create(url, properties, false);
     }
 
     @Override
     public DatabaseSessionFactory forPoolVendor(String url, Map<String, Object> properties)
             throws JdbdException {
-        Objects.requireNonNull(url, "url");
-        Objects.requireNonNull(properties, "properties");
-        return MySQLDatabaseSessionFactory.forPoolVendor(url, properties);
+        return MySQLDatabaseSessionFactory.create(url, properties, true);
     }
 
 
     @Override
-    public String productName() {
+    public String productFamily() {
         return MY_SQL;
     }
 
@@ -75,8 +70,8 @@ public final class MySQLDriver implements Driver {
                 .append(getClass().getName())
                 .append("[ vendor : ")
                 .append(vendor())
-                .append(" , productName : ")
-                .append(productName())
+                .append(" , productFamily : ")
+                .append(productFamily())
                 .append(" , version : ")
                 .append(version())
                 .append(" , hash : ")

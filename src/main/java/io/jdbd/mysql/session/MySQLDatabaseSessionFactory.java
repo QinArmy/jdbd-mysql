@@ -13,6 +13,7 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.session.LocalDatabaseSession;
+import io.jdbd.session.Option;
 import io.jdbd.session.RmDatabaseSession;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
@@ -31,14 +32,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory {
 
-    public static MySQLDatabaseSessionFactory create(String url, Map<String, Object> properties)
+    public static MySQLDatabaseSessionFactory create(String url, Map<String, Object> properties, boolean forPoolVendor)
             throws JdbdException {
-        return new MySQLDatabaseSessionFactory(createProtocolFactory(url, properties), false);
-    }
-
-    public static MySQLDatabaseSessionFactory forPoolVendor(String url, Map<String, Object> properties)
-            throws JdbdException {
-        return new MySQLDatabaseSessionFactory(createProtocolFactory(url, properties), true);
+        return new MySQLDatabaseSessionFactory(createProtocolFactory(url, properties), forPoolVendor);
     }
 
 
@@ -107,7 +103,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
 
     @Override
-    public String productName() {
+    public String productFamily() {
         return MySQLDriver.MY_SQL;
     }
 
@@ -128,11 +124,15 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     }
 
     @Override
-    public Publisher<Void> close() {
+    public <T> Publisher<T> close() {
         this.closed.set(true);
         return Mono.empty();
     }
 
+    @Override
+    public <T> T valueOf(Option<T> option) {
+        return null;
+    }
 
     @Override
     public String toString() {
@@ -144,8 +144,8 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
                 .append(factoryVendor())
                 .append(" , driverVendor : ")
                 .append(driverVendor())
-                .append(" , productName : ")
-                .append(productName())
+                .append(" , productFamily : ")
+                .append(productFamily())
                 .append(" , driverVersion : ")
                 .append(driverVersion())
                 .append(" , hash : ")

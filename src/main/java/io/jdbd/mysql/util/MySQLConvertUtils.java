@@ -1,6 +1,5 @@
 package io.jdbd.mysql.util;
 
-import io.jdbd.result.NotSupportedConvertException;
 import reactor.util.annotation.Nullable;
 
 import java.math.BigDecimal;
@@ -111,14 +110,6 @@ public abstract class MySQLConvertUtils {
     }
 
     /*################################## blow private method ##################################*/
-
-    private static NotSupportedConvertException createNotSupportedException(Object value, Class<?> targetClass
-            , @Nullable Throwable e) {
-        String m = String.format("Not support convert from value[%s] and type[%s] to [%s] ."
-                , value
-                , value.getClass().getName(), targetClass.getName());
-        return new NotSupportedConvertException(m, e);
-    }
 
 
 }
