@@ -3,7 +3,6 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
-import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.util.*;
 import io.jdbd.type.Point;
 import io.jdbd.vendor.stmt.*;
@@ -92,14 +91,13 @@ final class QueryCommandWriter {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
                 writeQueryAttribute(packet, stmt, adjutant);
             }
-            final MySQLParser sqlParser = adjutant.sqlParser();
             String sql;
             for (int i = 0; i < sqlSize; i++) {
                 if (i > 0) {
                     packet.writeByte(Constants.SEMICOLON_BYTE);
                 }
                 sql = sqlGroup.get(i);
-                if (!sqlParser.isSingleStmt(sql)) {
+                if (!adjutant.isSingleStmt(sql)) {
                     throw MySQLExceptions.createMultiStatementError();
                 }
                 packet.writeBytes(sql.getBytes(charsetClient));
@@ -177,20 +175,20 @@ final class QueryCommandWriter {
             throws JdbdException {
         final List<ParamStmt> stmtGroup = multiStmt.getStmtList();
         final int size = stmtGroup.size();
-        final MySQLParser parser = this.adjutant.sqlParser();
+        final TaskAdjutant adjutant = this.adjutant;
         final ByteBuf packet;
-        packet = Packets.createStmtPacket(this.adjutant.allocator(), multiStmt);
+        packet = Packets.createStmtPacket(adjutant.allocator(), multiStmt);
         packet.writeByte(Packets.COM_QUERY);
         try {
-            if (Capabilities.supportQueryAttr(this.adjutant.capability())) {
-                writeQueryAttribute(packet, multiStmt, this.adjutant);
+            if (Capabilities.supportQueryAttr(adjutant.capability())) {
+                writeQueryAttribute(packet, multiStmt, adjutant);
             }
             for (int i = 0; i < size; i++) {
                 if (i > 0) {
                     packet.writeByte(Constants.SEMICOLON_BYTE);
                 }
                 final ParamStmt stmt = stmtGroup.get(i);
-                final List<String> staticSqlList = parser.parse(stmt.getSql()).sqlPartList();
+                final List<String> staticSqlList = adjutant.parse(stmt.getSql()).sqlPartList();
                 doWriteBindableCommand(i, staticSqlList, stmt.getParamGroup(), packet);
             }
             return Packets.createPacketPublisher(packet, this.sequenceId, this.adjutant);
@@ -232,7 +230,7 @@ final class QueryCommandWriter {
     private Publisher<ByteBuf> writeBindableBatchCommand(final ParamBatchStmt stmt)
             throws JdbdException {
 
-        final List<String> staticSqlList = this.adjutant.sqlParser().parse(stmt.getSql()).getStaticSql();
+        final List<String> staticSqlList = this.adjutant.parse(stmt.getSql()).sqlPartList();
 
         final List<List<ParamValue>> parameterGroupList = stmt.getGroupList();
         final int stmtCount = parameterGroupList.size();

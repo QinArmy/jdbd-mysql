@@ -589,12 +589,13 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
                 final String[] elementArray;
                 elementArray = source.split(",");
-
+                Enum<?> enumValue;
                 for (String e : elementArray) {
                     if (actualClass == String.class) {
                         sink.next((T) e);
                     } else {
-                        sink.next(ColumnConverts.convertToEnum(actualClass, e));
+                        enumValue = ColumnConverts.convertToEnum(actualClass, e);
+                        sink.next((T) enumValue);
                     }
                 }
                 sink.complete();
@@ -786,12 +787,13 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 elementArray = ((String) source).split(",");
 
                 final Set<T> set = constructor.apply((int) (elementArray.length / 0.75f));
-
+                Enum<?> enumValue;
                 for (String e : elementArray) {
                     if (actualClass == String.class) {
                         set.add((T) e);
                     } else {
-                        set.add(ColumnConverts.convertToEnum(actualClass, e));
+                        enumValue = ColumnConverts.convertToEnum(actualClass, e);
+                        set.add((T) enumValue);
                     }
                 }
 
@@ -1038,6 +1040,8 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
         /**
          * private constructor
+         *
+         * @see MySQLCurrentRow#asResultRow()
          */
         private MySQLResultRow(MySQLCurrentRow currentRow) {
             super(currentRow);

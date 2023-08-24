@@ -525,7 +525,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
             assertEquals(e.getActualType(), ResultType.QUERY, "getActualType");
         } catch (Throwable e) {
             if (e instanceof JdbdCompositeException) {
-                MySQLExceptions.printCompositeException((JdbdCompositeException) e);
+                MySQLExceptions.printCompositeException((JdbdCompositeException) e, LOG);
             }
             fail("batchUpdateContainQueryWithTempMultiMode test failure.", e);
         }

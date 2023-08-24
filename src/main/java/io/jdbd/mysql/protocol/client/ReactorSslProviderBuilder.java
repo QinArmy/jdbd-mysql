@@ -91,7 +91,7 @@ final class ReactorSslProviderBuilder {
             return builder.build();
         } catch (SSLException e) {
             String message = String.format("Cannot create %s due to [%s]", SslHandler.class.getName(), e.getMessage());
-            throw new JdbdException(message, MySQLStates.SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION, 0, e);
+            throw new JdbdException(message, e, MySQLStates.SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION, 0);
         }
     }
 
@@ -173,11 +173,11 @@ final class ReactorSslProviderBuilder {
         } catch (NoSuchAlgorithmException e) {
             String message = String.format("%s algorithm[%s] not found.", TrustManagerFactory.class.getName(),
                     TrustManagerFactory.getDefaultAlgorithm());
-            throw new JdbdException(message, MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            throw new JdbdException(message, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         } catch (KeyStoreException e) {
             String message = String.format("Cannot init %s due to %s", TrustManagerFactory.class.getName(),
                     e.getMessage());
-            throw new JdbdException(message, MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            throw new JdbdException(message, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         }
     }
 
@@ -192,13 +192,13 @@ final class ReactorSslProviderBuilder {
             kmf.init(storePair.getFirst(), storePair.getSecond());
             return kmf;
         } catch (NoSuchAlgorithmException e) {
-            String message = String.format("%s algorithm[%s] not found.", KeyManagerFactory.class.getName()
-                    , KeyManagerFactory.getDefaultAlgorithm());
-            throw new JdbdException(message, MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            String message = String.format("%s algorithm[%s] not found.", KeyManagerFactory.class.getName(),
+                    KeyManagerFactory.getDefaultAlgorithm());
+            throw new JdbdException(message, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         } catch (KeyStoreException | UnrecoverableKeyException e) {
             String message = String.format("Cannot init %s due to %s", KeyManagerFactory.class.getName(),
                     e.getMessage());
-            throw new JdbdException(message, MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            throw new JdbdException(message, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         }
     }
 
@@ -269,14 +269,14 @@ final class ReactorSslProviderBuilder {
             keyStore.load(storeInput, storePassword);
             return Pair.create(keyStore, storePassword);
         } catch (MalformedURLException e) {
-            throw new JdbdException(String.format("%s[%s] isn't url.", storeUrlKey, storeUrl),
-                    MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            String m = String.format("%s[%s] isn't url.", storeUrlKey, storeUrl);
+            throw new JdbdException(m, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         } catch (KeyStoreException e) {
             String m = String.format("%s[%s] is KeyStore type than is supported by provider.", storeTypeKey, storeType);
-            throw new JdbdException(m, MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            throw new JdbdException(m, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         } catch (NoSuchAlgorithmException | IOException | CertificateException e) {
             String message = String.format("Cannot load KeyStore by url[%s] and type[%s]", storeUrl, storeType);
-            throw new JdbdException(message, MySQLStates.CONNECTION_EXCEPTION, 0, e);
+            throw new JdbdException(message, e, MySQLStates.CONNECTION_EXCEPTION, 0);
         }
     }
 
@@ -335,7 +335,7 @@ final class ReactorSslProviderBuilder {
             } catch (Throwable e) {
                 String message = String.format("Can't create %s due to %s.", X509TrustManagerWrapper.class.getName(),
                         e.getMessage());
-                throw new JdbdException(message, SQLStates.CONNECTION_EXCEPTION, 0, e);
+                throw new JdbdException(message, e, SQLStates.CONNECTION_EXCEPTION, 0);
             }
             return wrapperArray;
         }

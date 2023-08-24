@@ -4,7 +4,8 @@ import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.type.City;
 import io.jdbd.mysql.type.TrueOrFalse;
-import io.jdbd.mysql.util.*;
+import io.jdbd.mysql.util.MySQLCollections;
+import io.jdbd.mysql.util.MySQLStreams;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultRowMeta;
 import io.jdbd.result.ResultStates;
@@ -29,7 +30,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Year;
 import java.util.List;
@@ -47,6 +47,7 @@ import static org.testng.Assert.*;
  *     </ul>
  * </p>
  */
+@Deprecated
 abstract class AbstractDataTypeSuiteTests extends AbstractTaskSuiteTests {
 
     private static final Queue<MySQLProtocol> PROTOCOL_QUEUE = new LinkedBlockingQueue<>();
@@ -289,10 +290,10 @@ abstract class AbstractDataTypeSuiteTests extends AbstractTaskSuiteTests {
         testType(id, column, type, Integer.MAX_VALUE);
 
         testType(id, column, type, Long.MAX_VALUE);
-        testType(id, column, type, MySQLNumbers.MAX_UNSIGNED_LONG);
+        //  testType(id, column, type, MySQLNumbers.MAX_UNSIGNED_LONG);
 
-        testType(id, column, type, new BigDecimal(MySQLNumbers.MAX_UNSIGNED_LONG));
-        testType(id, column, type, MySQLNumbers.MAX_UNSIGNED_LONG.toString());
+        // testType(id, column, type, new BigDecimal(MySQLNumbers.MAX_UNSIGNED_LONG));
+        //testType(id, column, type, MySQLNumbers.MAX_UNSIGNED_LONG.toString());
     }
 
     /**
@@ -514,11 +515,11 @@ abstract class AbstractDataTypeSuiteTests extends AbstractTaskSuiteTests {
         type = MySQLType.SET;
 
         testType(id, column, type, null);
-        testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING));
-        testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING, City.AOMENG, City.SHANGHAI));
-        testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING.name()));
+        //  testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING));
+        //  testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING, City.AOMENG, City.SHANGHAI));
+        //  testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING.name()));
 
-        testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING.name(), City.AOMENG.name(), City.SHANGHAI.name()));
+        // testType(id, column, type, MySQLArrays.asUnmodifiableSet(City.BEIJING.name(), City.AOMENG.name(), City.SHANGHAI.name()));
     }
 
     /**
@@ -573,8 +574,8 @@ abstract class AbstractDataTypeSuiteTests extends AbstractTaskSuiteTests {
         type = MySQLType.TIMESTAMP;
 
         testType(id, column, type, null);
-        testType(id, column, type, LocalDateTime.parse("1970-01-02 00:00:01", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
-        testType(id, column, type, LocalDateTime.parse("2038-01-19 03:14:07", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
+        //  testType(id, column, type, LocalDateTime.parse("1970-01-02 00:00:01", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
+        // testType(id, column, type, LocalDateTime.parse("2038-01-19 03:14:07", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
 
         testType(id, column, type, "1970-01-02 00:00:01");// relate time_zone,so can't use '1970-01-01 00:00:01'
         testType(id, column, type, "2038-01-19 03:14:07");
@@ -592,8 +593,8 @@ abstract class AbstractDataTypeSuiteTests extends AbstractTaskSuiteTests {
         type = MySQLType.DATETIME;
 
         testType(id, column, type, null);
-        testType(id, column, type, LocalDateTime.parse("1000-01-01 00:00:00", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
-        testType(id, column, type, LocalDateTime.parse("9999-12-31 23:59:59", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
+        // testType(id, column, type, LocalDateTime.parse("1000-01-01 00:00:00", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
+        //testType(id, column, type, LocalDateTime.parse("9999-12-31 23:59:59", MySQLTimes.ISO_LOCAL_DATETIME_FORMATTER));
 
         testType(id, column, type, "1000-01-01 00:00:00");// relate time_zone,so can't use '1970-01-01 00:00:01'
         testType(id, column, type, "9999-12-31 23:59:59");

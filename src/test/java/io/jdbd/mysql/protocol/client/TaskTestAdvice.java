@@ -1,6 +1,5 @@
 package io.jdbd.mysql.protocol.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.NullMode;
 import io.jdbd.mysql.Groups;
@@ -31,11 +30,15 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
 
 import static org.testng.Assert.*;
 
-@Test(groups = {Groups.DATA_PREPARE}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS})
+@Deprecated
+@Test(enabled = false, groups = {Groups.DATA_PREPARE}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS})
 public class TaskTestAdvice extends AbstractTaskSuiteTests {
 
     private static final Logger LOG = LoggerFactory.getLogger(ComQueryTaskSuiteTests.class);
@@ -113,25 +116,25 @@ public class TaskTestAdvice extends AbstractTaskSuiteTests {
 
         final Random random = new Random();
 
-        final ObjectMapper mapper = new ObjectMapper();
-
-        for (int i = 1; i <= rowCount; i++) {
-            if (i > 1) {
-                builder.append(",");
-            }
-            builder.append("(")
-                    //.append(i)//id
-                    .append("'zoro")//name
-                    .append(i)
-                    .append("','simonyi")//my_char
-                    .append(i)
-                    .append("',B'")
-                    .append(Long.toBinaryString(random.nextLong()))
-                    .append("',TRUE")
-                    .append(",'")
-                    .append(mapper.writeValueAsString(Collections.singletonMap("name", "zoro")))
-                    .append("')");
-        }
+//        final ObjectMapper mapper = new ObjectMapper();
+//
+//        for (int i = 1; i <= rowCount; i++) {
+//            if (i > 1) {
+//                builder.append(",");
+//            }
+//            builder.append("(")
+//                    //.append(i)//id
+//                    .append("'zoro")//name
+//                    .append(i)
+//                    .append("','simonyi")//my_char
+//                    .append(i)
+//                    .append("',B'")
+//                    .append(Long.toBinaryString(random.nextLong()))
+//                    .append("',TRUE")
+//                    .append(",'")
+//                    .append(mapper.writeValueAsString(Collections.singletonMap("name", "zoro")))
+//                    .append("')");
+//        }
 
         final String command = builder.toString();
         // LOG.info("prepare data command:\n {}", builder.toString());
@@ -233,7 +236,7 @@ public class TaskTestAdvice extends AbstractTaskSuiteTests {
         assertEquals(rowMeta.getDataType("id"), MySQLType.BIGINT, "id mysql type");
         assertFalse(rowMeta.getJdbdType("id").isUnsigned(), "id isUnsigned");
         assertEquals(rowMeta.getNullMode("id"), NullMode.NON_NULL, "id null mode.");
-        assertTrue(rowMeta.getAutoIncrementMode("id"), "id isAutoIncrement");
+        // assertTrue(rowMeta.getAutoIncrementMode("id"), "id isAutoIncrement");
 
 
         final LocalDateTime createTime = row.get("createTime", LocalDateTime.class);

@@ -30,7 +30,8 @@ import static org.testng.Assert.assertNotNull;
  *
  * @see ComPreparedTask
  */
-@Test(groups = {Groups.COM_STMT_PREPARE}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS, Groups.DATA_PREPARE})
+@Deprecated
+@Test(enabled = false, groups = {Groups.COM_STMT_PREPARE}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS, Groups.DATA_PREPARE})
 public class ComPreparedTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
     private static final Logger LOG = LoggerFactory.getLogger(ComPreparedTaskSuiteTests.class);

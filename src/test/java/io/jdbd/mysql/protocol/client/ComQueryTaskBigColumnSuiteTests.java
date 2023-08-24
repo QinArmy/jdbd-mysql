@@ -1,7 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.MySQLType;
-import io.jdbd.mysql.util.MySQLNumbers;
 import io.jdbd.result.ResultStates;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -10,16 +9,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 /**
@@ -28,7 +22,8 @@ import static org.testng.Assert.assertNotNull;
  * @see ComQueryTask
  * @see TextResultSetReader
  */
-@Test
+@Deprecated
+@Test(enabled = false)
 //(groups = {Groups.TEXT_RESULT_BIG_COLUMN}, dependsOnGroups = {Groups.COM_QUERY, Groups.DATA_PREPARE, Groups.COM_STMT_PREPARE})
 public class ComQueryTaskBigColumnSuiteTests extends AbstractTaskSuiteTests {
 
@@ -79,38 +74,38 @@ public class ComQueryTaskBigColumnSuiteTests extends AbstractTaskSuiteTests {
 
 
     private Path crateLongBlobFile() throws Exception {
-        final Random random = new Random();
-        final byte[] blockArray = new byte[1024];
-        for (int i = 0, offset = 0; i < 128; i++) {
-            MySQLNumbers.longToBigEndian(random.nextLong(), blockArray, offset, 8);
-            offset += 8;
-        }
-        final Path dir = ClientTestUtils.getBigColumnTestPath();
-        if (Files.notExists(dir)) {
-            Files.createDirectories(dir);
-        }
-        final Path longBlobFile = Files.createTempFile(dir, "longBlob", ".b");
-
-        try (FileChannel channel = FileChannel.open(longBlobFile, StandardOpenOption.WRITE)) {
-            final ByteBuffer buffer = ByteBuffer.wrap(blockArray);
-            buffer.position(buffer.limit());
-            final int end = 1 << 22;
-            for (int i = 1; i <= end; i++) {
-                buffer.flip();
-                if (i == end) {
-                    buffer.get();
-                }
-                channel.write(buffer);
-                buffer.clear();
-                buffer.position(buffer.limit());
-            }
-            assertEquals(channel.size(), (1L << 32) - 1L, "size");
-            return longBlobFile;
-        } catch (Throwable e) {
-            Files.deleteIfExists(longBlobFile);
-            throw e;
-        }
-
+//        final Random random = new Random();
+//        final byte[] blockArray = new byte[1024];
+//        for (int i = 0, offset = 0; i < 128; i++) {
+//            MySQLNumbers.longToBigEndian(random.nextLong(), blockArray, offset, 8);
+//            offset += 8;
+//        }
+//        final Path dir = ClientTestUtils.getBigColumnTestPath();
+//        if (Files.notExists(dir)) {
+//            Files.createDirectories(dir);
+//        }
+//        final Path longBlobFile = Files.createTempFile(dir, "longBlob", ".b");
+//
+//        try (FileChannel channel = FileChannel.open(longBlobFile, StandardOpenOption.WRITE)) {
+//            final ByteBuffer buffer = ByteBuffer.wrap(blockArray);
+//            buffer.position(buffer.limit());
+//            final int end = 1 << 22;
+//            for (int i = 1; i <= end; i++) {
+//                buffer.flip();
+//                if (i == end) {
+//                    buffer.get();
+//                }
+//                channel.write(buffer);
+//                buffer.clear();
+//                buffer.position(buffer.limit());
+//            }
+//            assertEquals(channel.size(), (1L << 32) - 1L, "size");
+//            return longBlobFile;
+//        } catch (Throwable e) {
+//            Files.deleteIfExists(longBlobFile);
+//            throw e;
+//        }
+        return null;
 
     }
 

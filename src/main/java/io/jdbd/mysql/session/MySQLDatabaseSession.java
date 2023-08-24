@@ -336,6 +336,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
     @Override
+    public final <T> T valueOf(Option<T> option) throws JdbdException {
+        return this.protocol.valueOf(option);
+    }
+
+    @Override
     public final boolean isClosed() {
         return this.protocol.isClosed();
     }
