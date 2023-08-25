@@ -8,7 +8,6 @@ import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.FieldType;
 import io.jdbd.vendor.result.ColumnMeta;
 import io.netty.buffer.ByteBuf;
-import io.qinarmy.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -657,7 +656,7 @@ final class MySQLColumnMeta implements ColumnMeta {
     }
 
     private static boolean isFunctionsNeverReturnBlobs(final MySQLColumnMeta meta, final FixedEnv env) {
-        return StringUtils.isEmpty(meta.tableName) && env.functionsNeverReturnBlobs;
+        return MySQLStrings.isEmpty(meta.tableName) && env.functionsNeverReturnBlobs;
     }
 
     private static boolean isBlobTypeReturnText(final MySQLColumnMeta meta, final FixedEnv env) {

@@ -1,8 +1,9 @@
 package io.jdbd.mysql.protocol;
 
+import io.jdbd.session.OptionSpec;
 import reactor.core.publisher.Mono;
 
-public interface MySQLProtocolFactory {
+public interface MySQLProtocolFactory extends OptionSpec {
 
     String factoryName();
 

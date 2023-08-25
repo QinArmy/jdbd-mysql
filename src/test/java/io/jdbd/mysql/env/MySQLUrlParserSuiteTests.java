@@ -1,10 +1,12 @@
-package io.jdbd.mysql.protocol.conf;
+package io.jdbd.mysql.env;
 
+import io.jdbd.Driver;
 import io.jdbd.JdbdException;
-import io.jdbd.mysql.Groups;
-import io.jdbd.mysql.env.MySQLKey;
+import io.jdbd.mysql.protocol.client.Enums;
+import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -12,9 +14,10 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
-@Test(threadPoolSize = 3, groups = {Groups.MYSQL_URL})
+@Test//(threadPoolSize = 3, groups = {Groups.MYSQL_URL})
 public class MySQLUrlParserSuiteTests {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLUrlParserSuiteTests.class);
@@ -40,24 +43,55 @@ public class MySQLUrlParserSuiteTests {
     @Test
     public void singleConnection() {
         LOG.info("test SINGLE_CONNECTION start.");
-        String url = "jdbc:mysql://192.168.0.106:3306/army?sslMode=REQUIRED";
-        final Map<String, String> propMap = Collections.singletonMap(MySQLKey.USER.name, "army_w");
+        String url = "jdbd:mysql://192.168.0.106:3306/army?sslMode=REQUIRED";
+        final Map<String, Object> propMap;
+        propMap = Collections.singletonMap(Driver.USER, "army_w");
 
-//        MySQLUrl mySQLUrl = MySQLUrl.getInstance(url, propMap);
-//        Assert.assertEquals(mySQLUrl.protocolType, Protocol.SINGLE_CONNECTION, "protocolType");
-//        Assert.assertEquals(mySQLUrl.getProtocol(), Protocol.SINGLE_CONNECTION.getScheme(), "protocol");
-//        List<MySQLHost0> hostInfoList = mySQLUrl.getHostList();
-//
-//        Assert.assertEquals(hostInfoList.size(), 1, "hostList size");
-//        HostInfo hostInfo = hostInfoList.get(0);
-//        Assert.assertEquals(hostInfo.getHost(), "192.168.0.106", "host");
-//        Assert.assertEquals(hostInfo.getPort(), MySQLUrl.DEFAULT_PORT, "port");
-//
-//        Assert.assertEquals(hostInfo.getDbName(), "army");
-//
-//        Properties properties = hostInfo.getProperties();
-//        Assert.assertEquals(properties.size(), 1, "prop size");
-//        Assert.assertEquals(properties.getOrDefault(MyKey.sslMode, Enums.SslMode.class), Enums.SslMode.REQUIRED, "sslMode");
+        final List<MySQLHost> hostList;
+        hostList = MySQLUrlParser.parse(url, propMap);
+
+        Assert.assertEquals(hostList.size(), 1);
+
+        final MySQLHost myHost = hostList.get(0);
+
+        Assert.assertEquals(myHost.protocol(), Protocol.SINGLE_CONNECTION, "protocolType");
+
+        Assert.assertEquals(myHost.host(), "192.168.0.106", "host");
+        Assert.assertEquals(myHost.port(), MySQLUrlParser.DEFAULT_PORT, "port");
+
+        Assert.assertEquals(myHost.dbName(), "army");
+
+        final Environment env = myHost.properties();
+
+        Assert.assertEquals(env.getOrDefault(MySQLKey.SSL_MODE), Enums.SslMode.REQUIRED, "sslMode");
+
+        LOG.info("test SINGLE_CONNECTION end");
+    }
+
+    @Test
+    public void singleConnectionIpv6() {
+        LOG.info("test SINGLE_CONNECTION start.");
+        String url = "jdbd:mysql://[1000:2000::abcd]:3306/army?sslMode=REQUIRED";
+        final Map<String, Object> propMap;
+        propMap = Collections.singletonMap(Driver.USER, "army_w");
+
+        final List<MySQLHost> hostList;
+        hostList = MySQLUrlParser.parse(url, propMap);
+
+        Assert.assertEquals(hostList.size(), 1);
+
+        final MySQLHost myHost = hostList.get(0);
+
+        Assert.assertEquals(myHost.protocol(), Protocol.SINGLE_CONNECTION, "protocolType");
+
+        Assert.assertEquals(myHost.host(), "1000:2000::abcd", "host");
+        Assert.assertEquals(myHost.port(), MySQLUrlParser.DEFAULT_PORT, "port");
+
+        Assert.assertEquals(myHost.dbName(), "army");
+
+        final Environment env = myHost.properties();
+
+        Assert.assertEquals(env.getOrDefault(MySQLKey.SSL_MODE), Enums.SslMode.REQUIRED, "sslMode");
 
         LOG.info("test SINGLE_CONNECTION end");
     }

@@ -29,11 +29,7 @@ public abstract class ClientTestUtils {
     private static final Environment ENV = loadTestConfig();
 
     public static Path getModulePath() {
-        Path path = Paths.get(System.getProperty("user.dir"));
-        if (!path.toString().endsWith("jdbd-mysql")) {
-            path = Paths.get(path.toString(), "jdbd-mysql");
-        }
-        return path;
+        return Paths.get(System.getProperty("user.dir"));
     }
 
     public static Path getTestMyLocalPath() {

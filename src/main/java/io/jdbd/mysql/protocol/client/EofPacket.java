@@ -26,6 +26,7 @@ public final class EofPacket extends Terminator {
         if (limitIndex != writerIndex) {
             cumulateBuffer.writerIndex(writerIndex);
         }
+        cumulateBuffer.readerIndex(limitIndex); // avoid tailor filler
         return packet;
     }
 

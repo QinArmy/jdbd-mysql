@@ -41,7 +41,7 @@ public abstract class MySQLUrlParser {
     private static final Pattern SCHEME_PTRN = Pattern.compile("(?<scheme>[\\w\\+:%]+).*");
 
 
-    private static final short DEFAULT_PORT = 3306;
+    static final int DEFAULT_PORT = 3306;
 
 
     public static boolean acceptsUrl(final @Nullable String url) {
@@ -59,6 +59,9 @@ public abstract class MySQLUrlParser {
     }
 
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html">Connection URL Syntax</a>
+     */
     public static List<MySQLHost> parse(final String url, final Map<String, Object> properties) {
         if (!isConnectionStringSupported(url)) {
             String m = String.format("unsupported url[%s] schema", url);
@@ -311,17 +314,48 @@ public abstract class MySQLUrlParser {
      * @see #parseHostPropertyList(String)
      */
     private static Map<String, Object> parseHostPortHost(final String hostPortHost) {
-        String[] hostPortPair = hostPortHost.split(":");
-        if (hostPortPair.length == 0 || hostPortPair.length > 2) {
-            throw createFormatException(hostPortHost);
-        }
-        Map<String, Object> hostKeyValueMap = MySQLCollections.hashMap(4);
-        hostKeyValueMap.put(MySQLKey.HOST.name, decode(hostPortPair[0]).trim());
 
-        if (hostPortPair.length == 2) {
-            hostKeyValueMap.put(MySQLKey.PORT.name, decode(hostPortPair[1]).trim());
+        final Map<String, Object> hostKeyValueMap = MySQLCollections.hashMap(4);
+
+        final String port;
+        if (hostPortHost.charAt(0) == '[') { // ipv6
+            final int index, colonIndex;
+            index = parseIpv6Host(hostPortHost, 1, hostKeyValueMap);
+            colonIndex = hostPortHost.lastIndexOf(':');
+            if (colonIndex < index) {
+                port = null;
+            } else {
+                port = hostPortHost.substring(colonIndex + 1);
+            }
+        } else {
+            String[] hostPortPair = hostPortHost.split(":");
+            if (hostPortPair.length == 0 || hostPortPair.length > 2) {
+                throw createFormatException(hostPortHost);
+            }
+            hostKeyValueMap.put(MySQLKey.HOST.name, decode(hostPortPair[0]));
+            if (hostPortPair.length == 2) {
+                port = hostPortPair[1];
+            } else {
+                port = null;
+            }
+        }
+
+        if (port == null) {
+            hostKeyValueMap.put(MySQLKey.PORT.name, DEFAULT_PORT);
+        } else {
+            hostKeyValueMap.put(MySQLKey.PORT.name, Integer.parseInt(decode(port)));
         }
         return Collections.unmodifiableMap(hostKeyValueMap);
+    }
+
+    private static int parseIpv6Host(final String hostStr, final int offset, final Map<String, Object> map) {
+        final int index;
+        index = hostStr.indexOf(']', offset);
+        if (index < 2) {
+            throw createFormatException(hostStr);
+        }
+        map.put(MySQLKey.HOST.name, hostStr.substring(offset, index));
+        return index;
     }
 
 

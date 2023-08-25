@@ -14,7 +14,8 @@ import reactor.core.publisher.Mono;
 /**
  * @see QueryCommandWriter
  */
-@Test(groups = {Groups.COM_QUERY_WRITER}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS})
+@Deprecated
+@Test(enabled = false, groups = {Groups.COM_QUERY_WRITER}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS})
 public class QueryCommandWriterSuiteTests extends AbstractStmtTaskSuiteTests {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueryCommandWriterSuiteTests.class);

@@ -4,6 +4,7 @@ import io.jdbd.Driver;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.client.Enums;
 import io.jdbd.mysql.protocol.client.MySQLNativePasswordPlugin;
+import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.env.Key;
 import io.jdbd.vendor.env.Redefine;
 import reactor.netty.resources.ConnectionProvider;
@@ -28,36 +29,36 @@ public final class MySQLKey<T> extends Key<T> {
      */
     public static final MySQLKey<String> USER = new MySQLKey<>(Driver.USER, String.class, null);
 
-    /**
-     * The database user password.
-     *
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password</a>
-     */
-    public static final MySQLKey<String> PASSWORD = new MySQLKey<>(Driver.PASSWORD, String.class, null);
+//    /**
+//     * The database user password.
+//     *
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password</a>
+//     */
+//    public static final MySQLKey<String> PASSWORD = new MySQLKey<>(Driver.PASSWORD, String.class, null);
 
-    /**
-     * password1
-     *
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password1</a>
-     * @since MySQL Driver  8.0.28
-     */
-    public static final MySQLKey<String> PASSWORD1 = new MySQLKey<>("password1", String.class, null);
-
-    /**
-     * password2
-     *
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password2</a>
-     * @since MySQL Driver  8.0.28
-     */
-    public static final MySQLKey<String> PASSWORD2 = new MySQLKey<>("password2", String.class, null);
-
-    /**
-     * password3
-     *
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password3</a>
-     * @since MySQL Driver  8.0.28
-     */
-    public static final MySQLKey<String> PASSWORD3 = new MySQLKey<>("password3", String.class, null);
+//    /**
+//     * password1
+//     *
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password1</a>
+//     * @since MySQL Driver  8.0.28
+//     */
+//    public static final MySQLKey<String> PASSWORD1 = new MySQLKey<>("password1", String.class, null);
+//
+//    /**
+//     * password2
+//     *
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password2</a>
+//     * @since MySQL Driver  8.0.28
+//     */
+//    public static final MySQLKey<String> PASSWORD2 = new MySQLKey<>("password2", String.class, null);
+//
+//    /**
+//     * password3
+//     *
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">password3</a>
+//     * @since MySQL Driver  8.0.28
+//     */
+//    public static final MySQLKey<String> PASSWORD3 = new MySQLKey<>("password3", String.class, null);
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-authentication.html">authenticationPlugins</a>
@@ -1217,12 +1218,12 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * The hostname value from the properties instance passed to the driver.
      */
-    public static final MySQLKey<String> HOST = new MySQLKey<>("host", String.class, null);
+    public static final MySQLKey<String> HOST = new MySQLKey<>("host", String.class, JdbdHost.DEFAULT_HOST);
 
     /**
      * The port number value from the properties instance passed to the driver.
      */
-    public static final MySQLKey<Integer> PORT = new MySQLKey<>("port", Integer.class, 3306);
+    public static final MySQLKey<Integer> PORT = new MySQLKey<>("port", Integer.class, MySQLUrlParser.DEFAULT_PORT);
 
     /**
      * The communications protocol. Possible values: "tcp" and "pipe".

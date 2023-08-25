@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+@Deprecated
 public abstract class AbstractTaskSuiteTests {
 
     static final long TIME_OUT = 5 * 1000L;
@@ -56,9 +57,6 @@ public abstract class AbstractTaskSuiteTests {
         map.put("sslMode", Enums.SslMode.DISABLED.name());
         return ClientProtocolFactory.from(MySQLUrlParser.parse((String) map.get("url"), map).get(0));
     }
-
-
-
 
 
 }

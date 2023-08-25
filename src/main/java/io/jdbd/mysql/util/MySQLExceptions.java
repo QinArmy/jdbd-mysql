@@ -4,7 +4,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
-import io.jdbd.mysql.protocol.client.ErrorPacket;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.util.JdbdExceptions;
 
@@ -36,10 +35,6 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         return e;
     }
 
-
-    public static JdbdException createErrorPacketException(ErrorPacket error) {
-        return new JdbdException(error.getErrorMessage(), error.getSqlState(), error.getErrorCode());
-    }
 
 
     public static JdbdException createFatalIoException(String message, @Nullable Throwable cause) {

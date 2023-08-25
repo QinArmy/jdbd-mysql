@@ -74,10 +74,11 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         if (this == obj) {
             match = true;
         } else if (obj instanceof MySQLServerVersion) {
-            final MySQLServerVersion another = (MySQLServerVersion) obj;
-            match = this.major == another.major
-                    && this.minor == another.minor
-                    && this.subMinor == another.subMinor;
+            final MySQLServerVersion o = (MySQLServerVersion) obj;
+            match = o.completeVersion.equals(this.completeVersion)
+                    && this.major == o.major
+                    && this.minor == o.minor
+                    && this.subMinor == o.subMinor;
         } else {
             match = false;
         }
@@ -86,7 +87,7 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.major, this.minor, this.subMinor);
+        return Objects.hash(this.completeVersion, this.major, this.minor, this.subMinor);
     }
 
     /**
@@ -130,7 +131,6 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         return Integer.compare(this.subMinor, subMinor);
     }
 
-
     /**
      * Parse the server version into major/minor/subminor.
      *
@@ -142,34 +142,24 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         MySQLServerVersion serverVersion = null;
 
         try {
-            final int major, minor, point1, pont2;
+            final int major, minor, subMinor, point1, pont2;
             point1 = versionString.indexOf('.');
-            if (point1 < 0) {
-                throw serverVersionError(versionString);
-            }
             major = Integer.parseInt(versionString.substring(0, point1));
             pont2 = versionString.indexOf('.', point1 + 1);
-            if (pont2 < 0) {
-                throw serverVersionError(versionString);
-            }
             minor = Integer.parseInt(versionString.substring(point1 + 1, pont2));
 
             final int len = versionString.length();
 
+            int nonNumIndex = pont2 + 1;
             char ch;
-            for (int i = pont2 + 1, subMinor; i < len; i++) {
-                ch = versionString.charAt(i);
-                if (ch >= '0' && ch <= '9') {
-                    continue;
+            for (; nonNumIndex < len; nonNumIndex++) {
+                ch = versionString.charAt(nonNumIndex);
+                if (ch < '0' || ch > '9') {
+                    break;
                 }
-                subMinor = Integer.parseInt(versionString.substring(pont2 + 1, i));
-                serverVersion = new MySQLServerVersion(versionString, major, minor, subMinor);
-                break;
             }
-            if (serverVersion == null) {
-                // can't parse the server version
-                serverVersion = MIN_VERSION;
-            }
+            subMinor = Integer.parseInt(versionString.substring(pont2 + 1, nonNumIndex));
+            serverVersion = new MySQLServerVersion(versionString, major, minor, subMinor);
         } catch (Throwable e) {
             // can't parse the server version
             serverVersion = MIN_VERSION;

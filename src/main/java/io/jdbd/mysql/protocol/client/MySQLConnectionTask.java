@@ -318,19 +318,19 @@ final class MySQLConnectionTask extends CommunicationTask implements Authenticat
             taskEnd = true;
         } else if (OkPacket.isOkPacket(payload)) {
             OkPacket ok = OkPacket.read(payload, this.capability);
-            serverConsumer.accept(ok.getStatusFags());
+            serverConsumer.accept(ok);
             LOG.debug("MySQL authentication success,info:{}", ok.getInfo());
             this.sink.success(new AuthenticateResult(this.handshake, this.capability));
             taskEnd = true;
-        } else if (ErrorPacket.isErrorPacket(payload)) {
-            ErrorPacket error;
+        } else if (MySQLServerException.isErrorPacket(payload)) {
+            MySQLServerException error;
             if (this.sequenceId < 2) {
-                error = ErrorPacket.read(payload, 0, obtainServerCharset());
+                error = MySQLServerException.read(payload, payloadLength, 0, obtainServerCharset());
             } else {
-                error = ErrorPacket.read(payload, this.capability, obtainServerCharset());
+                error = MySQLServerException.read(payload, payloadLength, this.capability, obtainServerCharset());
             }
             taskEnd = true;
-            handleAuthenticateFailure(MySQLExceptions.createErrorPacketException(error));
+            handleAuthenticateFailure(error);
         } else {
             try {
                 taskEnd = processNextAuthenticationNegotiation(payload);

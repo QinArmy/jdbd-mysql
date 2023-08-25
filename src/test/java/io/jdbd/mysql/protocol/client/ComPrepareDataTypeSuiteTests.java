@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 
+@Deprecated
 public class ComPrepareDataTypeSuiteTests extends AbstractDataTypeSuiteTests {
 
 

@@ -10,6 +10,7 @@ import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.session.Isolation;
 import io.jdbd.session.XaStates;
 import io.jdbd.session.Xid;
@@ -273,7 +274,8 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         public ZoneOffset serverZone() {
             SessionEnv server = this.sessionEnv;
             if (server == null) {
-                throw new JdbdException("Cannot access zoneOffsetDatabase now.");
+                // before reset .
+                return MySQLTimes.systemZoneOffset();
             }
             return server.connZone();
         }

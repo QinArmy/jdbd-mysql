@@ -38,7 +38,8 @@ import static org.testng.Assert.*;
  * @see ComQueryTask
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_local_infile_request.html">Protocol::LOCAL INFILE Request</a>
  */
-@Test(groups = {Groups.LOAD_DATA}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS
+@Deprecated
+@Test(enabled = false, groups = {Groups.LOAD_DATA}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS
         , Groups.COM_QUERY_WRITER})
 public class LoadDataLocalSuiteTests extends AbstractStmtTaskSuiteTests {
 

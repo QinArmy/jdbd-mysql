@@ -1,8 +1,8 @@
 package io.jdbd.mysql.env;
 
 import io.jdbd.Driver;
-import io.jdbd.JdbdException;
 import io.jdbd.vendor.env.Environment;
+import io.jdbd.vendor.env.SimpleEnvironment;
 
 import java.util.Map;
 
@@ -30,20 +30,16 @@ final class MySQLJdbdHost implements MySQLHost {
 
     private MySQLJdbdHost(final Protocol protocol, final Map<String, Object> properties) {
         this.protocol = protocol;
-        this.host = (String) properties.remove(MySQLKey.HOST.name);
-        this.port = (Integer) properties.remove(MySQLKey.PORT.name);
-        this.user = (String) properties.remove(Driver.USER);
-
         this.password = (String) properties.remove(Driver.PASSWORD);
-        this.dbName = (String) properties.remove(MySQLKey.DB_NAME.name);
 
-        if (this.user == null) {
-            throw new JdbdException("No user property");
-        }
+        final Environment env = SimpleEnvironment.from(properties);
+        this.env = env;
 
-        assert this.host != null;
+        this.host = env.getOrDefault(MySQLKey.HOST);
+        this.port = env.getOrDefault(MySQLKey.PORT);
+        this.user = env.getOrDefault(MySQLKey.USER);
+        this.dbName = env.getOrDefault(MySQLKey.DB_NAME);
 
-        this.env = MySQLEnvironment.from(properties);
     }
 
 

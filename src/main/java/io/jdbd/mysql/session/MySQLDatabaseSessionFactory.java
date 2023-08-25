@@ -131,7 +131,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public <T> T valueOf(Option<T> option) {
-        return null;
+        return this.protocolFactory.valueOf(option);
     }
 
     @Override

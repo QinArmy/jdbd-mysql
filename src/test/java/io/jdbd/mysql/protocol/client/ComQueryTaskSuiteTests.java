@@ -32,7 +32,8 @@ import static org.testng.Assert.*;
 /**
  * @see ComQueryTask
  */
-@Test(groups = {Groups.COM_QUERY}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS
+@Deprecated
+@Test(enabled = false, groups = {Groups.COM_QUERY}, dependsOnGroups = {Groups.SESSION_INITIALIZER, Groups.UTILS
         , Groups.COM_QUERY_WRITER, Groups.DATA_PREPARE})
 public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 

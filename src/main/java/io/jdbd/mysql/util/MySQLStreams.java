@@ -4,5 +4,6 @@ import io.jdbd.vendor.util.JdbdStreams;
 
 public abstract class MySQLStreams extends JdbdStreams {
 
-
+    private MySQLStreams() {
+    }
 }

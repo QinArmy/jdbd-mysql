@@ -7,11 +7,11 @@ import io.jdbd.mysql.protocol.AuthenticateAssistant;
 import io.jdbd.mysql.protocol.ClientConstants;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.vendor.env.Environment;
+import io.jdbd.vendor.util.JdbdKeys;
 import io.jdbd.vendor.util.JdbdStreams;
+import io.jdbd.vendor.util.KeyPairType;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.qinarmy.util.security.KeyPairType;
-import io.qinarmy.util.security.KeyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.util.annotation.Nullable;
@@ -154,7 +154,7 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin {
 
         AuthenticateUtils.xorString(passwordBytes, mysqlScrambleBuff, seedBytes, passwordBytes.length);
         String publicKeyString = Objects.requireNonNull(this.publicKeyString, "this.publicKeyString");
-        PublicKey publicKey = KeyUtils.readPublicKey(KeyPairType.RSA, publicKeyString);
+        PublicKey publicKey = JdbdKeys.readPublicKey(KeyPairType.RSA, publicKeyString);
         return encryptWithPublicKey(mysqlScrambleBuff, publicKey, transformation);
     }
 

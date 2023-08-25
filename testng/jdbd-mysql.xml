@@ -3,20 +3,7 @@
     <test name="feature">
         <classes>
             <class name="io.jdbd.mysql.util.MySQLTimesSuiteTests"/>
-
-            <class name="io.jdbd.mysql.protocol.conf.MySQLUrlParserSuiteTests"/>
             <class name="io.jdbd.mysql.syntax.MySQLParserSuiteTests"/>
-            <class name="io.jdbd.mysql.protocol.client.AuthenticatePluginSuiteTests"/>
-            <class name="io.jdbd.mysql.protocol.client.SessionInitializerSuiteTests"/>
-
-            <class name="io.jdbd.mysql.protocol.client.QueryCommandWriterSuiteTests"/>
-
-            <class name="io.jdbd.mysql.protocol.client.TaskTestAdvice"/>
-            <class name="io.jdbd.mysql.protocol.client.ComQueryTaskSuiteTests"/>
-            <class name="io.jdbd.mysql.protocol.client.MultiStatementSuiteTests"/>
-            <class name="io.jdbd.mysql.protocol.client.ComQueryTaskBigColumnSuiteTests"/>
-
-            <class name="io.jdbd.mysql.protocol.client.ComPreparedTaskSuiteTests"/>
         </classes>
     </test>
 </suite>

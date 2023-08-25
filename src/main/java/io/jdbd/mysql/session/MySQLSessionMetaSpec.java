@@ -70,12 +70,12 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
 
     @Override
     public final String factoryVendor() {
-        return MySQLDriver.MY_SQL;
+        return MySQLDriver.DRIVER_VENDOR;
     }
 
     @Override
     public final String driverVendor() {
-        return MySQLDriver.MY_SQL;
+        return MySQLDriver.DRIVER_VENDOR;
     }
 
 

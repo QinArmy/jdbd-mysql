@@ -801,7 +801,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         final boolean canRead;
         final int headFlag = Packets.readInt1AsInt(cumulateBuffer);
         switch (headFlag) {
-            case ErrorPacket.ERROR_HEADER:
+            case MySQLServerException.ERROR_HEADER:
                 canRead = true;
                 break;
             case 0: {
@@ -855,7 +855,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         final int headFlag = Packets.getHeaderFlag(cumulateBuffer);
         final boolean taskEnd;
         switch (headFlag) {
-            case ErrorPacket.ERROR_HEADER: {
+            case MySQLServerException.ERROR_HEADER: {
                 readErrorPacket(cumulateBuffer);
                 taskEnd = true;
             }
@@ -987,7 +987,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         final int header = Packets.getHeaderFlag(cumulateBuffer);
         final boolean taskEnd;
         switch (header) {
-            case ErrorPacket.ERROR_HEADER: {
+            case MySQLServerException.ERROR_HEADER: {
                 readErrorPacket(cumulateBuffer);
                 taskEnd = true;
             }
@@ -1012,7 +1012,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     private boolean readFetchResponse(final ByteBuf cumulateBuffer) {
         final int flag = Packets.getInt1AsInt(cumulateBuffer, cumulateBuffer.readerIndex() + Packets.HEADER_SIZE);
         final boolean taskEnd;
-        if (flag == ErrorPacket.ERROR_HEADER) {
+        if (flag == MySQLServerException.ERROR_HEADER) {
             readErrorPacket(cumulateBuffer);
             taskEnd = true;
         } else {
@@ -1030,7 +1030,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         final int flag = Packets.getHeaderFlag(cumulateBuffer);
         final boolean taskEnd;
         switch (flag) {
-            case ErrorPacket.ERROR_HEADER: {
+            case MySQLServerException.ERROR_HEADER: {
                 readErrorPacket(cumulateBuffer);
                 taskEnd = true;
             }

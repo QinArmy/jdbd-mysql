@@ -33,6 +33,7 @@ public abstract class Terminator implements MySQLPacket {
         if (limitIndex != writerIndex) {
             cumulateBuffer.writerIndex(writerIndex);
         }
+        cumulateBuffer.readerIndex(limitIndex); // avoid tailor filler
         return packet;
     }
 

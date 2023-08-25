@@ -7,6 +7,7 @@ import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.FieldType;
 import io.jdbd.result.ResultRowMeta;
 import io.jdbd.session.Option;
+import io.jdbd.vendor.result.ColumnMeta;
 import io.jdbd.vendor.result.VendorResultRowMeta;
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
@@ -14,7 +15,6 @@ import reactor.util.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -97,6 +97,8 @@ final class MySQLRowMeta extends VendorResultRowMeta {
 
     final ZoneOffset serverZone;
 
+    private final Map<String, Integer> labelToIndexMap;
+
     int metaIndex = 0;
 
 
@@ -109,6 +111,13 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         this.customCollationMap = Collections.emptyMap();
         this.serverZone = PSEUDO_SERVER_ZONE;
         this.resultSetCharset = null;
+
+        if (columnMetaArray.length < 6) {
+            this.labelToIndexMap = null;
+        } else {
+            this.labelToIndexMap = createLabelToIndexMap(columnMetaArray);
+        }
+
     }
 
     private MySQLRowMeta(final MySQLColumnMeta[] columnMetaArray, StmtTask stmtTask) {
@@ -121,6 +130,12 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         this.customCollationMap = adjutant.obtainCustomCollationMap();
         this.serverZone = adjutant.serverZone();
         this.resultSetCharset = adjutant.getCharsetResults();
+
+        if (columnMetaArray.length < 6) {
+            this.labelToIndexMap = null;
+        } else {
+            this.labelToIndexMap = createLabelToIndexMap(columnMetaArray);
+        }
     }
 
     @Override
@@ -207,18 +222,40 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     }
 
     @Override
-    public List<String> getColumnLabelList() {
-        return null;
-    }
-
-    @Override
     public String getColumnLabel(int indexBasedZero) throws JdbdException {
-        return null;
+        return this.columnMetaArray[checkIndex(indexBasedZero)].columnLabel;
     }
 
     @Override
     public int getColumnIndex(String columnLabel) throws JdbdException {
-        return 0;
+        final Map<String, Integer> labelToIndexMap = this.labelToIndexMap;
+        if (labelToIndexMap != null) {
+            final Integer columnIndex = labelToIndexMap.get(columnLabel);
+            if (columnIndex == null) {
+                throw createNotFoundIndexException(columnLabel);
+            }
+            return columnIndex;
+        }
+
+        int indexBasedZero = -1;
+        final MySQLColumnMeta[] columnMetaArray = this.columnMetaArray;
+        final int length = columnMetaArray.length;
+        for (int i = length - 1; i > -1; i--) {
+            if (columnLabel.equals(columnMetaArray[i].columnLabel)) {
+                indexBasedZero = i;
+                break;
+            }
+        }
+        if (indexBasedZero < 0) {
+            throw createNotFoundIndexException(columnLabel);
+        }
+        return indexBasedZero;
+    }
+
+
+    @Override
+    protected ColumnMeta[] getColumnMetaArray() {
+        return this.columnMetaArray;
     }
 
     boolean isReady() {
@@ -236,7 +273,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         throw new JdbdException(String.format("Not found column for columnAlias[%s]", columnAlias));
     }
 
-    final MySQLType getMySQLType(int indexBaseZero) {
+    MySQLType getMySQLType(int indexBaseZero) {
         return this.columnMetaArray[checkIndex(indexBaseZero)].sqlType;
     }
 

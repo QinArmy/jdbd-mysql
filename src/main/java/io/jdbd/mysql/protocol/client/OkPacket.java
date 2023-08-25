@@ -1,8 +1,8 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.util.MySQLCollections;
+import io.jdbd.vendor.util.Pair;
 import io.netty.buffer.ByteBuf;
-import io.qinarmy.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.util.annotation.Nullable;
@@ -29,13 +29,14 @@ final class OkPacket extends Terminator {
             cumulateBuffer.writerIndex(limitIndex);
         }
 
-
         final OkPacket packet;
         packet = read(cumulateBuffer, capabilities);
 
         if (limitIndex != writerIndex) {
             cumulateBuffer.writerIndex(writerIndex);
         }
+
+        cumulateBuffer.readerIndex(limitIndex); // avoid tailor filler
         return packet;
     }
 
@@ -190,7 +191,7 @@ final class OkPacket extends Terminator {
                         String name = Packets.readStringLenEnc(payload, StandardCharsets.UTF_8);
                         String value = Packets.readStringLenEnc(payload, StandardCharsets.UTF_8);
                         if (name != null && value != null) {
-                            variablePairList.add(new Pair<>(name, value));
+                            variablePairList.add(Pair.create(name, value));
                         } else if (LOG.isDebugEnabled()) {
                             LOG.warn("MySQL server response SESSION_TRACK_SYSTEM_VARIABLES name:{} , value:{} error."
                                     , name, value);

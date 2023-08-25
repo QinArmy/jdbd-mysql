@@ -387,12 +387,12 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             limitIndex = packetIndex + Packets.HEADER_SIZE + payloadLength;
 
             switch (Packets.getInt1AsInt(cumulateBuffer, packetIndex + Packets.HEADER_SIZE)) {
-                case ErrorPacket.ERROR_HEADER: {
+                case MySQLServerException.ERROR_HEADER: {
                     sequenceId = Packets.readInt1AsInt(cumulateBuffer);
-                    final ErrorPacket packet;
-                    packet = ErrorPacket.readCumulate(cumulateBuffer, payloadLength, this.capability,
+                    final MySQLServerException error;
+                    error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability,
                             this.adjutant.errorCharset());
-                    this.task.addErrorToTask(MySQLExceptions.createErrorPacketException(packet));
+                    this.task.addErrorToTask(error);
                     states = States.END_ON_ERROR;
                     resultSetEnd = true;
                 }

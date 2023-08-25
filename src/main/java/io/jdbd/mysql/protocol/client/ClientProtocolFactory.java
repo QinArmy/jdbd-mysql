@@ -7,14 +7,15 @@ import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHost;
 import io.jdbd.mysql.env.MySQLKey;
-import io.jdbd.mysql.env.Protocol;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.protocol.MySQLProtocolFactory;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.*;
 import io.jdbd.result.CurrentRow;
+import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
+import io.jdbd.session.Option;
 import io.jdbd.vendor.env.Environment;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
@@ -22,6 +23,8 @@ import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.SQLStates;
 import io.netty.channel.EventLoopGroup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.resources.LoopResources;
@@ -40,11 +43,11 @@ import java.util.function.Consumer;
 public final class ClientProtocolFactory extends FixedEnv implements MySQLProtocolFactory {
 
     public static ClientProtocolFactory from(MySQLHost host) {
-        if (host.protocol() != Protocol.SINGLE_CONNECTION) {
-            throw new IllegalArgumentException();
-        }
         return new ClientProtocolFactory(host);
     }
+
+
+    private static final Logger LOG = LoggerFactory.getLogger(ClientProtocolFactory.class);
 
 
     final MySQLHost host;
@@ -79,6 +82,17 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .map(ClientProtocol::create);         //5. create ClientProtocol
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T valueOf(Option<T> option) {
+        final Object value;
+        if (option == Option.AUTO_RECONNECT) {
+            value = this.env.getOrDefault(MySQLKey.AUTO_RECONNECT);
+        } else {
+            value = null;
+        }
+        return (T) value;
+    }
 
     @Override
     public String toString() {
@@ -117,7 +131,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         private final MySQLTaskExecutor executor;
 
-
         private final TaskAdjutant adjutant;
 
         private final ClientProtocolFactory factory;
@@ -137,8 +150,9 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         @Override
         public Mono<Void> reset() {
+            LOG.debug("set connection");
             return ComResetTask.reset(this.adjutant)
-                    .then(Mono.defer(this::resetSessionEnvironment))
+                    .then(Mono.defer(this::initializing))
                     .then();
         }
 
@@ -153,13 +167,14 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
 
         private Mono<ClientProtocolManager> authenticate() {
-            return MySQLConnectionTask.authenticate(this.executor.taskAdjutant())
+            return MySQLConnectionTask.authenticate(this.adjutant)
                     .doOnSuccess(this.executor::setAuthenticateResult)
                     .thenReturn(this);
         }
 
 
         private Mono<ClientProtocolManager> initializing() {
+            LOG.debug("initializing connection");
             return this.initializeCustomCharset()
                     .then(Mono.defer(this::resetSessionEnvironment))
                     .thenReturn(this);
@@ -170,20 +185,21 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
          * @see #initializing()
          */
         private Mono<ProtocolManager> resetSessionEnvironment() {
-            final List<String> sqlGroup = MySQLCollections.arrayList(6);
+            LOG.debug("reset session environment");
+
+            final StringBuilder builder = new StringBuilder(480);
 
             final Charset clientCharset, resultCharset;
             final ZoneOffset connZone;
             try {
-                final Consumer<String> sqlConsumer = sqlGroup::add;
 
-                buildSetVariableCommand(sqlConsumer);
-                sqlGroup.add(connCollation());
-                clientCharset = clientMyCharset(sqlConsumer);
-                resultCharset = resultsCharset(sqlConsumer);
+                keyVariablesDefaultSql(builder);
+                buildSetVariableCommand(builder);
+                connCollation(builder);
+                clientCharset = clientMyCharset(builder);
 
-                sqlGroup.add(keyVariablesDefaultSql());
-                connZone = connTimeZone(sqlConsumer); // after keyVariablesDefaultSql
+                resultCharset = resultsCharset(builder);
+                connZone = connTimeZone(builder); // after keyVariablesDefaultSql
             } catch (Throwable e) {
                 return Mono.error(MySQLExceptions.wrap(e));
             }
@@ -191,18 +207,15 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
             final long utcEpochSecond;
             utcEpochSecond = OffsetDateTime.now(ZoneOffset.UTC).toEpochSecond();
-            final String keyVariablesQuerySql;
-            keyVariablesQuerySql = MySQLStrings.builder()
-                    .append("SELECT DATE_FORMAT(FROM_UNIXTIME(")
+            if (builder.length() > 0) {
+                builder.append(Constants.SPACE_SEMICOLON_SPACE);
+            }
+            builder.append("SELECT DATE_FORMAT(FROM_UNIXTIME(")
                     .append(utcEpochSecond)
-                    .append("),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@SESSION.local_infile localInfile")
-                    .toString();
+                    .append("),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@GLOBAL.local_infile localInfile");
 
-            sqlGroup.add(keyVariablesQuerySql); // 5.
-            final int sqlSize = sqlGroup.size();
-
-            return Flux.from(ComQueryTask.batchAsFlux(Stmts.batch(sqlGroup), this.adjutant))
-                    .filter(r -> r instanceof ResultRow && r.getResultNo() == sqlSize)
+            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
+                    .filter(ResultItem::isRowItem)
                     .last()
                     .map(ResultRow.class::cast)
                     .map(row -> new DefaultSessionEnv(clientCharset, resultCharset, connZone, row, utcEpochSecond, this.factory.env))
@@ -216,8 +229,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
          * @see #initializing()
          */
         private Mono<Void> initializeCustomCharset() {
-            if (!this.factory.env.getOrDefault(MySQLKey.DETECT_CUSTOM_COLLATIONS)
-                    || this.factory.customCharsetMap.size() == 0) {
+            if (this.factory.env.isOff(MySQLKey.DETECT_CUSTOM_COLLATIONS) || this.factory.customCharsetMap.size() == 0) {
                 return Mono.empty();
             }
             return ComQueryTask.query(Stmts.stmt("SHOW CHARACTER SET"), this::mapMyCharset, this.adjutant)// SHOW CHARACTER SET result
@@ -231,17 +243,18 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         /**
          * @see #initializeCustomCharset()
+         * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/charset-mysql.html">Character Sets and Collations in MySQL</a>
          */
         private Optional<MyCharset> mapMyCharset(final CurrentRow row) {
             final String name;
-            name = row.getNonNull("Charset", String.class);
+            name = row.getNonNull(0, String.class); // Charset
             final Charset charset;
             if (Charsets.NAME_TO_CHARSET.containsKey(name)
                     || (charset = this.factory.customCharsetMap.get(name)) == null) {
                 return Optional.empty();
             }
             final MyCharset myCharset;
-            myCharset = new MyCharset(name, row.getNonNull("Maxlen", Integer.class), 0, charset.name());
+            myCharset = new MyCharset(name, row.getNonNull(3, Integer.class), 0, charset.name()); // Maxlen
             return Optional.of(myCharset);
         }
 
@@ -306,10 +319,11 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
 
         /**
+         * @see #resetSessionEnvironment()
          * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/time-zone-support.html#time-zone-variables">Time Zone Variables</a>
          */
         @Nullable
-        private ZoneOffset connTimeZone(final Consumer<String> sqlConsumer) {
+        private ZoneOffset connTimeZone(final StringBuilder builder) {
             final String zoneStr;
             zoneStr = this.factory.env.get(MySQLKey.CONNECTION_TIME_ZONE);
             if (zoneStr == null || "SERVER".equals(zoneStr)) {
@@ -324,20 +338,24 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             }
 
             if (this.factory.env.getOrDefault(MySQLKey.FORCE_CONNECTION_TIME_ZONE_TO_SESSION)) {
-                final String command;
-                command = MySQLStrings.builder()
-                        .append("SET @@SESSION.time_zone = '")
+                if (builder.length() > 0) {
+                    builder.append(Constants.SPACE_SEMICOLON_SPACE);
+                }
+                builder.append("SET @@SESSION.time_zone = '")
                         .append(MySQLTimes.ZONE_FORMATTER.format(zone))
-                        .append(Constants.QUOTE)
-                        .toString();
+                        .append(Constants.QUOTE);
 
-                sqlConsumer.accept(command);
             }
             return zone;
         }
 
-        private String keyVariablesDefaultSql() {
-            final StringBuilder builder = new StringBuilder(50);
+        /**
+         * @see #resetSessionEnvironment()
+         */
+        private void keyVariablesDefaultSql(final StringBuilder builder) {
+            if (builder.length() > 0) {
+                builder.append(Constants.SPACE_SEMICOLON_SPACE);
+            }
             builder.append("SET");
 
             final List<String> list = KEY_VARIABLES;
@@ -345,7 +363,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
             for (int i = 0; i < size; i++) {
                 if (i > 0) {
-                    builder.append(" ,");
+                    builder.append(Constants.SPACE_COMMA_SPACE);
                 }
 
                 builder.append(" @@SESSION.")
@@ -353,14 +371,20 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                         .append(" = DEFAULT");
 
             }
-            return builder.toString();
+
         }
 
-
-        private Charset resultsCharset(final Consumer<String> sqlConsumer) throws JdbdException {
+        /**
+         * @see #resetSessionEnvironment()
+         * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html">Connection Character Sets and Collations</a>
+         */
+        private Charset resultsCharset(final StringBuilder builder) throws JdbdException {
             final String charsetString = this.factory.env.get(MySQLKey.CHARACTER_SET_RESULTS);
 
-            final StringBuilder builder = new StringBuilder(40);
+            if (builder.length() > 0) {
+                builder.append(Constants.SPACE_SEMICOLON_SPACE);
+            }
+
             final Charset charsetResults;
             builder.append("SET character_set_results = ");
             if (charsetString == null || charsetString.equalsIgnoreCase(Constants.NULL)) {
@@ -387,14 +411,13 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                         .append(Constants.QUOTE);
             }
 
-            sqlConsumer.accept(builder.toString());
             return charsetResults;
         }
 
         /**
-         * @see #reset()
+         * @see #resetSessionEnvironment()
          */
-        private String connCollation() throws JdbdException {
+        private void connCollation(final StringBuilder builder) throws JdbdException {
             final String collationStr;
             collationStr = this.factory.env.get(MySQLKey.CONNECTION_COLLATION);
 
@@ -425,7 +448,10 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 mysqlCharsetName = collation.myCharset.name;
             }
 
-            final StringBuilder builder = new StringBuilder(40);
+            if (builder.length() > 0) {
+                builder.append(Constants.SPACE_SEMICOLON_SPACE);
+            }
+
             builder.append("SET character_set_connection = '")
                     .append(mysqlCharsetName)
                     .append(Constants.QUOTE);
@@ -435,13 +461,14 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                         .append(collation.name)
                         .append(Constants.QUOTE);
             }
-            return builder.toString();
+
         }
 
         /**
-         * @see #reset()
+         * @see #resetSessionEnvironment()
+         * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html">Connection Character Sets and Collations</a>
          */
-        private Charset clientMyCharset(final Consumer<String> sqlConsumer) {
+        private Charset clientMyCharset(final StringBuilder builder) {
             Charset charset;
             charset = this.factory.env.getOrDefault(MySQLKey.CHARACTER_ENCODING);
 
@@ -455,20 +482,23 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 myCharset = Charsets.NAME_TO_CHARSET.get(Charsets.utf8mb4);
             }
 
-            final StringBuilder builder;
-            builder = MySQLStrings.builder()
-                    .append("SET character_set_client '")
+            if (builder.length() > 0) {
+                builder.append(Constants.SPACE_SEMICOLON_SPACE);
+            }
+
+            builder.append("SET character_set_client = '")
                     .append(myCharset.name)
                     .append(Constants.QUOTE);
-
-            sqlConsumer.accept(builder.toString());
 
             return charset;
         }
 
 
+        /**
+         * @see #resetSessionEnvironment()
+         */
         @Nullable
-        private void buildSetVariableCommand(final Consumer<String> sqlConsumer) throws JdbdException {
+        private void buildSetVariableCommand(final StringBuilder builder) throws JdbdException {
 
             final String variables;
             variables = this.factory.env.get(MySQLKey.SESSION_VARIABLES);
@@ -479,7 +509,10 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             final Map<String, String> map;
             map = MySQLStrings.spitAsMap(variables, ",", "=", true);
 
-            final StringBuilder builder = new StringBuilder(40);
+            if (builder.length() > 0) {
+                builder.append(Constants.SPACE_SEMICOLON_SPACE);
+            }
+
             builder.append("SET ");
             int index = 0;
             String lower, name, value;
@@ -507,13 +540,11 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                         .append(name)
                         .append(" = '")
                         .append(value)
-                        .append('\'');
+                        .append(Constants.QUOTE);
 
                 index++;
 
             }
-
-            sqlConsumer.accept(builder.toString());
         }
 
         /**
