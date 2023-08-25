@@ -120,7 +120,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public DriverVersion driverVersion() {
-        return MySQLDriver.getInstance().version();
+        return MySQLDriver.VERSION;
     }
 
     @Override
@@ -136,7 +136,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public String toString() {
-        return MySQLStrings.builder(50)
+        return MySQLStrings.builder(210)
                 .append(getClass().getName())
                 .append("[ name : ")
                 .append(name())
@@ -147,7 +147,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
                 .append(" , productFamily : ")
                 .append(productFamily())
                 .append(" , driverVersion : ")
-                .append(driverVersion())
+                .append(driverVersion().getVersion())
                 .append(" , hash : ")
                 .append(System.identityHashCode(this))
                 .append(" ]")

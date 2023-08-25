@@ -2,6 +2,7 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.NullMode;
+import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.Groups;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;

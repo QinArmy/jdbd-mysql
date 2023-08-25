@@ -1,5 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
+import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.env.MySQLUrlParser;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLCollections;

@@ -251,7 +251,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">connectTimeout</a>
      */
-    public static final MySQLKey<Long> CONNECT_TIMEOUT = new MySQLKey<>("connectTimeout", Long.class, 0L);
+    public static final MySQLKey<Integer> CONNECT_TIMEOUT = new MySQLKey<>("connectTimeout", Integer.class, 0);
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketTimeout</a>
@@ -1260,11 +1260,14 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html">Server SQL Modes</a>
      */
-    public static final MySQLKey<String> APPEND_SQL_MODE = new MySQLKey<>("append.sql.mode", String.class, null);
+    public static final MySQLKey<String> APPEND_SQL_MODE = new MySQLKey<>("appendSqlMode", String.class, null);
 
-    public static final MySQLKey<Integer> FACTORY_WORKER_COUNT = new MySQLKey<>("factory_work_count", Integer.class, 50);
+    public static final MySQLKey<Integer> FACTORY_WORKER_COUNT = new MySQLKey<>("factoryWorkerCount", Integer.class, 20);
 
-    public static final MySQLKey<Integer> FACTORY_TASK_QUEUE_SIZE = new MySQLKey<>("factory_task_queue_size", Integer.class, 18);
+    public static final MySQLKey<Integer> FACTORY_SELECT_COUNT_COUNT = new MySQLKey<>("factorySelectCount", Integer.class, FACTORY_WORKER_COUNT.defaultValue);
+
+
+    public static final MySQLKey<Integer> FACTORY_TASK_QUEUE_SIZE = new MySQLKey<>("factoryTaskQueueSize", Integer.class, 18);
 
     public static final MySQLKey<String> FACTORY_NAME = new MySQLKey<>(Driver.FACTORY_NAME, String.class, "unnamed");
 

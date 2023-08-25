@@ -125,8 +125,8 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
     }
 
 
-    Mono<Void> setCustomCollation(final Map<String, MyCharset> customCharsetMap
-            , final Map<Integer, Collation> customCollationMap) {
+    Mono<Void> setCustomCollation(final Map<String, MyCharset> customCharsetMap,
+                                  final Map<Integer, Collation> customCollationMap) {
         final Mono<Void> mono;
         final MySQLTaskAdjutant adjutant = ((MySQLTaskAdjutant) this.taskAdjutant);
         if (this.eventLoop.inEventLoop()) {
@@ -257,6 +257,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public int capability() {
+            // here , don't check session whether open or not
             int capacity = this.negotiatedCapability;
             if (capacity == 0) {
                 LOG.trace("Cannot access negotiatedCapability[{}],this[{}]", this.negotiatedCapability, this);
@@ -282,6 +283,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public Handshake10 handshake10() {
+            // here , don't check session whether open or not
             Handshake10 packet = this.handshake10;
             if (packet == null) {
                 throw new IllegalStateException("Cannot access handshakeV10Packet now.");

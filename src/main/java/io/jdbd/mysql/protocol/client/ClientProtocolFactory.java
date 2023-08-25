@@ -22,7 +22,8 @@ import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.SQLStates;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.unix.DomainSocketAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -31,6 +32,8 @@ import reactor.netty.resources.LoopResources;
 import reactor.netty.tcp.TcpClient;
 import reactor.netty.tcp.TcpResources;
 
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -38,8 +41,14 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.function.Consumer;
 
+/**
+ * <p>
+ * This class is physical protocol(connection) factory.
+ * </p>
+ *
+ * @since 1.0
+ */
 public final class ClientProtocolFactory extends FixedEnv implements MySQLProtocolFactory {
 
     public static ClientProtocolFactory from(MySQLHost host) {
@@ -59,14 +68,18 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     private ClientProtocolFactory(final MySQLHost host) {
         super(host.properties());
         this.host = host;
-
-        this.factoryTaskQueueSize = this.env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
+        final Environment env = this.env;
+        this.factoryTaskQueueSize = env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
 
         this.tcpClient = TcpClient.create(this.env.get(MySQLKey.SOCKET_FACTORY, TcpResources::get))
-                .runOn(createEventLoopGroup(this.env))
-                .host(host.host())
-                .port(host.port());
+                .option(ChannelOption.SO_KEEPALIVE, env.isOn(MySQLKey.TCP_KEEP_ALIVE))
+                .option(ChannelOption.TCP_NODELAY, env.isOn(MySQLKey.TCP_NO_DELAY))
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, env.getOrDefault(MySQLKey.CONNECT_TIMEOUT))
+                .runOn(createEventLoopGroup(this.env), true)
+                .remoteAddress(() -> hostAddress(host));
+
     }
+
 
     @Override
     public String factoryName() {
@@ -75,8 +88,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     @Override
     public Mono<MySQLProtocol> createProtocol() {
-        return MySQLTaskExecutor.create(this)//1. create tcp connection
-                .map(executor -> new ClientProtocolManager(executor, this))//2. create  SessionManagerImpl
+        return MySQLTaskExecutor.create(this)//1. create network connection
+                .map(executor -> new ClientProtocolManager(executor, this))//2. create  ClientProtocolManager
                 .flatMap(ClientProtocolManager::authenticate) //3. authenticate
                 .flatMap(ClientProtocolManager::initializing)//4. initializing
                 .map(ClientProtocol::create);         //5. create ClientProtocol
@@ -99,15 +112,31 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         return MySQLStrings.builder()
                 .append(getClass().getName())
                 .append("[ name : ")
+                .append(this.factoryName())
                 .append(" , hash : ")
                 .append(System.identityHashCode(this))
                 .append(" ]")
                 .toString();
     }
 
-    private static EventLoopGroup createEventLoopGroup(final Environment env) {
-        return LoopResources.create("jdbd-mysql", env.getOrDefault(MySQLKey.FACTORY_WORKER_COUNT), true)
-                .onClient(true);
+    private static LoopResources createEventLoopGroup(final Environment env) {
+        return LoopResources.create("jdbd-mysql",
+                env.getInRange(MySQLKey.FACTORY_SELECT_COUNT_COUNT, 2, Integer.MAX_VALUE),
+                env.getInRange(MySQLKey.FACTORY_WORKER_COUNT, 2, Integer.MAX_VALUE),
+                true
+        );
+    }
+
+    private static SocketAddress hostAddress(MySQLHost host) {
+        final String address;
+        address = host.host();
+        final SocketAddress socketAddress;
+        if (address.indexOf('/') > -1) {
+            socketAddress = new DomainSocketAddress(address);
+        } else {
+            socketAddress = InetSocketAddress.createUnresolved(address, host.port());
+        }
+        return socketAddress;
     }
 
 
@@ -214,7 +243,11 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                     .append(utcEpochSecond)
                     .append("),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@GLOBAL.local_infile localInfile");
 
-            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
+            final String sql;
+            sql = builder.toString();
+
+            LOG.debug("reset environment multi-statement length : {} ;  sql : {}", sql.length(), sql);
+            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(sql), this.adjutant))
                     .filter(ResultItem::isRowItem)
                     .last()
                     .map(ResultRow.class::cast)
@@ -378,6 +411,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
          * @see #resetSessionEnvironment()
          * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/charset-connection.html">Connection Character Sets and Collations</a>
          */
+        @Nullable
         private Charset resultsCharset(final StringBuilder builder) throws JdbdException {
             final String charsetString = this.factory.env.get(MySQLKey.CHARACTER_SET_RESULTS);
 
@@ -389,10 +423,10 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             builder.append("SET character_set_results = ");
             if (charsetString == null || charsetString.equalsIgnoreCase(Constants.NULL)) {
                 builder.append(Constants.NULL);
-                charsetResults = StandardCharsets.ISO_8859_1;
+                charsetResults = null;
             } else if (charsetString.equalsIgnoreCase("binary")) {
                 builder.append("binary");
-                charsetResults = StandardCharsets.ISO_8859_1;
+                charsetResults = null; // must be null
             } else {
                 MyCharset myCharset;
                 myCharset = Charsets.NAME_TO_CHARSET.get(charsetString.toLowerCase());
@@ -556,7 +590,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         }
 
         /**
-         * @see #buildSetVariableCommand(Consumer)
+         * @see #buildSetVariableCommand(StringBuilder)
          */
         private static JdbdException createSetVariableException() {
             String message = String.format("Below three session variables[%s,%s,%s,%s] must specified by below three properties[%s,%s,%s].",

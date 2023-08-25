@@ -11,6 +11,13 @@ import io.jdbd.vendor.util.DefaultDriverVersion;
 
 import java.util.Map;
 
+/**
+ * <p>
+ * This class is a implementation of {@link Driver} with MySQL.
+ * </p>
+ *
+ * @since 1.0
+ */
 public final class MySQLDriver implements Driver {
 
 
@@ -22,12 +29,14 @@ public final class MySQLDriver implements Driver {
 
     public static final String DRIVER_VENDOR = "io.jdbd.mysql";
 
+    public static final DriverVersion VERSION = DefaultDriverVersion.from(MY_SQL, MySQLDriver.class);
+
     private static final MySQLDriver INSTANCE = new MySQLDriver();
 
-    private final DriverVersion version;
-
+    /**
+     * private constructor
+     */
     private MySQLDriver() {
-        this.version = DefaultDriverVersion.from(MySQLDriver.class.getName(), MySQLDriver.class);
     }
 
     @Override
@@ -60,7 +69,7 @@ public final class MySQLDriver implements Driver {
 
     @Override
     public DriverVersion version() {
-        return this.version;
+        return VERSION;
     }
 
 

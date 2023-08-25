@@ -1,4 +1,4 @@
-package io.jdbd.mysql.protocol.client;
+package io.jdbd.mysql;
 
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.util.MySQLCollections;

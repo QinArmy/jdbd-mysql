@@ -32,7 +32,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
     @Override
     public DriverVersion driverVersion() {
-        return MySQLDriver.getInstance().version();
+        return MySQLDriver.VERSION;
     }
 
     @Override

@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
  * </p>
  *
  * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html">Connection URL Syntax</a>
+ * @see <a href="https://dev.mysql.com/doc/connector-j/8.1/en/connector-j-unix-socket.html">Connecting Using Unix Domain Sockets</a>
  */
 public abstract class MySQLUrlParser {
 
@@ -46,7 +47,7 @@ public abstract class MySQLUrlParser {
 
     public static boolean acceptsUrl(final @Nullable String url) {
         if (url == null) {
-            return false;
+            throw new NullPointerException("url is null");
         }
         boolean accept = false;
         for (Protocol protocol : Protocol.values()) {
@@ -61,8 +62,14 @@ public abstract class MySQLUrlParser {
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html">Connection URL Syntax</a>
+     * @see <a href="https://dev.mysql.com/doc/connector-j/8.1/en/connector-j-unix-socket.html">Connecting Using Unix Domain Sockets</a>
      */
-    public static List<MySQLHost> parse(final String url, final Map<String, Object> properties) {
+    public static List<MySQLHost> parse(final @Nullable String url, final @Nullable Map<String, Object> properties) {
+        if (url == null) {
+            throw new NullPointerException("url is null");
+        } else if (properties == null) {
+            throw new NullPointerException("properties is null");
+        }
         if (!isConnectionStringSupported(url)) {
             String m = String.format("unsupported url[%s] schema", url);
             throw new JdbdException(m);
@@ -73,21 +80,20 @@ public abstract class MySQLUrlParser {
             throw new JdbdException(m);
         }
 
-        final String schema, authority, path, query, actualAuthority;
-
+        final String schema, authority, database, query, actualAuthority;
         try {
             // 1. parse url partition.
             schema = decodeSkippingPlusSign(matcher.group("scheme"));
             authority = matcher.group("authority"); // Don't decode just yet.
-            path = matcher.group("path") == null ? null : decode(matcher.group("path")).trim();
+            database = matcher.group("path") == null ? null : decode(matcher.group("path")).trim();
             query = matcher.group("query"); // Don't decode just yet.
 
             // 2-1 parse url query properties
             final Map<String, Object> queryProperties;
             queryProperties = parseQueryProperties(query);
 
-            if (path != null) {
-                queryProperties.put(MySQLKey.DB_NAME.name, path);
+            if (database != null) {
+                queryProperties.put(MySQLKey.DB_NAME.name, database);
             }
 
             //2-2 parse user and password from url

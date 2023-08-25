@@ -1,6 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 
+import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.Groups;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.mysql.env.MySQLKey;

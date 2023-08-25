@@ -1,15 +1,15 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.Driver;
+import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
-import io.jdbd.mysql.protocol.client.ClientTestUtils;
+import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
-import io.jdbd.session.LocalDatabaseSession;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 /**
  * <p>
@@ -26,7 +26,10 @@ public class SessionFactorySuiteTests {
      */
     @Test
     public void createSessionFactory() {
-        LOG.debug("{}", doCreateSessionFactory());
+        final DatabaseSessionFactory sessionFactory;
+        sessionFactory = doCreateSessionFactory();
+        LOG.debug("{}", sessionFactory);
+
     }
 
     @Test
@@ -34,15 +37,12 @@ public class SessionFactorySuiteTests {
         final DatabaseSessionFactory sessionFactory;
         sessionFactory = doCreateSessionFactory();
 
-        final LocalDatabaseSession session;
-        session = Mono.from(sessionFactory.localSession())
-                .block();
-        // SET character_set_connection = 'utf8mb4';
-        // SET character_set_client 'utf8mb4';
-        // SET character_set_results = NULL;
-        // SET @@SESSION.sql_mode = DEFAULT , @@SESSION.time_zone = DEFAULT , @@SESSION.transaction_isolation = DEFAULT , @@SESSION.transaction_read_only = DEFAULT , @@SESSION.autocommit = DEFAULT;
-        // SELECT DATE_FORMAT(FROM_UNIXTIME(1692914281),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@SESSION.local_infile localInfile
-        LOG.debug("session : {}", session);
+        Flux.from(sessionFactory.localSession())
+                //.repeat(8)
+                .doOnNext(session -> LOG.debug("{}", session))
+                .flatMap(DatabaseSession::close)
+                .blockLast();
+
     }
 
 

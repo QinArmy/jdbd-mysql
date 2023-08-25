@@ -68,6 +68,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final long sessionIdentifier() {
+        if (this.protocol.isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
         return this.protocol.sessionIdentifier();
     }
 
@@ -361,7 +364,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final String toString() {
-        return MySQLStrings.builder()
+        return MySQLStrings.builder(256)
                 .append(getClass().getName())
                 .append("[ sessionIdentifier : ")
                 .append(this.protocol.sessionIdentifier())
@@ -374,7 +377,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .append(" , serverVersion : ")
                 .append(this.protocol.serverVersion().getVersion())
                 .append(" , driverVersion : ")
-                .append(MySQLDriver.getInstance().version().getVersion())
+                .append(MySQLDriver.VERSION.getVersion())
                 .append(" , hash : ")
                 .append(System.identityHashCode(this))
                 .append(" ]")
