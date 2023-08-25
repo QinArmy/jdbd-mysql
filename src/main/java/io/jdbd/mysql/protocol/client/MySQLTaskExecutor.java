@@ -43,9 +43,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
                 .map(connection -> new MySQLTaskExecutor(connection, factory));
     }
 
-
     private static final Logger LOG = LoggerFactory.getLogger(MySQLTaskExecutor.class);
-
 
     private final ClientProtocolFactory factory;
 
@@ -118,6 +116,11 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
             taskAdjutant.sessionEnv = sessionEnv;
         }
 
+    }
+
+    @Override
+    protected void onChannelClosed() {
+        ((MySQLTaskAdjutant) this.taskAdjutant).onSessionClose();
     }
 
     Mono<Void> reConnect(Duration duration) {
@@ -439,6 +442,15 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
                 }
             }
             SERVER_STATUS.set(this, terminator.statusFags);
+        }
+
+        /**
+         * @see MySQLTaskExecutor#onChannelClosed()
+         */
+        private void onSessionClose() {
+            for (Runnable listener : this.sessionCloseListenerList) {
+                listener.run(); // don't throw error
+            }
         }
 
         /**

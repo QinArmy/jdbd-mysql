@@ -17,6 +17,8 @@ import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -44,6 +46,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     static PoolRmDatabaseSession forPoolVendor(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
         return new MySQLPoolRmDatabaseSession(factory, protocol);
     }
+
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLRmDatabaseSession.class);
 
     private static final AtomicReferenceFieldUpdater<MySQLRmDatabaseSession, XaTxOption> CURRENT_TX_OPTION =
             AtomicReferenceFieldUpdater.newUpdater(MySQLRmDatabaseSession.class, XaTxOption.class, "currentTxOption");
@@ -404,11 +408,14 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     private void onSessionClose() {
-        CURRENT_TX_OPTION.set(this, null); // clear cache;
+        CURRENT_TX_OPTION.set(this, null);  // clear cache , avoid reconnect occur bug
+        LOG.debug("session close event,clear current xa transaction cache.");
+
     }
 
     private void onTransactionEnd() {
-        CURRENT_TX_OPTION.set(this, null); // clear cache;
+        CURRENT_TX_OPTION.set(this, null); // clear cache,avoid bug
+        LOG.debug("transaction end event,clear current xa transaction cache.");
     }
 
 

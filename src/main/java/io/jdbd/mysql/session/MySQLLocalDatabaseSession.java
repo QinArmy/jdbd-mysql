@@ -15,6 +15,8 @@ import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -41,6 +43,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         return new MySQLPoolLocalDatabaseSession(factory, protocol);
     }
 
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLLocalDatabaseSession.class);
 
     private static final AtomicReferenceFieldUpdater<MySQLLocalDatabaseSession, LocalTxOption> CURRENT_TX_OPTION =
             AtomicReferenceFieldUpdater.newUpdater(MySQLLocalDatabaseSession.class, LocalTxOption.class, "currentTxOption");
@@ -280,11 +283,14 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     private void onSessionClose() {
-        CURRENT_TX_OPTION.set(this, null); // clear cache;
+        CURRENT_TX_OPTION.set(this, null); // clear cache , avoid reconnect occur bug
+        LOG.debug("session close event,clear current local transaction cache.");
+
     }
 
     private void onTransactionEnd() {
-        CURRENT_TX_OPTION.set(this, null); // clear cache;
+        CURRENT_TX_OPTION.set(this, null); // clear cache,avoid bug
+        LOG.debug("transaction end event,clear current local transaction cache.");
     }
 
 
