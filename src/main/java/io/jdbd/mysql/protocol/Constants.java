@@ -12,19 +12,6 @@ import java.time.Duration;
 public interface Constants {
 
 
-    /**
-     * Avoids allocation of empty byte[] when representing 0-length strings.
-     */
-    byte[] EMPTY_BYTE_ARRAY = new byte[0];
-
-    /**
-     * I18N'd representation of the abbreviation for "ms"
-     */
-    String MILLIS_I18N = "ms";
-
-    byte[] SLASH_STAR_SPACE_AS_BYTES = new byte[]{(byte) '/', (byte) '*', (byte) ' '};
-
-    byte[] SPACE_STAR_SLASH_SPACE_AS_BYTES = new byte[]{(byte) ' ', (byte) '*', (byte) '/', (byte) ' '};
 
     //    String OS_NAME = System.getProperty("");
 //    String OS_ARCH = System.getProperty("");
@@ -46,6 +33,8 @@ public interface Constants {
     String NONE = "none";
 
     String LOCAL = "LOCAL";
+
+    String SERVER = "SERVER";
 
     byte EMPTY_CHAR_BYTE = '\0';
 

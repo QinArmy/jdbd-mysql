@@ -3,6 +3,7 @@ package io.jdbd.mysql.session;
 import io.jdbd.Driver;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
+import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.vendor.env.Environment;
@@ -21,32 +22,25 @@ public class SessionFactorySuiteTests {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionFactorySuiteTests.class);
 
-    /**
-     * @see MySQLDatabaseSessionFactory#localSession()
-     */
-    @Test
-    public void createSessionFactory() {
-        final DatabaseSessionFactory sessionFactory;
-        sessionFactory = doCreateSessionFactory();
-        LOG.debug("{}", sessionFactory);
 
-    }
 
     @Test
     public void localSession() {
         final DatabaseSessionFactory sessionFactory;
-        sessionFactory = doCreateSessionFactory();
+        sessionFactory = createSessionFactory();
 
         Flux.from(sessionFactory.localSession())
                 //.repeat(8)
                 .doOnNext(session -> LOG.debug("{}", session))
+                .map(PoolLocalDatabaseSession.class::cast)
+                .flatMap(PoolLocalDatabaseSession::reset)
                 .flatMap(DatabaseSession::close)
                 .blockLast();
 
     }
 
 
-    private DatabaseSessionFactory doCreateSessionFactory() {
+    private DatabaseSessionFactory createSessionFactory() {
         final Environment testEnv;
         testEnv = ClientTestUtils.getTestConfig();
         final String url;
@@ -55,7 +49,7 @@ public class SessionFactorySuiteTests {
         final Driver driver;
         driver = Driver.findDriver(url);
         //LOG.debug("driver {} ", driver);
-        return driver.forDeveloper(url, testEnv.sourceMap());
+        return driver.forPoolVendor(url, testEnv.sourceMap());
     }
 
 

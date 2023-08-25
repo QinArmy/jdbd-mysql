@@ -1,6 +1,5 @@
 package io.jdbd.mysql.protocol.client;
 
-import io.jdbd.mysql.protocol.MySQLPacket;
 import io.netty.buffer.ByteBuf;
 
 import java.util.Arrays;
@@ -9,7 +8,7 @@ import java.util.Arrays;
  * @see EofPacket
  * @see OkPacket
  */
-public abstract class Terminator implements MySQLPacket {
+public abstract class Terminator {
 
 
     static Terminator fromCumulate(final ByteBuf cumulateBuffer, final int payloadLength,

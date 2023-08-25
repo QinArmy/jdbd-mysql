@@ -1,8 +1,9 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
+import io.jdbd.lang.Nullable;
 import io.jdbd.meta.*;
-import io.jdbd.mysql.MySQLType;
+import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.FieldType;
 import io.jdbd.result.ResultRowMeta;
@@ -10,7 +11,6 @@ import io.jdbd.session.Option;
 import io.jdbd.vendor.result.ColumnMeta;
 import io.jdbd.vendor.result.VendorResultRowMeta;
 import io.netty.buffer.ByteBuf;
-import reactor.util.annotation.Nullable;
 
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
@@ -87,6 +87,40 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         return rowMeta;
     }
 
+    private static final Option<Integer> COLLATION_INDEX = Option.from("COLUMN_COLLATION_INDEX", Integer.class);
+
+    private static final Option<Charset> CHARSET = Option.from("COLUMN_CHARSET", Charset.class);
+
+    /**
+     * length of fixed length fields
+     *
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html"> Column Definition Protocol</a>
+     */
+    private static final Option<Long> FIXED_LENGTH = Option.from("COLUMN_FIXED_LENGTH", Long.class);
+
+    /**
+     * column_length
+     *
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html"> Column Definition Protocol</a>
+     */
+    private static final Option<Integer> LENGTH = Option.from("COLUMN_LENGTH", Integer.class);
+
+    /**
+     * flags
+     *
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html"> Column Definition Protocol</a>
+     */
+    private static final Option<Integer> FLAGS = Option.from("COLUMN_FLAGS", Integer.class);
+
+    /**
+     * virtual table name
+     *
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html"> Column Definition Protocol</a>
+     */
+    private static final Option<String> TABLE_LABEL = Option.from("COLUMN_TABLE_LABEL", String.class);
+
+    private static final Option<Long> PRECISION = Option.from("COLUMN_PRECISION", Long.class);
+
 
     final MySQLColumnMeta[] columnMetaArray;
 
@@ -98,8 +132,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     final ZoneOffset serverZone;
 
     private final Map<String, Integer> labelToIndexMap;
-
-    int metaIndex = 0;
 
 
     /**
@@ -150,75 +182,155 @@ final class MySQLRowMeta extends VendorResultRowMeta {
 
 
     @Override
-    public JdbdType getJdbdType(int indexBasedZero) throws JdbdException {
-        return null;
+    public JdbdType getJdbdType(final int indexBasedZero) throws JdbdException {
+        return this.columnMetaArray[checkIndex(indexBasedZero)].sqlType.jdbdType();
     }
 
     @Override
-    public FieldType getFieldType(int indexBasedZero) throws JdbdException {
-        return null;
+    public FieldType getFieldType(final int indexBasedZero) throws JdbdException {
+        final MySQLColumnMeta meta;
+        meta = this.columnMetaArray[checkIndex(indexBasedZero)];
+        final FieldType fieldType;
+        if (MySQLStrings.hasText(meta.tableName)) {
+            fieldType = FieldType.FIELD;
+        } else {
+            fieldType = FieldType.EXPRESSION;
+        }
+        return fieldType;
     }
 
 
     @Override
-    public BooleanMode getAutoIncrementMode(int indexBasedZero) throws JdbdException {
-        return null;
+    public BooleanMode getAutoIncrementMode(final int indexBasedZero) throws JdbdException {
+        final MySQLColumnMeta meta;
+        meta = this.columnMetaArray[checkIndex(indexBasedZero)];
+        final BooleanMode mode;
+        if (meta.isAutoIncrement()) {
+            mode = BooleanMode.TRUE;
+        } else {
+            mode = BooleanMode.FALSE;
+        }
+        return mode;
+    }
+
+    /**
+     * <p>
+     * jdbd-mysql support following options :
+     *     <ul>
+     *         <li>{@link #COLLATION_INDEX}</li>
+     *         <li>{@link #CHARSET}</li>
+     *         <li>{@link #FIXED_LENGTH}</li>
+     *         <li>{@link #FLAGS}</li>
+     *         <li>{@link #TABLE_LABEL}</li>
+     *         <li>{@link #PRECISION}</li>
+     *     </ul>
+     * </p>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T getOf(final int indexBasedZero, final Option<T> option) throws JdbdException {
+        final MySQLColumnMeta meta;
+        meta = this.columnMetaArray[checkIndex(indexBasedZero)];
+
+        final Object value;
+        if (COLLATION_INDEX.equals(option)) {
+            value = meta.collationIndex;
+        } else if (CHARSET.equals(option)) {
+            value = meta.columnCharset;
+        } else if (FIXED_LENGTH.equals(option)) {
+            value = meta.fixedLength;
+        } else if (LENGTH.equals(option)) {
+            value = meta.length;
+        } else if (FLAGS.equals(option)) {
+            value = meta.definitionFlags;
+        } else if (TABLE_LABEL.equals(option)) {
+            value = meta.tableLabel;
+        } else if (PRECISION.equals(option)) {
+            value = meta.obtainPrecision(this.customCollationMap);
+        } else {
+            value = null;
+        }
+        return (T) value;
     }
 
     @Override
-    public <T> T getOf(int indexBasedZero, Option<T> option) throws JdbdException {
-        return null;
+    public String getCatalogName(final int indexBasedZero) throws JdbdException {
+        return this.columnMetaArray[checkIndex(indexBasedZero)].catalogName;
     }
 
     @Override
-    public String getCatalogName(int indexBasedZero) throws JdbdException {
-        return null;
+    public String getSchemaName(final int indexBasedZero) throws JdbdException {
+        return this.columnMetaArray[checkIndex(indexBasedZero)].schemaName;
     }
 
     @Override
-    public String getSchemaName(int indexBasedZero) throws JdbdException {
-        return null;
+    public String getTableName(final int indexBasedZero) throws JdbdException {
+        return this.columnMetaArray[checkIndex(indexBasedZero)].tableName;
     }
 
     @Override
-    public String getTableName(int indexBasedZero) throws JdbdException {
-        return null;
+    public String getColumnName(final int indexBasedZero) throws JdbdException {
+        return this.columnMetaArray[checkIndex(indexBasedZero)].columnName;
     }
 
     @Override
-    public String getColumnName(int indexBasedZero) throws JdbdException {
-        return null;
+    public int getPrecision(final int indexBasedZero) throws JdbdException {
+        final long precision;
+        precision = this.columnMetaArray[checkIndex(indexBasedZero)].obtainPrecision(this.customCollationMap);
+        final int actual;
+        if (precision > Integer.MAX_VALUE) {
+            actual = Integer.MAX_VALUE;
+        } else {
+            actual = (int) precision;
+        }
+        return actual;
     }
 
     @Override
-    public int getPrecision(int indexBasedZero) throws JdbdException {
-        return 0;
+    public int getScale(final int indexBasedZero) throws JdbdException {
+        return this.columnMetaArray[checkIndex(indexBasedZero)].getScale();
     }
 
     @Override
-    public int getScale(int indexBasedZero) throws JdbdException {
-        return 0;
+    public KeyMode getKeyMode(final int indexBasedZero) throws JdbdException {
+        final int flags;
+        flags = this.columnMetaArray[checkIndex(indexBasedZero)].definitionFlags;
+        final KeyMode mode;
+        if ((flags & MySQLColumnMeta.PRI_KEY_FLAG) != 0) {
+            mode = KeyMode.PRIMARY_KEY;
+        } else if ((flags & MySQLColumnMeta.UNIQUE_KEY_FLAG) != 0) {
+            mode = KeyMode.UNIQUE_KEY;
+        } else if ((flags & MySQLColumnMeta.MULTIPLE_KEY_FLAG) != 0) {
+            mode = KeyMode.MULTIPLE_KEY; // TODO check ?
+        } else {
+            mode = KeyMode.UNKNOWN;
+        }
+        return mode;
     }
 
     @Override
-    public KeyMode getKeyMode(int indexBasedZero) throws JdbdException {
-        return null;
-    }
+    public NullMode getNullMode(final int indexBasedZero) throws JdbdException {
+        final int flags;
+        flags = this.columnMetaArray[checkIndex(indexBasedZero)].definitionFlags;
 
-    @Override
-    public NullMode getNullMode(int indexBasedZero) throws JdbdException {
-        return null;
+        final NullMode mode;
+        if ((flags & MySQLColumnMeta.NOT_NULL_FLAG) != 0) {
+            mode = NullMode.NON_NULL;
+        } else {
+            mode = NullMode.NULLABLE;
+        }
+        return mode;
     }
 
 
     @Override
     public Class<?> getFirstJavaType(int indexBasedZero) throws JdbdException {
-        return null;
+        return this.columnMetaArray[checkIndex(indexBasedZero)].sqlType.firstJavaType();
     }
 
     @Override
     public Class<?> getSecondJavaType(int indexBasedZero) throws JdbdException {
-        return null;
+        return this.columnMetaArray[checkIndex(indexBasedZero)].sqlType.secondJavaType();
     }
 
     @Override
@@ -258,28 +370,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         return this.columnMetaArray;
     }
 
-    boolean isReady() {
-        return this.metaIndex == this.columnMetaArray.length;
-    }
-
-    int convertToIndex(String columnAlias) throws JdbdException {
-        MySQLColumnMeta[] columnMetas = this.columnMetaArray;
-        int len = columnMetas.length;
-        for (int i = 0; i < len; i++) {
-            if (columnMetas[i].columnLabel.equals(columnAlias)) {
-                return i;
-            }
-        }
-        throw new JdbdException(String.format("Not found column for columnAlias[%s]", columnAlias));
-    }
-
-    MySQLType getMySQLType(int indexBaseZero) {
-        return this.columnMetaArray[checkIndex(indexBaseZero)].sqlType;
-    }
-
-    public final Charset getColumnCharset(int indexBaseZero) {
-        return this.columnMetaArray[checkIndex(indexBaseZero)].columnCharset;
-    }
 
     int checkIndex(final int indexBaseZero) {
         if (indexBaseZero < 0 || indexBaseZero >= this.columnMetaArray.length) {
@@ -289,46 +379,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         return indexBaseZero;
     }
 
-    private boolean doIsCaseSensitive(MySQLColumnMeta columnMeta) {
-        boolean caseSensitive;
-        switch (columnMeta.sqlType) {
-            case BIT:
-            case TINYINT:
-            case SMALLINT:
-            case INT:
-            case INT_UNSIGNED:
-            case MEDIUMINT:
-            case MEDIUMINT_UNSIGNED:
-            case BIGINT:
-            case BIGINT_UNSIGNED:
-            case FLOAT:
-            case FLOAT_UNSIGNED:
-            case DOUBLE:
-            case DOUBLE_UNSIGNED:
-            case DATE:
-            case YEAR:
-            case TIME:
-            case TIMESTAMP:
-            case DATETIME:
-                caseSensitive = false;
-                break;
-            case CHAR:
-            case VARCHAR:
-            case TINYTEXT:
-            case TEXT:
-            case MEDIUMTEXT:
-            case LONGTEXT:
-            case JSON:
-            case ENUM:
-            case SET:
-                String collationName = Charsets.getCollationNameByIndex(columnMeta.collationIndex);
-                caseSensitive = ((collationName != null) && !collationName.endsWith("_ci"));
-                break;
-            default:
-                caseSensitive = true;
-        }
-        return caseSensitive;
-    }
 
 
 }

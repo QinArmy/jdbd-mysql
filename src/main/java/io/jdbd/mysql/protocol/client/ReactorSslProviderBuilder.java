@@ -5,7 +5,6 @@ import io.jdbd.mysql.env.MySQLHost;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.AuthenticateAssistant;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
-import io.jdbd.mysql.protocol.X509TrustManagerWrapper;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLStates;
 import io.jdbd.mysql.util.MySQLStrings;

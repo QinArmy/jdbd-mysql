@@ -377,7 +377,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .append(" , serverVersion : ")
                 .append(this.protocol.serverVersion().getVersion())
                 .append(" , driverVersion : ")
-                .append(MySQLDriver.VERSION.getVersion())
+                .append(MySQLDriver.getInstance().version().getVersion())
                 .append(" , hash : ")
                 .append(System.identityHashCode(this))
                 .append(" ]")

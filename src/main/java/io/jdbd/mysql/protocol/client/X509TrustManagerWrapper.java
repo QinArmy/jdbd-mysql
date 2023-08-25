@@ -1,4 +1,4 @@
-package io.jdbd.mysql.protocol;
+package io.jdbd.mysql.protocol.client;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 /**
  * Implementation of X509TrustManager wrapping JVM X509TrustManagers to add expiration and identity check
  */
-public final class X509TrustManagerWrapper implements X509TrustManager {
+final class X509TrustManagerWrapper implements X509TrustManager {
 
     private X509TrustManager origTm = null;
     private final boolean verifyServerCert;

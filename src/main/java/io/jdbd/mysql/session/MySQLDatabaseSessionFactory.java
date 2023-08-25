@@ -120,7 +120,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public DriverVersion driverVersion() {
-        return MySQLDriver.VERSION;
+        return MySQLDriver.getInstance().version();
     }
 
     @Override

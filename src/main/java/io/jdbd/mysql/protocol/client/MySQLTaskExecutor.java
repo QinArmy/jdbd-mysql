@@ -124,6 +124,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
     }
 
     Mono<Void> reConnect(Duration duration) {
+        // TODO
         return Mono.empty();
     }
 

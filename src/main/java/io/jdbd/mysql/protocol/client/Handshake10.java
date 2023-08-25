@@ -1,6 +1,5 @@
 package io.jdbd.mysql.protocol.client;
 
-import io.jdbd.mysql.protocol.MySQLPacket;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.netty.buffer.ByteBuf;
@@ -11,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_handshake_v10.html">Protocol::HandshakeV10</a>
  */
-final class Handshake10 implements MySQLPacket {
+final class Handshake10 {
 
     /**
      * @param cumulateBuffer the cumulateBuffer that {@link ByteBuf#readerIndex()} is payload start index.

@@ -29,7 +29,7 @@ public final class MySQLDriver implements Driver {
 
     public static final String DRIVER_VENDOR = "io.jdbd.mysql";
 
-    public static final DriverVersion VERSION = DefaultDriverVersion.from(MY_SQL, MySQLDriver.class);
+    private static final DriverVersion VERSION = DefaultDriverVersion.from(MySQLDriver.class.getName(), MySQLDriver.class);
 
     private static final MySQLDriver INSTANCE = new MySQLDriver();
 

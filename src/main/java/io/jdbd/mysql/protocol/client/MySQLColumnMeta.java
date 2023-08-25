@@ -141,23 +141,25 @@ final class MySQLColumnMeta implements ColumnMeta {
     }
 
 
-    public long obtainPrecision(Map<Integer, Charsets.CustomCollation> customCollationMap) {
+    long obtainPrecision(final Map<Integer, Charsets.CustomCollation> customCollationMap) {
         long precision;
         // Protocol returns precision and scale differently for some types. We need to align then to I_S.
         switch (this.sqlType) {
-            case DECIMAL:
+            case DECIMAL: {
                 precision = this.length;
                 precision--;// signed
                 if (this.decimals > 0) {
                     precision--; // point
                 }
-                break;
-            case DECIMAL_UNSIGNED:
+            }
+            break;
+            case DECIMAL_UNSIGNED: {
                 precision = this.length;
                 if (this.decimals > 0) {
                     precision--;// point
                 }
-                break;
+            }
+            break;
             case TINYBLOB:
             case BLOB:
             case MEDIUMBLOB:
@@ -170,7 +172,7 @@ final class MySQLColumnMeta implements ColumnMeta {
             case TINYTEXT:
             case MEDIUMTEXT:
             case TEXT:
-            case LONGTEXT:
+            case LONGTEXT: {
                 // char
                 int collationIndex = this.collationIndex;
                 Charsets.CustomCollation collation = customCollationMap.get(collationIndex);
@@ -182,14 +184,8 @@ final class MySQLColumnMeta implements ColumnMeta {
                     mblen = Charsets.getMblen(collationIndex);
                 }
                 precision = this.length / mblen;
-                break;
-            case TIME:
-                precision = obtainTimeTypePrecision();
-                break;
-            case TIMESTAMP:
-            case DATETIME:
-                precision = getDateTimeTypePrecision();
-                break;
+            }
+            break;
             default:
                 precision = -1;
 
@@ -208,12 +204,19 @@ final class MySQLColumnMeta implements ColumnMeta {
         return this.columnLabel;
     }
 
-    public int getScale() {
+    int getScale() {
         final int scale;
         switch (sqlType) {
             case DECIMAL:
             case DECIMAL_UNSIGNED:
                 scale = this.decimals;
+                break;
+            case TIME:
+                scale = obtainTimeTypePrecision();
+                break;
+            case TIMESTAMP:
+            case DATETIME:
+                scale = getDateTimeTypePrecision();
                 break;
             default:
                 scale = -1;
@@ -380,7 +383,7 @@ final class MySQLColumnMeta implements ColumnMeta {
 
     }
 
-    int obtainTimeTypePrecision() {
+    private int obtainTimeTypePrecision() {
         final int precision;
         if (this.decimals > 0 && this.decimals < 7) {
             precision = this.decimals;
@@ -396,7 +399,7 @@ final class MySQLColumnMeta implements ColumnMeta {
     }
 
 
-    int getDateTimeTypePrecision() {
+    private int getDateTimeTypePrecision() {
         final int precision;
         if (this.decimals > 0 && this.decimals < 7) {
             precision = this.decimals;

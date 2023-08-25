@@ -7,12 +7,14 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.result.*;
 import io.jdbd.session.Option;
 import io.jdbd.session.ServerVersion;
+import io.jdbd.session.SessionCloseException;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
@@ -30,6 +32,8 @@ final class ClientProtocol implements MySQLProtocol {
     final TaskAdjutant adjutant;
 
     private final ProtocolManager manager;
+
+    private final AtomicBoolean userCloseSession = new AtomicBoolean(false);
 
     private ClientProtocol(final ProtocolManager manager) {
         this.manager = manager;
@@ -171,12 +175,6 @@ final class ClientProtocol implements MySQLProtocol {
         return ComPreparedTask.prepare(sql, this.adjutant);
     }
 
-
-    @Override
-    public Mono<Void> reconnect(Duration duration) {
-        return this.manager.reConnect(duration);
-    }
-
     @Override
     public boolean supportOutParameter() {
         return this.adjutant.handshake10().serverVersion.isSupportOutParameter();
@@ -242,7 +240,17 @@ final class ClientProtocol implements MySQLProtocol {
 
     @Override
     public <T> Mono<T> close() {
+        this.userCloseSession.set(true);
         return QuitTask.quit(this.adjutant);
+    }
+
+
+    @Override
+    public Mono<Void> reconnect(Duration duration) {
+        if (this.userCloseSession.get()) {
+            return Mono.error(new SessionCloseException("session have closed by close() method,reject reconnect."));
+        }
+        return this.manager.reConnect(duration);
     }
 
     @Override

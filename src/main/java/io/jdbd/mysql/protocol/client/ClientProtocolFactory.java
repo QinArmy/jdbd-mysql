@@ -164,7 +164,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         private final ClientProtocolFactory factory;
 
-
         private ClientProtocolManager(MySQLTaskExecutor executor, ClientProtocolFactory factory) {
             this.executor = executor;
             this.adjutant = executor.taskAdjutant();
@@ -179,15 +178,17 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         @Override
         public Mono<Void> reset() {
-            LOG.debug("set connection");
+            LOG.debug("reset session");
             return ComResetTask.reset(this.adjutant)
-                    .then(Mono.defer(this::initializing))
+                    .then(Mono.defer(this::initializeCustomCharset))
+                    .then(Mono.defer(this::resetSessionEnvironment))
                     .then();
         }
 
 
         @Override
         public Mono<Void> reConnect(Duration duration) {
+            LOG.debug("reconnect");
             return this.executor.reConnect(duration)
                     .then(Mono.defer(this::authenticate))
                     .then(Mono.defer(this::initializing))
@@ -196,17 +197,36 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
 
         private Mono<ClientProtocolManager> authenticate() {
+            LOG.debug("authenticate");
             return MySQLConnectionTask.authenticate(this.adjutant)
                     .doOnSuccess(this.executor::setAuthenticateResult)
                     .thenReturn(this);
         }
 
 
+        /**
+         * Just for
+         * <ul>
+         *     <li>{@link ClientProtocolFactory#createProtocol() }</li>
+         *     <li>{@link #reConnect(Duration)}</li>
+         * </ul>
+         *
+         * @see ClientProtocolFactory#createProtocol()
+         */
         private Mono<ClientProtocolManager> initializing() {
             LOG.debug("initializing connection");
             return this.initializeCustomCharset()
                     .then(Mono.defer(this::resetSessionEnvironment))
+                    .onErrorResume(this::onInitializingError)
                     .thenReturn(this);
+        }
+
+        /**
+         * @see #initializing()
+         */
+        private Mono<ClientProtocolManager> onInitializingError(Throwable error) {
+            return QuitTask.quit(this.adjutant)
+                    .then(Mono.error(error));
         }
 
 
@@ -359,12 +379,12 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         private ZoneOffset connTimeZone(final StringBuilder builder) {
             final String zoneStr;
             zoneStr = this.factory.env.get(MySQLKey.CONNECTION_TIME_ZONE);
-            if (zoneStr == null || "SERVER".equals(zoneStr)) {
+            if (zoneStr == null || Constants.SERVER.equals(zoneStr)) {
                 return null;
             }
 
             final ZoneOffset zone;
-            if (zoneStr.equals("LOCAL")) {
+            if (Constants.LOCAL.equals(zoneStr)) {
                 zone = MySQLTimes.systemZoneOffset();
             } else {
                 zone = ZoneOffset.of(zoneStr);

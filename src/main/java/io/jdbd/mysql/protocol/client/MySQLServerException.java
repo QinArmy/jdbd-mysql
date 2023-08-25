@@ -19,7 +19,7 @@ import java.nio.charset.Charset;
  */
 final class MySQLServerException extends ServerException {
 
-    static final short ERROR_HEADER = 0xFF;
+    static final int ERROR_HEADER = 0xFF;
 
     static boolean isErrorPacket(ByteBuf byteBuf) {
         return Packets.getInt1AsInt(byteBuf, byteBuf.readerIndex()) == ERROR_HEADER;
