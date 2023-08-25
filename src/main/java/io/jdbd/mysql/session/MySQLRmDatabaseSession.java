@@ -388,6 +388,20 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         return mono;
     }
 
+    @Override
+    final void printTransactionInfo(final StringBuilder builder) {
+        final XaTxOption xaTxOption = this.currentTxOption;
+        if (xaTxOption != null) {
+            builder.append(" , currentTransactionXid : ")
+                    .append(xaTxOption.xid)
+                    .append(" , currentTransactionXaStates : ")
+                    .append(xaTxOption.xaStates.name())
+                    .append(" , currentTransactionIsolation : ")
+                    .append(xaTxOption.isolation.name())
+                    .append(" , currentTransactionFlags : ")
+                    .append(xaTxOption.flags);
+        }
+    }
 
     /**
      * @see #start(Xid, int, TransactionOption)

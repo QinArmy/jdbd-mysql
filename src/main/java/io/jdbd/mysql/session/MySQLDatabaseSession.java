@@ -364,8 +364,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final String toString() {
-        return MySQLStrings.builder(256)
-                .append(getClass().getName())
+        final StringBuilder builder = new StringBuilder(290);
+
+        builder.append(getClass().getName())
                 .append("[ sessionIdentifier : ")
                 .append(this.protocol.sessionIdentifier())
                 .append(" , factoryName : ")
@@ -377,8 +378,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .append(" , serverVersion : ")
                 .append(this.protocol.serverVersion().getVersion())
                 .append(" , driverVersion : ")
-                .append(MySQLDriver.getInstance().version().getVersion())
-                .append(" , hash : ")
+                .append(MySQLDriver.getInstance().version().getVersion());
+
+        printTransactionInfo(builder);
+
+        return builder.append(" , hash : ")
                 .append(System.identityHashCode(this))
                 .append(" ]")
                 .toString();
@@ -388,6 +392,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
      * @see #transactionStatus()
      */
     abstract Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list);
+
+    /**
+     * @see #toString()
+     */
+    abstract void printTransactionInfo(StringBuilder builder);
 
 
     /*################################## blow private method ##################################*/

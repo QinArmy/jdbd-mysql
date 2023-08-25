@@ -3,6 +3,7 @@ package io.jdbd.mysql.session;
 import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.protocol.MySQLProtocol;
+import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.session.DatabaseMetaSpec;
 import io.jdbd.session.ServerVersion;
 
@@ -27,6 +28,9 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
 
     @Override
     public final ServerVersion serverVersion() throws JdbdException {
+        if (this.protocol.isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
         return this.protocol.serverVersion();
     }
 
@@ -44,8 +48,8 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
 
     @Override
     public final boolean isSupportStoredProcedures() throws JdbdException {
-        //always false,  MySQL support store procedures
-        return false;
+        //always true,  MySQL support store procedures
+        return true;
     }
 
     @Override
@@ -55,16 +59,25 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
 
     @Override
     public final boolean isSupportStmtVar() throws JdbdException {
+        if (this.protocol.isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
         return this.protocol.supportStmtVar();
     }
 
     @Override
     public final boolean isSupportMultiStatement() throws JdbdException {
+        if (this.protocol.isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
         return this.protocol.supportMultiStmt();
     }
 
     @Override
     public final boolean isSupportOutParameter() throws JdbdException {
+        if (this.protocol.isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
         return this.protocol.supportOutParameter();
     }
 

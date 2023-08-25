@@ -4,6 +4,7 @@ import io.jdbd.Driver;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.pool.PoolLocalDatabaseSession;
+import io.jdbd.pool.PoolRmDatabaseSession;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.vendor.env.Environment;
@@ -34,6 +35,21 @@ public class SessionFactorySuiteTests {
                 .doOnNext(session -> LOG.debug("{}", session))
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)
+                .flatMap(DatabaseSession::close)
+                .blockLast();
+
+    }
+
+    @Test
+    public void rmSession() {
+        final DatabaseSessionFactory sessionFactory;
+        sessionFactory = createSessionFactory();
+
+        Flux.from(sessionFactory.rmSession())
+                //.repeat(8)
+                .doOnNext(session -> LOG.debug("{}", session))
+                .map(PoolRmDatabaseSession.class::cast)
+                .flatMap(PoolRmDatabaseSession::reset)
                 .flatMap(DatabaseSession::close)
                 .blockLast();
 

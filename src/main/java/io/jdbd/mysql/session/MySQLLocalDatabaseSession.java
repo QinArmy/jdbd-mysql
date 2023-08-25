@@ -124,7 +124,6 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
 
-
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
         return this.commit(DatabaseProtocol.OPTION_FUNC);
@@ -187,6 +186,17 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         return mono;
     }
 
+
+    @Override
+    final void printTransactionInfo(final StringBuilder builder) {
+        final LocalTxOption localTxOption = this.currentTxOption;
+        if (localTxOption != null) {
+            builder.append(" , currentTransactionIsolation : ")
+                    .append(localTxOption.isolation.name())
+                    .append(" , currentTransactionConsistentSnapshot : ")
+                    .append(localTxOption.consistentSnapshot);
+        }
+    }
 
     /**
      * @see #commit(Function)
