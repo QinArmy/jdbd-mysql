@@ -5,6 +5,7 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.mysql.protocol.UnrecognizedCollationException;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.util.JdbdExceptions;
 
@@ -73,7 +74,7 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         return new JdbdException(m, cause);
     }
 
-    public static JdbdException unknownCollationError(final Set<Integer> collationSet) {
+    public static UnrecognizedCollationException unrecognizedCollationError(final Set<Integer> collationSet) {
         final StringBuilder builder = new StringBuilder(30);
         builder.append("unrecognized collation index : ");
         int count = 0;
@@ -84,7 +85,7 @@ public abstract class MySQLExceptions extends JdbdExceptions {
             builder.append(index);
             count++;
         }
-        return new JdbdException(builder.toString());
+        return new UnrecognizedCollationException(builder.toString());
     }
 
 

@@ -2,7 +2,6 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.statement.InOutParameter;
 import io.jdbd.type.*;
 import io.jdbd.vendor.result.ColumnMeta;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -17,7 +16,6 @@ import reactor.core.publisher.FluxSink;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.util.Objects;
 import java.util.function.IntSupplier;
 
 /**
@@ -65,11 +63,7 @@ final class LongParameterWriter {
     private void sendPathParameterInEventLoop(final int batchIndex, final ParamValue paramValue,
                                               final FluxSink<ByteBuf> sink) {
         final Object value = paramValue.getNonNull();
-        if (value instanceof InOutParameter) {
-            sendParameterValue(batchIndex, paramValue, sink, Objects.requireNonNull(((InOutParameter) value).value()));
-        } else {
-            sendParameterValue(batchIndex, paramValue, sink, value);
-        }
+        sendParameterValue(batchIndex, paramValue, sink, value);
     }
 
 

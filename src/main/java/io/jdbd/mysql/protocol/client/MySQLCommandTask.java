@@ -1,5 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
+import io.jdbd.mysql.protocol.UnrecognizedCollationException;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.result.ResultItem;
@@ -75,7 +76,14 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
     @Override
     public final void addErrorToTask(Throwable error) {
-        addError(error);
+        if (error instanceof UnrecognizedCollationException) {
+            if (!containsError(UnrecognizedCollationException.class)) {
+                addError(error);
+            }
+        } else {
+            addError(error);
+        }
+
     }
 
     @Override

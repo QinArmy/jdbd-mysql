@@ -96,7 +96,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             this.currentRow = currentRow;
             this.resultSetCharset = currentRow.rowMeta.resultSetCharset; // update
             if (currentRow.rowMeta.unknownCollationSet.size() > 0) {
-                this.task.addErrorToTask(MySQLExceptions.unknownCollationError(currentRow.rowMeta.unknownCollationSet));
+                this.task.addErrorToTask(MySQLExceptions.unrecognizedCollationError(currentRow.rowMeta.unknownCollationSet));
             } else {
                 this.task.next(currentRow.rowMeta); // emit ResultRowMeta as the header of query result.
             }

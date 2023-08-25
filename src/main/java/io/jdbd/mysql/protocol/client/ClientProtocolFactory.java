@@ -34,9 +34,9 @@ import reactor.netty.tcp.TcpResources;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -44,7 +44,7 @@ import java.util.*;
 
 /**
  * <p>
- * This class is physical protocol(connection) factory.
+ * This class is protocol(connection) factory.
  * </p>
  *
  * @since 1.0
@@ -65,19 +65,20 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     final TcpClient tcpClient;
 
+
     private ClientProtocolFactory(final MySQLHost host) {
         super(host.properties());
         this.host = host;
+
         final Environment env = this.env;
         this.factoryTaskQueueSize = env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
 
-        this.tcpClient = TcpClient.create(this.env.get(MySQLKey.SOCKET_FACTORY, TcpResources::get))
+        this.tcpClient = TcpClient.create(env.get(MySQLKey.CONNECTION_PROVIDER, TcpResources::get))
                 .option(ChannelOption.SO_KEEPALIVE, env.isOn(MySQLKey.TCP_KEEP_ALIVE))
                 .option(ChannelOption.TCP_NODELAY, env.isOn(MySQLKey.TCP_NO_DELAY))
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, env.getOrDefault(MySQLKey.CONNECT_TIMEOUT))
                 .runOn(createEventLoopGroup(this.env), true)
-                .remoteAddress(() -> hostAddress(host));
-
+                .remoteAddress(() -> hostAddress(this.host));
     }
 
 
@@ -89,22 +90,18 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     @Override
     public Mono<MySQLProtocol> createProtocol() {
         return MySQLTaskExecutor.create(this)//1. create network connection
+                .onErrorMap(this::mapConnectionError)
                 .map(executor -> new ClientProtocolManager(executor, this))//2. create  ClientProtocolManager
                 .flatMap(ClientProtocolManager::authenticate) //3. authenticate
                 .flatMap(ClientProtocolManager::initializing)//4. initializing
                 .map(ClientProtocol::create);         //5. create ClientProtocol
     }
 
-    @SuppressWarnings("unchecked")
+
     @Override
     public <T> T valueOf(Option<T> option) {
-        final Object value;
-        if (option == Option.AUTO_RECONNECT) {
-            value = this.env.getOrDefault(MySQLKey.AUTO_RECONNECT);
-        } else {
-            value = null;
-        }
-        return (T) value;
+        //TODO
+        return null;
     }
 
     @Override
@@ -120,14 +117,17 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     }
 
     private static LoopResources createEventLoopGroup(final Environment env) {
-        return LoopResources.create("jdbd-mysql",
-                env.getInRange(MySQLKey.FACTORY_SELECT_COUNT_COUNT, 2, Integer.MAX_VALUE),
-                env.getInRange(MySQLKey.FACTORY_WORKER_COUNT, 2, Integer.MAX_VALUE),
-                true
-        );
+        final int workerCount;
+        workerCount = env.getInRange(MySQLKey.FACTORY_WORKER_COUNT, 2, Integer.MAX_VALUE);
+        int selectCount;
+        selectCount = env.getOrDefault(MySQLKey.FACTORY_SELECT_COUNT_COUNT);
+        if (selectCount < 0) {
+            selectCount = workerCount;
+        }
+        return LoopResources.create("jdbd-mysql", selectCount, workerCount, true);
     }
 
-    private static SocketAddress hostAddress(MySQLHost host) {
+    private static SocketAddress hostAddress(final MySQLHost host) {
         final String address;
         address = host.host();
         final SocketAddress socketAddress;
@@ -137,6 +137,18 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             socketAddress = InetSocketAddress.createUnresolved(address, host.port());
         }
         return socketAddress;
+    }
+
+    private JdbdException mapConnectionError(final Throwable cause) {
+        final JdbdException error;
+        if (cause instanceof JdbdException) {
+            error = (JdbdException) cause;
+        } else if (cause instanceof ClosedChannelException) {
+            error = new JdbdException("connect timeout,possibly server too busy", cause);
+        } else {
+            error = new JdbdException("connect error, unknown error", cause);
+        }
+        return error;
     }
 
 
@@ -186,16 +198,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         }
 
 
-        @Override
-        public Mono<Void> reConnect(Duration duration) {
-            LOG.debug("reconnect");
-            return this.executor.reConnect(duration)
-                    .then(Mono.defer(this::authenticate))
-                    .then(Mono.defer(this::initializing))
-                    .then();
-        }
-
-
         private Mono<ClientProtocolManager> authenticate() {
             LOG.debug("authenticate");
             return MySQLConnectionTask.authenticate(this.adjutant)
@@ -208,7 +210,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
          * Just for
          * <ul>
          *     <li>{@link ClientProtocolFactory#createProtocol() }</li>
-         *     <li>{@link #reConnect(Duration)}</li>
          * </ul>
          *
          * @see ClientProtocolFactory#createProtocol()

@@ -12,7 +12,7 @@ import io.jdbd.session.ChunkOption;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.statement.BindSingleStatement;
-import io.jdbd.statement.InOutParameter;
+import io.jdbd.statement.Parameter;
 import io.jdbd.statement.Statement;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.NamedValue;
@@ -78,7 +78,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
             error = MySQLExceptions.stmtVarNameHaveNoText(name);
         } else if (dataType == null) {
             error = MySQLExceptions.dataTypeIsNull();
-        } else if (value instanceof Publisher || value instanceof InOutParameter) {
+        } else if (value instanceof Parameter) {
             error = MySQLExceptions.dontSupportJavaType(name, value, MY_SQL);
         } else if (value != null && (dataType == JdbdType.NULL || dataType == MySQLType.NULL)) {
             error = MySQLExceptions.nonNullBindValueOf(dataType);
@@ -205,13 +205,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
      */
     @Override
     public final <T> T valueOf(Option<T> option) {
-        final T value;
-        if (option == Option.AUTO_RECONNECT) {
-            value = null;
-        } else {
-            value = this.session.protocol.valueOf(option);
-        }
-        return value;
+        return this.session.protocol.valueOf(option);
     }
 
 

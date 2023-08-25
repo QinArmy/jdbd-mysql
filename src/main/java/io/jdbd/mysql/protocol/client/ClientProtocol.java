@@ -1,19 +1,16 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.lang.Nullable;
-import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.result.*;
 import io.jdbd.session.Option;
 import io.jdbd.session.ServerVersion;
-import io.jdbd.session.SessionCloseException;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
@@ -219,8 +216,6 @@ final class ClientProtocol implements MySQLProtocol {
             value = adjutant.sessionEnv().serverZone();
         } else if (option == Option.CLIENT_CHARSET) {
             value = adjutant.sessionEnv().charsetClient();
-        } else if (option == Option.AUTO_RECONNECT) {
-            value = adjutant.host().properties().getOrDefault(MySQLKey.AUTO_RECONNECT);
         } else {
             value = null;
         }
@@ -244,14 +239,6 @@ final class ClientProtocol implements MySQLProtocol {
         return QuitTask.quit(this.adjutant);
     }
 
-
-    @Override
-    public Mono<Void> reconnect(Duration duration) {
-        if (this.userCloseSession.get()) {
-            return Mono.error(new SessionCloseException("session have closed by close() method,reject reconnect."));
-        }
-        return this.manager.reConnect(duration);
-    }
 
     @Override
     public Mono<Void> reset() {

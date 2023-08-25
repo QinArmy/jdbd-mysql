@@ -13,18 +13,16 @@ import io.jdbd.result.BatchQuery;
 import io.jdbd.result.MultiResult;
 import io.jdbd.result.OrderedFlux;
 import io.jdbd.result.ResultStates;
-import io.jdbd.statement.InOutParameter;
 import io.jdbd.statement.MultiStatement;
+import io.jdbd.statement.Parameter;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdBinds;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-import java.nio.file.Path;
 import java.util.List;
 
 import static io.jdbd.mysql.MySQLDriver.MY_SQL;
@@ -103,9 +101,7 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
             error = MySQLExceptions.cannotReuseStatement(MultiStatement.class);
         } else if (indexBasedZero < 0) {
             error = MySQLExceptions.invalidParameterValue(this.stmtGroup.size(), indexBasedZero);
-        } else if (value instanceof InOutParameter) {
-            error = MySQLExceptions.dontSupportOutParameter(indexBasedZero, MultiStatement.class, MY_SQL);
-        } else if (value instanceof Publisher || value instanceof Path) {
+        } else if (value instanceof Parameter) {
             error = MySQLExceptions.dontSupportJavaType(indexBasedZero, value, MY_SQL);
         } else if (dataType == null) {
             error = MySQLExceptions.dataTypeIsNull();

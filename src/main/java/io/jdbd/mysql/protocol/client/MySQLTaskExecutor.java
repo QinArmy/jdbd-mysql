@@ -25,7 +25,6 @@ import reactor.netty.Connection;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
@@ -123,10 +122,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         ((MySQLTaskAdjutant) this.taskAdjutant).onSessionClose();
     }
 
-    Mono<Void> reConnect(Duration duration) {
-        // TODO
-        return Mono.empty();
-    }
 
 
     Mono<Void> setCustomCollation(final Map<String, MyCharset> customCharsetMap,

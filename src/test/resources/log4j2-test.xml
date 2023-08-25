@@ -7,7 +7,7 @@
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%highlight{%-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %l%n%msg%n}"/>
         </Console>
-        <RollingFile name="RollingFile" fileName="${baseDir}/army.log"
+        <RollingFile name="RollingFile" fileName="${baseDir}/target/jdbd-mysql.log"
                      filePattern="${baseDir}/${date:yyyy-MM}/jdbd-%d{MM-dd}_%i.log">
             <PatternLayout pattern="%highlight{%-5level %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %l%n%msg%n}"/>
             <Policies>
@@ -40,6 +40,7 @@
         </Logger>
         <Root level="INFO">
             <AppenderRef ref="Console"/>
+            <!--  <AppenderRef ref="RollingFile"/>-->
         </Root>
     </Loggers>
 </Configuration>

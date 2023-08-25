@@ -10,6 +10,7 @@ import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 
@@ -24,26 +25,34 @@ public class SessionFactorySuiteTests {
     private static final Logger LOG = LoggerFactory.getLogger(SessionFactorySuiteTests.class);
 
 
+    private DatabaseSessionFactory sessionFactory;
 
-    @Test
+    @BeforeClass
+    public void beforeClass() {
+        this.sessionFactory = createSessionFactory();
+    }
+
+
+    @Test//(invocationCount = 2000,threadPoolSize = 10)
     public void localSession() {
         final DatabaseSessionFactory sessionFactory;
-        sessionFactory = createSessionFactory();
+        sessionFactory = this.sessionFactory;
 
         Flux.from(sessionFactory.localSession())
-                //.repeat(8)
+                // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)
                 .flatMap(DatabaseSession::close)
-                .blockLast();
+                .then()
+                .block();
 
     }
 
     @Test
     public void rmSession() {
         final DatabaseSessionFactory sessionFactory;
-        sessionFactory = createSessionFactory();
+        sessionFactory = this.sessionFactory;
 
         Flux.from(sessionFactory.rmSession())
                 //.repeat(8)

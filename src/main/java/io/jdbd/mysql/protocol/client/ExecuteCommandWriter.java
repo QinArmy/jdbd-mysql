@@ -5,6 +5,7 @@ import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.statement.ValueParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
@@ -24,7 +25,7 @@ import java.util.function.IntSupplier;
  * @see ComPreparedTask
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html">Protocol::COM_STMT_EXECUTE</a>
  */
-final class ExecuteCommandWriter implements CommandWriter {
+final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
 
     static ExecuteCommandWriter create(final PrepareStmtTask stmtTask) {
@@ -42,9 +43,6 @@ final class ExecuteCommandWriter implements CommandWriter {
 
     final ParamSingleStmt stmt;
 
-
-    final TaskAdjutant adjutant;
-
     final boolean supportQueryAttr;
 
     final boolean supportZoneOffset;
@@ -59,14 +57,13 @@ final class ExecuteCommandWriter implements CommandWriter {
 
 
     private ExecuteCommandWriter(final PrepareStmtTask stmtTask) {
+        super(stmtTask.adjutant());
         this.stmtTask = stmtTask;
         this.sequenceId = stmtTask::nextSequenceId;
         this.stmt = stmtTask.getStmt();
 
 
-        final TaskAdjutant adjutant = stmtTask.adjutant();
-
-        this.adjutant = adjutant;
+        final TaskAdjutant adjutant = this.adjutant;
         this.supportQueryAttr = (adjutant.capability() & Capabilities.CLIENT_QUERY_ATTRIBUTES) != 0;
         this.supportZoneOffset = adjutant.handshake10().serverVersion.isSupportZoneOffset();
         this.fixedEnv = adjutant.getFactory();
@@ -93,7 +90,7 @@ final class ExecuteCommandWriter implements CommandWriter {
                 // hear invoker has bug
                 throw MySQLExceptions.bindValueParamIndexNotMatchError(batchIndex, paramValue, i);
             }
-            value = paramValue.getValue();
+            value = paramValue.get();
             if (value instanceof Publisher || value instanceof Path) {
                 if (longParamList == null) {
                     longParamList = MySQLCollections.arrayList();
@@ -244,10 +241,10 @@ final class ExecuteCommandWriter implements CommandWriter {
             final int anonymousParamCount = paramMetaArray.length;
             for (int i = 0; i < anonymousParamCount; i++) {
                 paramValue = paramGroup.get(i);
-                if (paramValue.getValue() == null) {
+                if (paramValue.get() == null) {
                     nullBitsMap[i >> 3] |= (1 << (i & 7));
                 }
-                type = BinaryWriter.decideActualType(paramValue, supportZoneOffset);
+                type = decideActualType(paramValue);
                 Packets.writeInt2(packet, type.parameterType);
                 if (supportQueryAttr) {
                     packet.writeByte(0); //write empty, anonymous parameter, not query attribute parameter. string<lenenc>
@@ -256,7 +253,7 @@ final class ExecuteCommandWriter implements CommandWriter {
 
 
             if (supportQueryAttr && queryAttrSize > 0) {
-                BinaryWriter.writeQueryAttrType(packet, queryAttrList, nullBitsMap, this.clientCharset, supportZoneOffset);
+                writeQueryAttrType(packet, queryAttrList, nullBitsMap);
             }
 
             // write nullBitsMap
@@ -305,8 +302,8 @@ final class ExecuteCommandWriter implements CommandWriter {
         // below write bind parameter values
         for (int i = 0, scale; i < paramSize; i++) {
             paramValue = paramList.get(i);
-            value = paramValue.getValue();
-            if (value == null || value instanceof Publisher || value instanceof Path) {
+            value = paramValue.get();
+            if (value == null || value instanceof ValueParameter) {
                 continue;
             }
 
@@ -347,7 +344,7 @@ final class ExecuteCommandWriter implements CommandWriter {
                     zoneOffset = null;
             }
 
-            BinaryWriter.writeBinary(packet, batchIndex, paramValue, scale, clientCharset, zoneOffset);
+            writeBinary(packet, batchIndex, paramValue, scale);
 
         }
 

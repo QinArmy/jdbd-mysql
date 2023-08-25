@@ -23,7 +23,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -529,11 +528,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             super(factory, protocol);
         }
 
-        @Override
-        public Publisher<PoolRmDatabaseSession> reconnect(Duration duration) {
-            return this.protocol.reconnect(duration)
-                    .thenReturn(this);
-        }
 
         @Override
         public Mono<PoolRmDatabaseSession> ping(int timeoutSeconds) {

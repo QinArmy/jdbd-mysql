@@ -11,7 +11,7 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
 import io.jdbd.statement.BindStatement;
-import io.jdbd.statement.InOutParameter;
+import io.jdbd.statement.Parameter;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
 import io.jdbd.vendor.result.MultiResults;
@@ -21,7 +21,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -98,9 +97,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
             if (paramGroup == null) {
                 this.paramGroup = paramGroup = MySQLCollections.arrayList(firstGroupSize < 0 ? 0 : firstGroupSize);
             }
-            if (value instanceof InOutParameter
-                    || value instanceof Publisher
-                    || value instanceof Path) { // TODO long string or binary
+            if (value instanceof Parameter) { // TODO long string or binary
                 this.usePrepare = true;
             }
             paramGroup.add(JdbdValues.paramValue(indexBasedZero, type, value));

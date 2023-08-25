@@ -245,18 +245,20 @@ public final class MySQLKey<T> extends Key<T> {
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketFactory</a>
      */
     @Redefine
-    public static final MySQLKey<ConnectionProvider> SOCKET_FACTORY = new MySQLKey<>("socketFactory", ConnectionProvider.class, null);
+    public static final MySQLKey<ConnectionProvider> CONNECTION_PROVIDER = new MySQLKey<>("connectionProvider", ConnectionProvider.class, null);
 
 
     /**
+     * Timeout for socket connect (in milliseconds), with 0 being no timeout.
+     *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">connectTimeout</a>
      */
     public static final MySQLKey<Integer> CONNECT_TIMEOUT = new MySQLKey<>("connectTimeout", Integer.class, 0);
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketTimeout</a>
-     */
-    public static final MySQLKey<Long> SOCKET_TIMEOUT = new MySQLKey<>("socketTimeout", Long.class, 0L);
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketTimeout</a>
+//     */
+//    public static final MySQLKey<Long> SOCKET_TIMEOUT = new MySQLKey<>("socketTimeout", Long.class, 0L);
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">dnsSrv</a>
@@ -294,24 +296,24 @@ public final class MySQLKey<T> extends Key<T> {
      */
     public static final MySQLKey<Boolean> TCP_NO_DELAY = new MySQLKey<>("tcpNoDelay", Boolean.class, Boolean.TRUE);
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">tcpRcvBuf</a>
-     * @since MySQL Driver  5.0.7
-     */
-    public static final MySQLKey<Integer> TCP_RCV_BUF = new MySQLKey<>("tcpRcvBuf", Integer.class, 0);
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">tcpRcvBuf</a>
+//     * @since MySQL Driver  5.0.7
+//     */
+//    public static final MySQLKey<Integer> TCP_RCV_BUF = new MySQLKey<>("tcpRcvBuf", Integer.class, 0);
+//
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">tcpSndBuf</a>
+//     * @since MySQL Driver  5.0.7
+//     */
+//    public static final MySQLKey<Integer> TCP_SND_BUF = new MySQLKey<>("tcpSndBuf", Integer.class, 0);
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">tcpSndBuf</a>
-     * @since MySQL Driver  5.0.7
-     */
-    public static final MySQLKey<Integer> TCP_SND_BUF = new MySQLKey<>("tcpSndBuf", Integer.class, 0);
 
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">tcpTrafficClass</a>
-     * @since MySQL Driver  5.0.7
-     */
-    public static final MySQLKey<Integer> TCP_TRAFFIC_CLASS = new MySQLKey<>("tcpTrafficClass", Integer.class, 0);
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">tcpTrafficClass</a>
+//     * @since MySQL Driver  5.0.7
+//     */
+//    public static final MySQLKey<Integer> TCP_TRAFFIC_CLASS = new MySQLKey<>("tcpTrafficClass", Integer.class, 0);
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">useCompression</a>
@@ -799,13 +801,13 @@ public final class MySQLKey<T> extends Key<T> {
     public static final MySQLKey<Enums.ZeroDatetimeBehavior> ZERO_DATE_TIME_BEHAVIOR = new MySQLKey<>("zeroDateTimeBehavior", Enums.ZeroDatetimeBehavior.class, Enums.ZeroDatetimeBehavior.EXCEPTION);
 
     /*-------------------below High Availability and Clustering group-------------------*/
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-high-availability-and-clustering.html">autoReconnect</a>
-     * @see #MAX_RECONNECTS
-     * @since MySQL Driver  1.1
-     */
-    public static final MySQLKey<Boolean> AUTO_RECONNECT = new MySQLKey<>("autoReconnect", Boolean.class, Boolean.FALSE);
+//
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-high-availability-and-clustering.html">autoReconnect</a>
+//     * @see #MAX_RECONNECTS
+//     * @since MySQL Driver  1.1
+//     */
+//    public static final MySQLKey<Boolean> AUTO_RECONNECT = new MySQLKey<>("autoReconnect", Boolean.class, Boolean.FALSE);
 
 
 //    /**
@@ -1264,7 +1266,7 @@ public final class MySQLKey<T> extends Key<T> {
 
     public static final MySQLKey<Integer> FACTORY_WORKER_COUNT = new MySQLKey<>("factoryWorkerCount", Integer.class, 20);
 
-    public static final MySQLKey<Integer> FACTORY_SELECT_COUNT_COUNT = new MySQLKey<>("factorySelectCount", Integer.class, FACTORY_WORKER_COUNT.defaultValue);
+    public static final MySQLKey<Integer> FACTORY_SELECT_COUNT_COUNT = new MySQLKey<>("factorySelectCount", Integer.class, -1);
 
 
     public static final MySQLKey<Integer> FACTORY_TASK_QUEUE_SIZE = new MySQLKey<>("factoryTaskQueueSize", Integer.class, 18);

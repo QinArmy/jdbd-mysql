@@ -1,7 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
 
-import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.MySQLBinds;
@@ -22,7 +21,14 @@ import java.util.List;
 
 /**
  * <p>
- * This util class provider method that write MySQL Binary Protocol.
+ * This class provider method that write MySQL Binary Protocol.
+ * </p>
+ * <p>
+ * This class is base class of following :
+ *     <ul>
+ *         <li>{@link QueryCommandWriter}</li>
+ *         <li>{@link ExecuteCommandWriter}</li>
+ *     </ul>
  * </p>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html">Binary Protocol Resultset</a>
@@ -30,8 +36,24 @@ import java.util.List;
  */
 abstract class BinaryWriter {
 
-    private BinaryWriter() {
-        throw new UnsupportedOperationException();
+
+    final TaskAdjutant adjutant;
+
+    final Charset clientCharset;
+
+    final ZoneOffset serverZone;
+
+
+    final boolean supportZoneOffset;
+
+    BinaryWriter(TaskAdjutant adjutant) {
+        this.adjutant = adjutant;
+        this.clientCharset = adjutant.charsetClient();
+        this.serverZone = adjutant.serverZone();
+
+        final MySQLServerVersion serverVersion;
+        serverVersion = adjutant.handshake10().serverVersion;
+        this.supportZoneOffset = serverVersion.isSupportZoneOffset();
     }
 
 
@@ -40,24 +62,14 @@ abstract class BinaryWriter {
      * Bind non-null and simple(no {@link org.reactivestreams.Publisher} or {@link java.nio.file.Path}) value with MySQL binary protocol.
      * </p>
      *
-     * @param precision  negative if dont' need to truncate micro seconds.
-     * @param charset    client charset
-     * @param serverZone null if as of MySQL 8.0.19 and {@link Value#getType()} is {@link MySQLType#DATETIME} or {@link MySQLType#TIMESTAMP} ,
-     *                   now binary protocol parameter type is varchar
-     *                   when {@link Value#getNonNullValue()} is following type:
-     *                   <ul>
-     *                      <li>{@link OffsetDateTime}</li>
-     *                      <li>{@link ZonedDateTime}</li>
-     *                   </ul>  see {@link #decideActualType(Value, boolean)}.
-     *                   But if  {@link Value#getType()} is {@link MySQLType#TIME} serverZone must non-null.
-     * @see #decideActualType(Value, boolean)
+     * @param precision negative if dont' need to truncate micro seconds.
+     * @see #decideActualType(Value)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html">Binary Protocol Resultset</a>
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html">COM_STMT_EXECUTE</a>
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">COM_QUERY CLIENT_QUERY_ATTRIBUTES</a>
      */
     @SuppressWarnings("deprecation")
-    static void writeBinary(final ByteBuf packet, final int batchIndex, final Value paramValue,
-                            final int precision, final Charset charset, final @Nullable ZoneOffset serverZone) {
+    final void writeBinary(final ByteBuf packet, final int batchIndex, final Value paramValue, final int precision) {
 
         switch ((MySQLType) paramValue.getType()) {
             case BOOLEAN: {
@@ -101,7 +113,7 @@ abstract class BinaryWriter {
             case DECIMAL: {
                 final BigDecimal value;
                 value = MySQLBinds.bindToDecimal(batchIndex, paramValue);
-                Packets.writeStringLenEnc(packet, value.toPlainString().getBytes(charset));
+                Packets.writeStringLenEnc(packet, value.toPlainString().getBytes(this.clientCharset));
             }
             break;
             case DECIMAL_UNSIGNED: {
@@ -110,7 +122,7 @@ abstract class BinaryWriter {
                 if (value.compareTo(BigDecimal.ZERO) < 0) {
                     throw MySQLExceptions.outOfTypeRange(batchIndex, paramValue, null);
                 }
-                Packets.writeStringLenEnc(packet, value.toPlainString().getBytes(charset));
+                Packets.writeStringLenEnc(packet, value.toPlainString().getBytes(this.clientCharset));
             }
             break;
             case FLOAT: {
@@ -153,7 +165,7 @@ abstract class BinaryWriter {
             case JSON: {
                 final String value;
                 value = MySQLBinds.bindToString(batchIndex, paramValue);
-                Packets.writeStringLenEnc(packet, value.getBytes(charset));
+                Packets.writeStringLenEnc(packet, value.getBytes(this.clientCharset));
             }
             break;
             case BINARY:
@@ -162,7 +174,7 @@ abstract class BinaryWriter {
             case MEDIUMBLOB:
             case BLOB:
             case LONGBLOB: {
-                final Object nonNull = paramValue.getNonNullValue();
+                final Object nonNull = paramValue.getNonNull();
                 if (!(nonNull instanceof byte[])) {
                     throw JdbdExceptions.nonSupportBindSqlTypeError(batchIndex, paramValue);
                 }
@@ -171,14 +183,14 @@ abstract class BinaryWriter {
             break;
             case TIMESTAMP:
             case DATETIME:
-                writeDatetime(packet, batchIndex, paramValue, precision, charset, serverZone);
+                writeDatetime(packet, batchIndex, paramValue, precision);
                 break;
             case TIME: {
                 if (serverZone == null) {
                     // no bug never here
                     throw new NullPointerException("serverZone is null");
                 }
-                writeTime(packet, batchIndex, paramValue, precision, serverZone);
+                writeTime(packet, batchIndex, paramValue, precision);
             }
             break;
             case DATE: {
@@ -192,11 +204,11 @@ abstract class BinaryWriter {
             }
             break;
             case GEOMETRY: {
-                final Object nonNull = paramValue.getNonNullValue();
+                final Object nonNull = paramValue.getNonNull();
                 if (nonNull instanceof byte[]) {
                     Packets.writeStringLenEnc(packet, (byte[]) nonNull);
                 } else if (nonNull instanceof String) {
-                    Packets.writeStringLenEnc(packet, ((String) nonNull).getBytes(charset));
+                    Packets.writeStringLenEnc(packet, ((String) nonNull).getBytes(this.clientCharset));
                 } else {
                     throw JdbdExceptions.nonSupportBindSqlTypeError(batchIndex, paramValue);
                 }
@@ -208,7 +220,7 @@ abstract class BinaryWriter {
             case SET: {
                 final String value;
                 value = MySQLBinds.bindToSetType(batchIndex, paramValue);
-                Packets.writeStringLenEnc(packet, value.getBytes(charset));
+                Packets.writeStringLenEnc(packet, value.getBytes(this.clientCharset));
             }
             break;
             case NULL:
@@ -220,32 +232,30 @@ abstract class BinaryWriter {
 
     }
 
-    static void writeQueryAttrType(final ByteBuf packet, final List<NamedValue> queryAttrList, final byte[] nullBitsMap,
-                                   final Charset clientCharset, final boolean supportZoneOffset) {
+    final void writeQueryAttrType(final ByteBuf packet, final List<NamedValue> queryAttrList, final byte[] nullBitsMap) {
         final int queryAttrSize = queryAttrList.size();
         NamedValue namedValue;
         MySQLType type;
         for (int i = 0; i < queryAttrSize; i++) {
             namedValue = queryAttrList.get(i);
-            if (namedValue.getValue() == null) {
+            if (namedValue.get() == null) {
                 nullBitsMap[i >> 3] |= (1 << (i & 7));
             }
-            type = BinaryWriter.decideActualType(namedValue, supportZoneOffset);
+            type = decideActualType(namedValue);
             Packets.writeInt2(packet, type.parameterType);
-            Packets.writeStringLenEnc(packet, namedValue.getName().getBytes(clientCharset));
+            Packets.writeStringLenEnc(packet, namedValue.getName().getBytes(this.clientCharset));
         }
 
     }
 
 
     /**
-     * @param supportZoneOffset Beginning with MySQL 8.0.19, you can specify a time zone offset when inserting TIMESTAMP and DATETIME values into a table.
-     * @see #writeBinary(ByteBuf, int, Value, int, Charset, ZoneOffset)
+     * @see #writeBinary(ByteBuf, int, Value, int)
      * @see MySQLServerVersion#isSupportZoneOffset()
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/date-and-time-literals.html">Date and Time Literals</a>
      */
-    static MySQLType decideActualType(final Value paramValue, final boolean supportZoneOffset) {
-        final Object source = paramValue.getNonNullValue();
+    final MySQLType decideActualType(final Value paramValue) {
+        final Object source = paramValue.getNonNull();
         final MySQLType type = (MySQLType) paramValue.getType();
         final MySQLType bindType;
         switch (type) {
@@ -261,7 +271,7 @@ abstract class BinaryWriter {
             }
             break;
             case DATETIME: {
-                if (supportZoneOffset || source instanceof OffsetDateTime || source instanceof ZonedDateTime) {
+                if (this.supportZoneOffset || source instanceof OffsetDateTime || source instanceof ZonedDateTime) {
                     //As of MySQL 8.0.19 can append zone
                     //Datetime literals that include time zone offsets are accepted as parameter values by prepared statements.
                     bindType = MySQLType.VARCHAR;
@@ -278,11 +288,11 @@ abstract class BinaryWriter {
 
 
     /**
-     * @see #decideActualType(Value, boolean)
-     * @see #writeBinary(ByteBuf, int, Value, int, Charset, ZoneOffset)
+     * @see #decideActualType(Value)
+     * @see #writeBinary(ByteBuf, int, Value, int)
      */
     private static void writeBit(final ByteBuf packet, final int batchIndex, final Value paramValue) {
-        final Object nonNull = paramValue.getNonNullValue();
+        final Object nonNull = paramValue.getNonNull();
         final long value;
         if (nonNull instanceof Long) {
             value = (Long) nonNull;
@@ -319,14 +329,12 @@ abstract class BinaryWriter {
      *     to {@link MySQLType#TIME}
      * </p>
      *
-     * @param precision  negative if dont' need to truncate micro seconds.
-     * @param serverZone null if as of MySQL 8.0.19 ,now binary protocol parameter type is varchar
-     *                   when {@link Value#getNonNullValue()} is {@link OffsetTime} type.
-     * @see #writeBinary(ByteBuf, int, Value, int, Charset, ZoneOffset)
+     * @param precision negative if dont' need to truncate micro seconds.
+     * @see #writeBinary(ByteBuf, int, Value, int)
      */
-    private static void writeTime(final ByteBuf packet, final int batchIndex, final Value paramValue,
-                                  final int precision, final ZoneOffset serverZone) {
-        final Object nonNull = paramValue.getNonNullValue();
+    private void writeTime(final ByteBuf packet, final int batchIndex, final Value paramValue,
+                           final int precision) {
+        final Object nonNull = paramValue.getNonNull();
 
         if (nonNull instanceof LocalTime || nonNull instanceof String) {
             final LocalTime value;
@@ -344,11 +352,59 @@ abstract class BinaryWriter {
         } else if (nonNull instanceof OffsetTime) {
             final OffsetTime value;
             value = MySQLTimes.truncatedIfNeed(precision, (OffsetTime) nonNull);
-            writeLocalTime(packet, value.withOffsetSameInstant(serverZone).toLocalTime());
+            writeLocalTime(packet, value.withOffsetSameInstant(this.serverZone).toLocalTime());
         } else {
             throw JdbdExceptions.nonSupportBindSqlTypeError(batchIndex, paramValue);
         }
 
+
+    }
+
+
+    /**
+     * <p>
+     * write following type :
+     *     <ul>
+     *         <li>{@link LocalDateTime}</li>
+     *         <li>{@link String}</li>
+     *         <li>{@link OffsetDateTime}</li>
+     *         <li>{@link ZonedDateTime}</li>
+     *     </ul>
+     *     to {@link MySQLType#DATETIME} or {@link MySQLType#TIMESTAMP}
+     * </p>
+     *
+     * @param precision negative if dont' need to truncate micro seconds.
+     * @see #writeBinary(ByteBuf, int, Value, int)
+     */
+    private void writeDatetime(final ByteBuf packet, final int batchIndex, final Value paramValue,
+                               final int precision) {
+        final Object nonNull = paramValue.getNonNull();
+
+        if (nonNull instanceof OffsetDateTime) {
+            final OffsetDateTime value;
+            value = JdbdTimes.truncatedIfNeed(precision, (OffsetDateTime) nonNull);
+            if (this.supportZoneOffset) {
+                final byte[] bytes;
+                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(clientCharset);
+                Packets.writeStringLenEnc(packet, bytes);
+            } else {
+                writeLocalDateTime(packet, value.withOffsetSameInstant(serverZone).toLocalDateTime());
+            }
+        } else if (nonNull instanceof ZonedDateTime) {
+            final ZonedDateTime value;
+            value = JdbdTimes.truncatedIfNeed(precision, (ZonedDateTime) nonNull);
+            if (this.supportZoneOffset) {
+                final byte[] bytes;
+                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(clientCharset);
+                Packets.writeStringLenEnc(packet, bytes);
+            } else {
+                writeLocalDateTime(packet, value.withZoneSameInstant(serverZone).toLocalDateTime());
+            }
+        } else {
+            final LocalDateTime value;
+            value = JdbdTimes.truncatedIfNeed(precision, MySQLBinds.bindToLocalDateTime(batchIndex, paramValue));
+            writeLocalDateTime(packet, value);
+        }
 
     }
 
@@ -357,7 +413,7 @@ abstract class BinaryWriter {
      * write {@link Duration} with MySQL binary MYSQL_TYPE_TIME protocol.
      * </p>
      *
-     * @see #writeTime(ByteBuf, int, Value, int, ZoneOffset)
+     * @see #writeTime(ByteBuf, int, Value, int)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_time">MYSQL_TYPE_TIME</a>
      */
     private static void writeDuration(final ByteBuf packet, final int precision, final Duration value) {
@@ -397,7 +453,7 @@ abstract class BinaryWriter {
      * write {@link LocalTime} with MySQL binary MYSQL_TYPE_TIME protocol.
      * </p>
      *
-     * @see #writeTime(ByteBuf, int, Value, int, ZoneOffset)
+     * @see #writeTime(ByteBuf, int, Value, int)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_time">MYSQL_TYPE_TIME</a>
      */
     private static void writeLocalTime(final ByteBuf packet, final LocalTime value) {
@@ -417,60 +473,6 @@ abstract class BinaryWriter {
 
     }
 
-
-    /**
-     * <p>
-     * write following type :
-     *     <ul>
-     *         <li>{@link LocalDateTime}</li>
-     *         <li>{@link String}</li>
-     *         <li>{@link OffsetDateTime}</li>
-     *         <li>{@link ZonedDateTime}</li>
-     *     </ul>
-     *     to {@link MySQLType#DATETIME} or {@link MySQLType#TIMESTAMP}
-     * </p>
-     *
-     * @param precision  negative if dont' need to truncate micro seconds.
-     * @param serverZone null if as of MySQL 8.0.19 ,now binary protocol parameter type is varchar
-     *                   when {@link Value#getNonNullValue()} is following type:
-     *                   <ul>
-     *                      <li>{@link OffsetDateTime}</li>
-     *                      <li>{@link ZonedDateTime}</li>
-     *                   </ul>
-     * @see #writeBinary(ByteBuf, int, Value, int, Charset, ZoneOffset)
-     */
-    private static void writeDatetime(final ByteBuf packet, final int batchIndex, final Value paramValue,
-                                      final int precision, final Charset clientCharset,
-                                      final @Nullable ZoneOffset serverZone) {
-        final Object nonNull = paramValue.getNonNullValue();
-
-        if (nonNull instanceof OffsetDateTime) {
-            final OffsetDateTime value;
-            value = JdbdTimes.truncatedIfNeed(precision, (OffsetDateTime) nonNull);
-            if (serverZone == null) {
-                final byte[] bytes;
-                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(clientCharset);
-                Packets.writeStringLenEnc(packet, bytes);
-            } else {
-                writeLocalDateTime(packet, value.withOffsetSameInstant(serverZone).toLocalDateTime());
-            }
-        } else if (nonNull instanceof ZonedDateTime) {
-            final ZonedDateTime value;
-            value = JdbdTimes.truncatedIfNeed(precision, (ZonedDateTime) nonNull);
-            if (serverZone == null) {
-                final byte[] bytes;
-                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(clientCharset);
-                Packets.writeStringLenEnc(packet, bytes);
-            } else {
-                writeLocalDateTime(packet, value.withZoneSameInstant(serverZone).toLocalDateTime());
-            }
-        } else {
-            final LocalDateTime value;
-            value = JdbdTimes.truncatedIfNeed(precision, MySQLBinds.bindToLocalDateTime(batchIndex, paramValue));
-            writeLocalDateTime(packet, value);
-        }
-
-    }
 
     /**
      * <p>

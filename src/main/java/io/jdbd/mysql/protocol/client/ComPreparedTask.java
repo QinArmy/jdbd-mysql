@@ -2,6 +2,7 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.meta.DataType;
 import io.jdbd.mysql.MySQLType;
+import io.jdbd.mysql.protocol.UnrecognizedCollationException;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.result.*;
@@ -898,8 +899,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
                     final Set<Integer> unknownCollationSet;
                     unknownCollationSet = MySQLColumnMeta.readMetas(cumulateBuffer, paramMetas, this);
-                    if (unknownCollationSet.size() > 0) {
-                        addError(MySQLExceptions.unknownCollationError(unknownCollationSet));
+                    if (unknownCollationSet.size() > 0 && !containsError(UnrecognizedCollationException.class)) {
+                        addError(MySQLExceptions.unrecognizedCollationError(unknownCollationSet));
                     }
                     this.paramMetas = paramMetas;
                     if (readEof) {
@@ -907,8 +908,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     }
                     final MySQLRowMeta resultMeta;
                     this.rowMeta = resultMeta = MySQLRowMeta.readForPrepare(cumulateBuffer, numColumns, this);
-                    if (resultMeta.unknownCollationSet.size() > 0) {
-                        addError(MySQLExceptions.unknownCollationError(resultMeta.unknownCollationSet));
+                    if (resultMeta.unknownCollationSet.size() > 0 && !containsError(UnrecognizedCollationException.class)) {
+                        addError(MySQLExceptions.unrecognizedCollationError(resultMeta.unknownCollationSet));
                     }
                     if (readEof) {
                         readEofOfMeta(cumulateBuffer, serverStatusConsumer);

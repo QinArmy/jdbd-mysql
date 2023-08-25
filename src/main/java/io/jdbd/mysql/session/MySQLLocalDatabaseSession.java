@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -318,12 +317,6 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             super(factory, protocol);
         }
 
-
-        @Override
-        public Publisher<PoolLocalDatabaseSession> reconnect(Duration duration) {
-            return this.protocol.reconnect(duration)
-                    .thenReturn(this);
-        }
 
         @Override
         public Mono<PoolLocalDatabaseSession> ping(int timeoutSeconds) {

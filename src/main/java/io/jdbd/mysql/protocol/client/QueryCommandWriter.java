@@ -27,7 +27,7 @@ import java.util.function.IntSupplier;
 /**
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY</a>
  */
-final class QueryCommandWriter {
+final class QueryCommandWriter extends BinaryWriter {
 
     /**
      * @param stmt must be below stmt type:
@@ -55,7 +55,8 @@ final class QueryCommandWriter {
 
         try {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                writeQueryAttribute(packet, stmt, adjutant);
+                new QueryCommandWriter(sequenceId, adjutant)
+                        .writeQueryAttribute(packet, stmt);
             }
             packet.writeBytes(sqlBytes);
             return Packets.createPacketPublisher(packet, sequenceId, adjutant);
@@ -89,7 +90,8 @@ final class QueryCommandWriter {
 
         try {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                writeQueryAttribute(packet, stmt, adjutant);
+                new QueryCommandWriter(sequenceId, adjutant)
+                        .writeQueryAttribute(packet, stmt);
             }
             String sql;
             for (int i = 0; i < sqlSize; i++) {
@@ -145,21 +147,13 @@ final class QueryCommandWriter {
 
     private final IntSupplier sequenceId;
 
-    private final TaskAdjutant adjutant;
-
     private final boolean hexEscape;
-
-    private final Charset clientCharset;
-
-    private final boolean supportZoneOffset;
 
 
     private QueryCommandWriter(final IntSupplier sequenceId, final TaskAdjutant adjutant) {
+        super(adjutant);
         this.sequenceId = sequenceId;
-        this.adjutant = adjutant;
         this.hexEscape = Terminator.isNoBackslashEscapes(adjutant.serverStatus());
-        this.clientCharset = adjutant.charsetClient();
-        this.supportZoneOffset = adjutant.handshake10().serverVersion.isSupportZoneOffset();
 
     }
 
@@ -181,7 +175,7 @@ final class QueryCommandWriter {
         packet.writeByte(Packets.COM_QUERY);
         try {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                writeQueryAttribute(packet, multiStmt, adjutant);
+                writeQueryAttribute(packet, multiStmt);
             }
             for (int i = 0; i < size; i++) {
                 if (i > 0) {
@@ -212,7 +206,7 @@ final class QueryCommandWriter {
         packet.writeByte(Packets.COM_QUERY);
         try {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                writeQueryAttribute(packet, stmt, adjutant);
+                writeQueryAttribute(packet, stmt);
             }
             doWriteBindableCommand(-1, staticSqlList, stmt.getParamGroup(), packet);
             return Packets.createPacketPublisher(packet, this.sequenceId, adjutant);
@@ -240,7 +234,7 @@ final class QueryCommandWriter {
         packet.writeByte(Packets.COM_QUERY);
         try {
             if (Capabilities.supportQueryAttr(this.adjutant.capability())) {
-                writeQueryAttribute(packet, stmt, this.adjutant);
+                writeQueryAttribute(packet, stmt);
             }
             for (int i = 0; i < stmtCount; i++) {
                 if (i > 0) {
@@ -279,7 +273,7 @@ final class QueryCommandWriter {
             }
             packet.writeBytes(staticSqlList.get(i).getBytes(clientCharset));
 
-            value = paramValue.getValue();
+            value = paramValue.get();
             if (value == null) {
                 packet.writeBytes(nullBytes);
                 continue;
@@ -459,7 +453,7 @@ final class QueryCommandWriter {
                 case BLOB:
                 case LONGBLOB: {
                     final Object value;
-                    value = paramValue.getNonNullValue();
+                    value = paramValue.getNonNull();
                     if (!(value instanceof byte[])) {
                         throw JdbdExceptions.outOfTypeRange(batchIndex, paramValue, null);
                     }
@@ -483,7 +477,7 @@ final class QueryCommandWriter {
                     writeDateTimeValue(batchIndex, paramValue, packet);
                     break;
                 case GEOMETRY: {
-                    final Object nonNull = paramValue.getNonNullValue();
+                    final Object nonNull = paramValue.getNonNull();
                     if (nonNull instanceof Point) {
                         writeHexEscape(packet, JdbdSpatials.writePointToWkb(false, (Point) nonNull));
                     } else if (nonNull instanceof byte[]) {
@@ -569,7 +563,7 @@ final class QueryCommandWriter {
      */
     private void writeTimeValue(final int batchIndex, final ParamValue bindValue, final ByteBuf packet) {
 
-        final Object nonNull = bindValue.getNonNullValue();
+        final Object nonNull = bindValue.getNonNull();
         final String value;
         if (nonNull instanceof Duration) {
             value = MySQLTimes.durationToTimeText((Duration) nonNull);
@@ -602,7 +596,7 @@ final class QueryCommandWriter {
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/date-and-time-literals.html">Date and Time Literals</a>
      */
     private void writeDateTimeValue(final int batchIndex, final ParamValue bindValue, final ByteBuf packet) {
-        final Object nonNull = bindValue.getNonNullValue();
+        final Object nonNull = bindValue.getNonNull();
 
         final String value;
         if (this.supportZoneOffset && (nonNull instanceof OffsetDateTime || nonNull instanceof ZonedDateTime)) {
@@ -621,7 +615,7 @@ final class QueryCommandWriter {
      * @see #writeBitValue(int, ParamValue, ByteBuf)
      */
     private static String bindToBit(final int batchIndex, final Value paramValue) {
-        final Object nonNull = paramValue.getValue();
+        final Object nonNull = paramValue.get();
         final String value;
 
         if (nonNull instanceof Long) {
@@ -700,7 +694,7 @@ final class QueryCommandWriter {
     /**
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY</a>
      */
-    private static void writeQueryAttribute(final ByteBuf packet, final Stmt stmt, final TaskAdjutant adjutant) {
+    private void writeQueryAttribute(final ByteBuf packet, final Stmt stmt) {
 
         final List<NamedValue> attrList;
         attrList = stmt.getStmtVarList();
@@ -718,31 +712,20 @@ final class QueryCommandWriter {
         packet.writeZero(nullBitMap.length); //placeholder of nullBitMap
         packet.writeByte(1); // new_params_bind_flag.Always 1. Malformed packet error if not 1
 
-        final Charset clientCharset;
-        clientCharset = adjutant.charsetClient();
-
-        final boolean supportZoneOffset;
-        supportZoneOffset = adjutant.handshake10().serverVersion.isSupportZoneOffset();
-
         // write param_type_and_flag and parameter name
-        BinaryWriter.writeQueryAttrType(packet, attrList, nullBitMap, clientCharset, supportZoneOffset);
+        writeQueryAttrType(packet, attrList, nullBitMap);
 
         // below write nullBitMap bytes
         Packets.writeBytesAtIndex(packet, nullBitMap, nullBitMapWriterIndex);
 
         // below write parameter_values for query attribute
-
-        final ZoneOffset serverZone;
-        serverZone = adjutant.serverZone();
-        boolean useServerZone;
         NamedValue namedValue;
         for (int i = 0; i < paramCount; i++) {
             namedValue = attrList.get(i);
-            if (namedValue.getValue() == null) {
+            if (namedValue.get() == null) {
                 continue;
             }
-            useServerZone = supportZoneOffset && namedValue.getType() == MySQLType.DATETIME;
-            BinaryWriter.writeBinary(packet, -1, namedValue, -1, clientCharset, useServerZone ? serverZone : null);
+            writeBinary(packet, -1, namedValue, -1);
         }
 
     }
