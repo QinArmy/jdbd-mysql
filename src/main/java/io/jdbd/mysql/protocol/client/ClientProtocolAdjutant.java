@@ -28,7 +28,7 @@ interface ClientProtocolAdjutant extends ResultRowAdjutant {
      */
     int capability();
 
-    Map<Integer, Charsets.CustomCollation> obtainCustomCollationMap();
+    Map<Integer, CustomCollation> obtainCustomCollationMap();
 
 
     Handshake10 handshake10();

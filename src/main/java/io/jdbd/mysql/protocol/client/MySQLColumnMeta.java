@@ -4,6 +4,7 @@ import io.jdbd.meta.DataType;
 import io.jdbd.meta.NullMode;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.FieldType;
 import io.jdbd.vendor.result.ColumnMeta;
@@ -13,7 +14,9 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/group__group__cs__column__definition__flags.html"> Column Definition Flags</a>
@@ -81,8 +84,8 @@ final class MySQLColumnMeta implements ColumnMeta {
     /**
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html">Protocol::ColumnDefinition41</a>
      */
-    private MySQLColumnMeta(int columnIndex, final ByteBuf cumulateBuffer, final Charset metaCharset,
-                            final Map<Integer, Charsets.CustomCollation> customCollationMap, final FixedEnv env) {
+    MySQLColumnMeta(int columnIndex, final ByteBuf cumulateBuffer, final Charset metaCharset,
+                    final Map<Integer, CustomCollation> customCollationMap, final FixedEnv env) {
 
         this.columnIndex = columnIndex;
         // 1. catalog
@@ -108,7 +111,7 @@ final class MySQLColumnMeta implements ColumnMeta {
         this.fixedLength = Packets.readLenEnc(cumulateBuffer);
         // 8. character_set of column
         this.collationIndex = Packets.readInt2AsInt(cumulateBuffer);
-        this.columnCharset = Charsets.getJavaCharsetByCollationIndex(this.collationIndex, customCollationMap); // TODO throw specified Exception for cleaning channel
+        this.columnCharset = Charsets.tryGetJavaCharsetByCollationIndex(this.collationIndex, customCollationMap);
         // 9. column_length,maximum length of the field
         this.length = Packets.readInt4AsLong(cumulateBuffer);
         // 10. type,type of the column as defined in enum_field_types,type of the column as defined in enum_field_types
@@ -124,6 +127,7 @@ final class MySQLColumnMeta implements ColumnMeta {
         this.fieldType = parseFieldType(this);
         this.sqlType = parseSqlType(this, env);
     }
+
 
     @Override
     public int getColumnIndex() {
@@ -141,7 +145,7 @@ final class MySQLColumnMeta implements ColumnMeta {
     }
 
 
-    long obtainPrecision(final Map<Integer, Charsets.CustomCollation> customCollationMap) {
+    long obtainPrecision(final Map<Integer, CustomCollation> customCollationMap) {
         long precision;
         // Protocol returns precision and scale differently for some types. We need to align then to I_S.
         switch (this.sqlType) {
@@ -175,7 +179,7 @@ final class MySQLColumnMeta implements ColumnMeta {
             case LONGTEXT: {
                 // char
                 int collationIndex = this.collationIndex;
-                Charsets.CustomCollation collation = customCollationMap.get(collationIndex);
+                CustomCollation collation = customCollationMap.get(collationIndex);
                 Integer mblen = null;
                 if (collation != null) {
                     mblen = collation.maxLen;
@@ -414,34 +418,52 @@ final class MySQLColumnMeta implements ColumnMeta {
         return precision;
     }
 
+    /**
+     * @return non-empty : unknown collation index.
+     */
+    static Set<Integer> readMetas(final ByteBuf cumulateBuffer, final MySQLColumnMeta[] metaArray,
+                                  final MetaAdjutant metaAdjutant) {
 
-    static MySQLColumnMeta[] readMetas(final ByteBuf cumulateBuffer, final int columnCount, final MetaAdjutant metaAdjutant) {
-
-        final MySQLColumnMeta[] metaArray = columnCount == 0 ? EMPTY : new MySQLColumnMeta[columnCount];
-
+        final int columnCount = metaArray.length;
         final TaskAdjutant adjutant = metaAdjutant.adjutant();
         final Charset metaCharset = adjutant.obtainCharsetMeta();
         final FixedEnv env = adjutant.getFactory();
-        final Map<Integer, Charsets.CustomCollation> customCollationMap = adjutant.obtainCustomCollationMap();
+
+        final Map<Integer, CustomCollation> customCollationMap = adjutant.obtainCustomCollationMap();
 
         final boolean debug = LOG.isDebugEnabled();
         int sequenceId = -1;
+        MySQLColumnMeta columnMeta;
+        Set<Integer> unknownCollationSet = null;
         for (int i = 0, payloadLength, payloadIndex; i < columnCount; i++) {
             payloadLength = Packets.readInt3(cumulateBuffer);
             sequenceId = Packets.readInt1AsInt(cumulateBuffer);
 
             payloadIndex = cumulateBuffer.readerIndex();
 
-            metaArray[i] = new MySQLColumnMeta(i, cumulateBuffer, metaCharset, customCollationMap, env);
+            columnMeta = new MySQLColumnMeta(i, cumulateBuffer, metaCharset, customCollationMap, env);
+            metaArray[i] = columnMeta;
+            if (columnMeta.columnCharset == null) {
+                if (unknownCollationSet == null) {
+                    unknownCollationSet = MySQLCollections.hashSet();
+                }
+                unknownCollationSet.add(columnMeta.collationIndex);
+            }
             if (debug) {
-                LOG.debug("column[{}] {}", i, metaArray[i]);
+                LOG.debug("column meta [{}] {}", i, columnMeta);
             }
             cumulateBuffer.readerIndex(payloadIndex + payloadLength); //avoid tail filler
         }
         if (sequenceId > -1) {
             metaAdjutant.updateSequenceId(sequenceId);
         }
-        return metaArray;
+
+        if (unknownCollationSet == null) {
+            unknownCollationSet = Collections.emptySet();
+        } else {
+            unknownCollationSet = MySQLCollections.unmodifiableSet(unknownCollationSet);
+        }
+        return unknownCollationSet;
     }
 
 

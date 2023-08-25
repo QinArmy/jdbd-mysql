@@ -2,9 +2,9 @@ package io.jdbd.mysql.protocol.client;
 
 
 import io.jdbd.JdbdException;
+import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.MySQLCollections;
-import reactor.util.annotation.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -246,24 +246,37 @@ public abstract class Charsets {
         return Charset.forName(collation.myCharset.javaEncodingsUcList.get(0));
     }
 
-    public static Charset getJavaCharsetByCollationIndex(int collationIndex,
-                                                         Map<Integer, Charsets.CustomCollation> customCollationMap)
+    public static Charset getJavaCharsetByCollationIndex(final int collationIndex,
+                                                         final Map<Integer, CustomCollation> customCollationMap)
             throws JdbdException {
-        Collation collation = INDEX_TO_COLLATION.get(collationIndex);
+
         Charset charset = getJavaCharsetByCollationIndex(collationIndex);
-        if (charset == null) {
-            Charsets.CustomCollation customCollation = customCollationMap.get(collationIndex);
-            if (customCollation == null) {
-                String m = String.format("Not found collation for index[%s]", collation);
-                throw new JdbdException(m);
-            }
+        if (charset != null) {
+            return charset;
+        }
+        final CustomCollation customCollation;
+        if ((customCollation = customCollationMap.get(collationIndex)) == null) {
+            String m = String.format("Not found collation for index[%s]", collationIndex);
+            throw new JdbdException(m);
+        } else if ((charset = getJavaCharsetByMySQLCharsetName(customCollation.charsetName)) == null) {
+            String m = String.format("Not found java charset for name[%s]", customCollation.charsetName);
+            throw new JdbdException(m);
+        }
+        return charset;
+    }
+
+
+    @Nullable
+    public static Charset tryGetJavaCharsetByCollationIndex(final int collationIndex,
+                                                            final Map<Integer, CustomCollation> collationMap) {
+        Charset charset;
+        charset = getJavaCharsetByCollationIndex(collationIndex);
+        if (charset != null) {
+            return charset;
+        }
+        final CustomCollation customCollation;
+        if ((customCollation = collationMap.get(collationIndex)) != null) {
             charset = getJavaCharsetByMySQLCharsetName(customCollation.charsetName);
-            if (charset == null) {
-                String m = String.format("Not found java charset for name[%s]", customCollation.charsetName);
-                throw new JdbdException(m);
-            }
-        } else {
-            charset = Charset.forName(collation.myCharset.javaEncodingsUcList.get(0));
         }
         return charset;
     }
@@ -754,21 +767,4 @@ public abstract class Charsets {
 
     /*################################## blow static class ##################################*/
 
-    public static final class CustomCollation {
-
-        public final int index;
-
-        public final String collationName;
-
-        public final String charsetName;
-
-        public final int maxLen;
-
-        public CustomCollation(int index, String collationName, String charsetName, int maxLen) {
-            this.index = index;
-            this.collationName = collationName;
-            this.charsetName = charsetName;
-            this.maxLen = maxLen;
-        }
-    }
 }

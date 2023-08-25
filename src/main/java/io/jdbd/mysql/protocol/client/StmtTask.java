@@ -19,7 +19,7 @@ interface StmtTask extends MetaAdjutant {
  void updateSequenceId(int sequenceId);
 
 
- int nextResultIndex();
+ int nextResultNo();
 
 
 }

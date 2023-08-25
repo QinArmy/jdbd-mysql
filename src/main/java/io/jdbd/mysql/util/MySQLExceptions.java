@@ -4,10 +4,12 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.util.JdbdExceptions;
 
 import java.sql.SQLException;
+import java.util.Set;
 
 /**
  * @see <a href="https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html">Server Error Message Reference</a>
@@ -34,7 +36,6 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         }
         return e;
     }
-
 
 
     public static JdbdException createFatalIoException(String message, @Nullable Throwable cause) {
@@ -72,10 +73,23 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         return new JdbdException(m, cause);
     }
 
+    public static JdbdException unknownCollationError(final Set<Integer> collationSet) {
+        final StringBuilder builder = new StringBuilder(30);
+        builder.append("unrecognized collation index : ");
+        int count = 0;
+        for (Integer index : collationSet) {
+            if (count > 0) {
+                builder.append(Constants.SPACE_COMMA_SPACE);
+            }
+            builder.append(index);
+            count++;
+        }
+        return new JdbdException(builder.toString());
+    }
+
 
 
     /*################################## blow create SQLException method ##################################*/
-
 
 
     public static JdbdException createQueryIsEmptyError() {
@@ -158,7 +172,6 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         }
         return new JdbdException(message, cause);
     }
-
 
 
     public static JdbdException createTruncatedWrongValue(String message, @Nullable Throwable cause) {

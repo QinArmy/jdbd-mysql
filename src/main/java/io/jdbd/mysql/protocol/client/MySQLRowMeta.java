@@ -1,7 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
-import io.jdbd.lang.Nullable;
 import io.jdbd.meta.*;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.mysql.util.MySQLTimes;
@@ -16,6 +15,7 @@ import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * This class is a implementation of {@link ResultRowMeta}
@@ -23,11 +23,11 @@ import java.util.Map;
 final class MySQLRowMeta extends VendorResultRowMeta {
 
     /**
-     * for {@link #MySQLRowMeta(MySQLColumnMeta[])}
+     * for {@link #MySQLRowMeta(MySQLColumnMeta[], Set)}
      */
     private static final ZoneOffset PSEUDO_SERVER_ZONE = MySQLTimes.systemZoneOffset();
 
-    static final MySQLRowMeta EMPTY = new MySQLRowMeta(MySQLColumnMeta.EMPTY);
+    static final MySQLRowMeta EMPTY = new MySQLRowMeta(MySQLColumnMeta.EMPTY, Collections.emptySet());
 
 
     static boolean canReadMeta(final ByteBuf cumulateBuffer, final boolean eofEnd) {
@@ -65,27 +65,43 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         final int columnCount = Packets.readLenEncAsInt(cumulateBuffer);
         cumulateBuffer.readerIndex(payloadIndex + payloadLength);//avoid tail filler
 
-        final MySQLColumnMeta[] metaArray;
-        metaArray = MySQLColumnMeta.readMetas(cumulateBuffer, columnCount, stmtTask);
-
-        return new MySQLRowMeta(metaArray, stmtTask);
-    }
-
-
-    @Nullable
-    static MySQLRowMeta readForPrepare(final ByteBuf cumulateBuffer, final int columnCount,
-                                       final MetaAdjutant metaAdjutant) {
-        final MySQLColumnMeta[] metaArray;
-        metaArray = MySQLColumnMeta.readMetas(cumulateBuffer, columnCount, metaAdjutant);
 
         final MySQLRowMeta rowMeta;
-        if (metaArray.length == 0) {
+
+        if (columnCount == 0) {
             rowMeta = EMPTY;
         } else {
-            rowMeta = new MySQLRowMeta(metaArray);
+            final MySQLColumnMeta[] metaArray;
+            metaArray = new MySQLColumnMeta[columnCount];
+
+            final Set<Integer> unknownCollationSet;
+            unknownCollationSet = MySQLColumnMeta.readMetas(cumulateBuffer, metaArray, stmtTask);
+
+            rowMeta = new MySQLRowMeta(metaArray, stmtTask, unknownCollationSet);
         }
         return rowMeta;
     }
+
+
+    static MySQLRowMeta readForPrepare(final ByteBuf cumulateBuffer, final int columnCount,
+                                       final MetaAdjutant metaAdjutant) {
+
+        final MySQLRowMeta rowMeta;
+
+        if (columnCount == 0) {
+            rowMeta = EMPTY;
+        } else {
+            final MySQLColumnMeta[] metaArray;
+            metaArray = new MySQLColumnMeta[columnCount];
+
+            final Set<Integer> unknownCollationSet;
+            unknownCollationSet = MySQLColumnMeta.readMetas(cumulateBuffer, metaArray, metaAdjutant);
+
+            rowMeta = new MySQLRowMeta(metaArray, unknownCollationSet);
+        }
+        return rowMeta;
+    }
+
 
     private static final Option<Integer> COLLATION_INDEX = Option.from("COLUMN_COLLATION_INDEX", Integer.class);
 
@@ -124,12 +140,13 @@ final class MySQLRowMeta extends VendorResultRowMeta {
 
     final MySQLColumnMeta[] columnMetaArray;
 
-    final Map<Integer, Charsets.CustomCollation> customCollationMap;
+    final Map<Integer, CustomCollation> customCollationMap;
 
     final Charset resultSetCharset;
 
-
     final ZoneOffset serverZone;
+
+    final Set<Integer> unknownCollationSet;
 
     private final Map<String, Integer> labelToIndexMap;
 
@@ -137,13 +154,14 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     /**
      * @see #readForPrepare(ByteBuf, int, MetaAdjutant)
      */
-    private MySQLRowMeta(final MySQLColumnMeta[] columnMetaArray) {
+    private MySQLRowMeta(final MySQLColumnMeta[] columnMetaArray, final Set<Integer> unknownCollationSet) {
         super(-1);
         this.columnMetaArray = columnMetaArray;
         this.customCollationMap = Collections.emptyMap();
         this.serverZone = PSEUDO_SERVER_ZONE;
         this.resultSetCharset = null;
 
+        this.unknownCollationSet = unknownCollationSet;
         if (columnMetaArray.length < 6) {
             this.labelToIndexMap = null;
         } else {
@@ -152,10 +170,10 @@ final class MySQLRowMeta extends VendorResultRowMeta {
 
     }
 
-    private MySQLRowMeta(final MySQLColumnMeta[] columnMetaArray, StmtTask stmtTask) {
-        super(stmtTask.nextResultIndex());
-        if (this.resultNo < 0) {
-            throw new IllegalArgumentException("resultIndex must great than -1");
+    private MySQLRowMeta(final MySQLColumnMeta[] columnMetaArray, StmtTask stmtTask, final Set<Integer> unknownCollationSet) {
+        super(stmtTask.nextResultNo());
+        if (this.resultNo < 1) {
+            throw new IllegalArgumentException("resultNo must great than 0");
         }
         this.columnMetaArray = columnMetaArray;
         final TaskAdjutant adjutant = stmtTask.adjutant();
@@ -163,12 +181,14 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         this.serverZone = adjutant.serverZone();
         this.resultSetCharset = adjutant.getCharsetResults();
 
+        this.unknownCollationSet = unknownCollationSet;
         if (columnMetaArray.length < 6) {
             this.labelToIndexMap = null;
         } else {
             this.labelToIndexMap = createLabelToIndexMap(columnMetaArray);
         }
     }
+
 
     @Override
     public int getColumnCount() {
@@ -378,7 +398,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         }
         return indexBaseZero;
     }
-
 
 
 }

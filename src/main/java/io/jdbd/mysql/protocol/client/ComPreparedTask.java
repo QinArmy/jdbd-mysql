@@ -29,6 +29,7 @@ import reactor.util.annotation.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -893,11 +894,22 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 if (hasMeta) {
                     // below read param and column meta data
                     final boolean readEof = (capability & Capabilities.CLIENT_DEPRECATE_EOF) == 0;
-                    this.paramMetas = MySQLColumnMeta.readMetas(cumulateBuffer, numParams, this);
+                    final MySQLColumnMeta[] paramMetas = numParams == 0 ? MySQLColumnMeta.EMPTY : new MySQLColumnMeta[numParams];
+
+                    final Set<Integer> unknownCollationSet;
+                    unknownCollationSet = MySQLColumnMeta.readMetas(cumulateBuffer, paramMetas, this);
+                    if (unknownCollationSet.size() > 0) {
+                        addError(MySQLExceptions.unknownCollationError(unknownCollationSet));
+                    }
+                    this.paramMetas = paramMetas;
                     if (readEof) {
                         readEofOfMeta(cumulateBuffer, serverStatusConsumer);
                     }
-                    this.rowMeta = MySQLRowMeta.readForPrepare(cumulateBuffer, numColumns, this);
+                    final MySQLRowMeta resultMeta;
+                    this.rowMeta = resultMeta = MySQLRowMeta.readForPrepare(cumulateBuffer, numColumns, this);
+                    if (resultMeta.unknownCollationSet.size() > 0) {
+                        addError(MySQLExceptions.unknownCollationError(resultMeta.unknownCollationSet));
+                    }
                     if (readEof) {
                         readEofOfMeta(cumulateBuffer, serverStatusConsumer);
                     }

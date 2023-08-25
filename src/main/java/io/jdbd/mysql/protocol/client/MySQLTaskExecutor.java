@@ -271,7 +271,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         }
 
         @Override
-        public Map<Integer, Charsets.CustomCollation> obtainCustomCollationMap() {
+        public Map<Integer, CustomCollation> obtainCustomCollationMap() {
             return Collections.emptyMap();
         }
 

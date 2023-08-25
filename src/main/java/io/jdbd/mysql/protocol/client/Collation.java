@@ -4,7 +4,6 @@ public final class Collation {
 
     public final int index;
 
-
     public final String name;
     public final int priority;
     public final MyCharset myCharset;

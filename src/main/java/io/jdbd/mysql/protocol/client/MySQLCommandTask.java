@@ -112,7 +112,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
     }
 
     @Override
-    public final int nextResultIndex() {
+    public final int nextResultNo() {
         return this.resultIndex++;
     }
 
@@ -204,7 +204,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
         ok = OkPacket.readCumulate(cumulateBuffer, payloadLength, this.capability);
         serverStatusConsumer.accept(ok);
 
-        final int resultIndex = nextResultIndex(); // must increment result index.
+        final int resultIndex = nextResultNo(); // must increment result index.
         final boolean noMoreResult = !ok.hasMoreResult();
 
         final boolean taskEnd;
