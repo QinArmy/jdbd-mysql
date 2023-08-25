@@ -192,6 +192,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final boolean inTransaction() throws JdbdException {
+        if (this.protocol.isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
         return this.protocol.inTransaction();
     }
 

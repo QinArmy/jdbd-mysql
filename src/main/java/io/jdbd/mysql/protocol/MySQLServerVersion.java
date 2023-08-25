@@ -31,11 +31,6 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         this.subMinor = subMinor;
     }
 
-    public int compareTo(MySQLServerVersion other) {
-        return doCompareTo(other.major, other.minor, other.subMinor);
-    }
-
-
     @Override
     public <T> T valueOf(Option<T> option) {
         return null;
@@ -97,11 +92,33 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
      * @return true if version meets the minimum specified by `min'
      */
     public boolean meetsMinimum(MySQLServerVersion min) {
-        return doCompareTo(min.major, min.minor, min.subMinor) >= 0;
+        return meetsMinimum(min.major, min.minor, min.subMinor);
     }
 
-    public boolean meetsMinimum(int major, int minor, int subMinor) {
-        return doCompareTo(major, minor, subMinor) >= 0;
+    @Override
+    public boolean meetsMinimum(final int major, final int minor, final int subMinor) {
+        final boolean meets;
+        if (this.major != major) {
+            meets = this.major >= major;
+        } else if (this.minor != minor) {
+            meets = this.minor >= minor;
+        } else {
+            meets = this.subMinor >= subMinor;
+        }
+        return meets;
+    }
+
+    @Override
+    public int compareTo(final MySQLServerVersion o) {
+        final int result;
+        if (this.major != o.major) {
+            result = this.major - o.major;
+        } else if (this.minor != o.minor) {
+            result = this.minor - o.minor;
+        } else {
+            result = this.subMinor - o.subMinor;
+        }
+        return result;
     }
 
     @Override
@@ -109,27 +126,21 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         return this.completeVersion;
     }
 
+    @Override
     public int getMajor() {
         return this.major;
     }
 
+    @Override
     public int getMinor() {
         return this.minor;
     }
 
+    @Override
     public int getSubMinor() {
         return this.subMinor;
     }
 
-    private int doCompareTo(int major, int minor, int subMinor) {
-        int c;
-        if ((c = Integer.compare(this.major, major)) != 0) {
-            return c;
-        } else if ((c = Integer.compare(this.minor, minor)) != 0) {
-            return c;
-        }
-        return Integer.compare(this.subMinor, subMinor);
-    }
 
     /**
      * Parse the server version into major/minor/subminor.
@@ -139,7 +150,7 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
      */
     public static MySQLServerVersion from(final String versionString) throws JdbdException {
 
-        MySQLServerVersion serverVersion = null;
+        MySQLServerVersion serverVersion;
 
         try {
             final int major, minor, subMinor, point1, pont2;
@@ -182,10 +193,6 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
         return completeVersion.contains("enterprise")
                 || completeVersion.contains("commercial")
                 || completeVersion.contains("advanced");
-    }
-
-    private static JdbdException serverVersionError(String versionString) {
-        return new JdbdException(String.format("versionString %s error", versionString));
     }
 
 }
