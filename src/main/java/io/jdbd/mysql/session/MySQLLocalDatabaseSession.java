@@ -76,10 +76,10 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             return Mono.error(new NullPointerException());
         }
 
-        final StringBuilder builder = new StringBuilder(128);
+        final StringBuilder builder = new StringBuilder(168);
         final LocalTxOption currentTxOption = this.currentTxOption;
         final JdbdException error;
-        if ((currentTxOption != null || this.protocol.inTransaction())
+        if ((currentTxOption != null || this.inTransaction())
                 && (error = handleInTransaction(mode, builder)) != null) {
             return Mono.error(error);
         }
@@ -115,7 +115,6 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         }
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
-
         return Flux.from(this.protocol.executeAsFlux(Stmts.multiStmt(builder.toString())))
                 .doOnNext(item -> handleStartTransactionResult(item, isolationHolder, consistentSnapshot))
                 .doOnError(e -> CURRENT_TX_OPTION.set(this, null))

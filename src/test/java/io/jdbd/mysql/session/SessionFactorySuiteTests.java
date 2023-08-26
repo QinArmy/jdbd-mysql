@@ -5,10 +5,7 @@ import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.pool.PoolRmDatabaseSession;
-import io.jdbd.session.DatabaseSession;
-import io.jdbd.session.DatabaseSessionFactory;
-import io.jdbd.session.LocalDatabaseSession;
-import io.jdbd.session.TransactionOption;
+import io.jdbd.session.*;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +60,9 @@ public class SessionFactorySuiteTests {
                 .doOnError(error -> LOG.error("", error))
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
-                .flatMap(session -> session.startTransaction(TransactionOption.option(null, false)))
+                .flatMap(session -> session.startTransaction(TransactionOption.builder().option(Option.READ_ONLY, Boolean.FALSE)
+                        .option(Option.WITH_CONSISTENT_SNAPSHOT, Boolean.TRUE).build()))
+                .doOnNext(session -> LOG.debug("{}", session))
                 .flatMap(LocalDatabaseSession::commit)
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)
