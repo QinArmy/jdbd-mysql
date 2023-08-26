@@ -86,8 +86,7 @@ final class OkPacket extends Terminator {
         } else {
             info = Packets.readStringEof(payload, StandardCharsets.UTF_8);
         }
-        return new OkPacket(affectedRows, lastInsertId
-                , statusFags, warnings, info, stateOption);
+        return new OkPacket(affectedRows, lastInsertId, statusFags, warnings, info, stateOption);
     }
 
     static boolean isOkPacket(ByteBuf payloadBuf) {

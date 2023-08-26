@@ -210,8 +210,9 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     public FieldType getFieldType(final int indexBasedZero) throws JdbdException {
         final MySQLColumnMeta meta;
         meta = this.columnMetaArray[checkIndex(indexBasedZero)];
+
         final FieldType fieldType;
-        if (MySQLStrings.hasText(meta.tableName)) {
+        if (MySQLStrings.hasText(meta.tableName) && MySQLStrings.hasText(meta.columnName)) {
             fieldType = FieldType.FIELD;
         } else {
             fieldType = FieldType.EXPRESSION;

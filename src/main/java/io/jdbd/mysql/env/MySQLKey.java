@@ -5,6 +5,7 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.auth.MySQLNativePasswordPlugin;
 import io.jdbd.mysql.protocol.client.Enums;
 import io.jdbd.mysql.util.MySQLCollections;
+import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.env.Key;
 import io.jdbd.vendor.env.Redefine;
@@ -14,7 +15,7 @@ import reactor.netty.tcp.TcpResources;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -258,6 +259,24 @@ public final class MySQLKey<T> extends Key<T> {
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">connectTimeout</a>
      */
     public static final MySQLKey<Integer> CONNECT_TIMEOUT = new MySQLKey<>("connectTimeout", Integer.class, 0);
+
+    /**
+     * <p>
+     * {@link DatabaseSessionFactory#close()}  shutdown quiet period milliseconds .
+     * </p>
+     *
+     * @see reactor.netty.resources.LoopResources#disposeLater(Duration, Duration)
+     */
+    public static final MySQLKey<Integer> SHUTDOWN_QUIET_PERIOD = new MySQLKey<>("shutdownQuietPeriod", Integer.class, 2 * 1000);
+
+    /**
+     * <p>
+     * {@link DatabaseSessionFactory#close()}  shutdown timeout milliseconds .
+     * </p>
+     *
+     * @see reactor.netty.resources.LoopResources#disposeLater(Duration, Duration)
+     */
+    public static final MySQLKey<Integer> SHUTDOWN_TIMEOUT = new MySQLKey<>("shutdownTimeout", Integer.class, 15 * 1000);
 
 //    /**
 //     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketTimeout</a>
@@ -1268,17 +1287,39 @@ public final class MySQLKey<T> extends Key<T> {
      */
     public static final MySQLKey<String> APPEND_SQL_MODE = new MySQLKey<>("appendSqlMode", String.class, null);
 
-    public static final MySQLKey<Integer> FACTORY_WORKER_COUNT = new MySQLKey<>("factoryWorkerCount", Integer.class, 20);
+    /**
+     * <p>
+     * worker count
+     * </p>
+     *
+     * @see reactor.netty.resources.LoopResources#create(String, int, int, boolean)
+     */
+    public static final MySQLKey<Integer> FACTORY_WORKER_COUNT = new MySQLKey<>("factoryWorkerCount", Integer.class, 30);
 
+    /**
+     * <p>
+     * select count , default value is same with {@link #FACTORY_WORKER_COUNT}.
+     * </p>
+     *
+     * @see reactor.netty.resources.LoopResources#create(String, int, int, boolean)
+     */
     public static final MySQLKey<Integer> FACTORY_SELECT_COUNT_COUNT = new MySQLKey<>("factorySelectCount", Integer.class, -1);
 
-
+    /**
+     * The task queue size of each session.
+     * <p>
+     * see {@code io.jdbd.mysql.protocol.client.MySQLTaskExecutor#taskQueue}
+     * </p>
+     */
     public static final MySQLKey<Integer> FACTORY_TASK_QUEUE_SIZE = new MySQLKey<>("factoryTaskQueueSize", Integer.class, 18);
 
+    /**
+     * @see DatabaseSessionFactory#name()
+     */
     public static final MySQLKey<String> FACTORY_NAME = new MySQLKey<>(Driver.FACTORY_NAME, String.class, "unnamed");
 
 
-    private static final List<MySQLKey<?>> KEY_LIST = createKeyList();
+    private static final List<MySQLKey<?>> KEY_LIST = createKeyList(MySQLKey.class, MySQLCollections::arrayList);
 
 
     private MySQLKey(String name, Class<T> valueClass, @Nullable T defaultValue) {
@@ -1290,16 +1331,5 @@ public final class MySQLKey<T> extends Key<T> {
         return KEY_LIST;
     }
 
-    @SuppressWarnings("unchecked")
-    private static List<MySQLKey<?>> createKeyList() {
-        try {
-            List<MySQLKey<?>> list = MySQLCollections.arrayList();
-            addAllKey(MySQLKey.class, list::add);
-
-            return Collections.unmodifiableList(MySQLCollections.arrayList(list));
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
 }

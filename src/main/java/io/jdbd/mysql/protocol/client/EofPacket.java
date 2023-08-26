@@ -37,13 +37,13 @@ public final class EofPacket extends Terminator {
             throw new IllegalArgumentException("only supported CLIENT_PROTOCOL_41.");
         }
         final int statusFags, warnings;
-        statusFags = Packets.readInt2AsInt(payload);
         warnings = Packets.readInt2AsInt(payload);
-        return new EofPacket(statusFags, warnings);
+        statusFags = Packets.readInt2AsInt(payload);
+        return new EofPacket(warnings, statusFags);
     }
 
 
-    private EofPacket(int statusFags, int warnings) {
+    private EofPacket(int warnings, int statusFags) {
         super(warnings, statusFags);
     }
 

@@ -7,12 +7,16 @@ import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.pool.PoolRmDatabaseSession;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
+import io.jdbd.session.LocalDatabaseSession;
+import io.jdbd.session.TransactionOption;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 
@@ -34,6 +38,12 @@ public class SessionFactorySuiteTests {
         this.sessionFactory = createSessionFactory();
     }
 
+    @AfterClass
+    public void afterClass() {
+        Mono.from(this.sessionFactory.close())
+                .block();
+    }
+
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_socket">socket</a>
@@ -46,13 +56,15 @@ public class SessionFactorySuiteTests {
         LOG.info(URLEncoder.encode("/tmp/mysql.sock", "utf-8"));
     }
 
-    @Test//(invocationCount = 10000, threadPoolSize = 30)
+    @Test//(invocationCount = 1000, threadPoolSize = 20)
     public void localSession() {
 
         Flux.from(this.sessionFactory.localSession())
                 .doOnError(error -> LOG.error("", error))
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
+                .flatMap(session -> session.startTransaction(TransactionOption.option(null, false)))
+                .flatMap(LocalDatabaseSession::commit)
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)
                 .flatMap(session -> session.ping(200))

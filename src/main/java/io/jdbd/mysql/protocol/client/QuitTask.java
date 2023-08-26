@@ -1,6 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.session.SessionCloseException;
 import io.jdbd.vendor.task.DisposeTask;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
@@ -12,19 +13,30 @@ import reactor.core.publisher.MonoSink;
 import java.util.function.Consumer;
 
 /**
+ * <p>
+ * close MySQL session task
+ * </p>
+ *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_quit.html">Protocol::COM_QUIT</a>
  */
 final class QuitTask extends MySQLTask implements DisposeTask {
 
-    static <T> Mono<T> quit(TaskAdjutant adjutant) {
+    static <T> Mono<T> quit(final TaskAdjutant adjutant) {
         return Mono.create(sink -> {
             try {
                 QuitTask task = new QuitTask(adjutant, sink);
-                task.submit(sink::error);
+                task.submit(error -> {
+                    if (error instanceof SessionCloseException) {
+                        sink.success();
+                    } else {
+                        sink.error(MySQLExceptions.wrap(error));
+                    }
+                });
+            } catch (SessionCloseException e) {
+                sink.success();
             } catch (Throwable e) {
                 sink.error(MySQLExceptions.wrap(e));
             }
-
         });
     }
 
@@ -66,7 +78,10 @@ final class QuitTask extends MySQLTask implements DisposeTask {
     @Override
     protected Action onError(Throwable e) {
         if (this.taskEnd) {
-            LOG.error("Unknown error.", e);
+            LOG.debug("Unknown error.", e);
+        } else if (e instanceof SessionCloseException) {
+            this.taskEnd = true;
+            this.sink.success();
         } else {
             this.sink.error(MySQLExceptions.wrap(e));
         }
@@ -75,8 +90,10 @@ final class QuitTask extends MySQLTask implements DisposeTask {
 
     @Override
     public void onChannelClose() {
-        this.taskEnd = true;
-        this.sink.success();
+        if (!this.taskEnd) {
+            this.taskEnd = true;
+            this.sink.success();
+        }
     }
 
 

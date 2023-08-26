@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.ITestContext;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.Test;
-import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -47,10 +46,10 @@ public class TaskTestAdvice extends AbstractTaskSuiteTests {
 
     @AfterSuite(timeOut = 10 * 1000)
     public static void afterSuite(ITestContext context) {
-        Flux.fromIterable(TASK_ADJUTANT_QUEUE)
-                .flatMap(QuitTask::quit)
-                .then()
-                .block();
+//        Flux.fromIterable(TASK_ADJUTANT_QUEUE)
+//                .flatMap(QuitTask::quit)
+//                .then()
+//                .block();
 
     }
 

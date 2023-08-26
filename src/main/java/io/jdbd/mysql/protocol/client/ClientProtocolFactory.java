@@ -39,6 +39,7 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -105,11 +106,34 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     @Override
     public <T> Mono<T> close() {
+        // io.jdbd.session.DatabaseSessionFactory is responsible for parallel.
         if (this.loopResources.isDisposed()) {
             return Mono.empty();
         }
-        return this.loopResources.disposeLater() // TODO config
+        final boolean debugEnabled;
+        debugEnabled = LOG.isDebugEnabled();
+        if (debugEnabled) {
+            LOG.debug("close {}[{}] ...", this.getClass().getName(), factoryName());
+        }
+        final Environment env = this.env;
+
+        final Duration shutdownQuietPeriod, shutdownTimeout;
+        shutdownQuietPeriod = Duration.ofMillis(env.getOrDefault(MySQLKey.SHUTDOWN_QUIET_PERIOD));
+        shutdownTimeout = Duration.ofMillis(env.getOrDefault(MySQLKey.SHUTDOWN_TIMEOUT));
+
+        return this.loopResources.disposeLater(shutdownQuietPeriod, shutdownTimeout)
+                .doOnSuccess(v -> {
+                    if (debugEnabled) {
+                        LOG.debug("close {}[{}] success", this.getClass().getName(), factoryName());
+                    }
+                })
                 .then(Mono.empty());
+    }
+
+    @Override
+    public boolean isClosed() {
+        // io.jdbd.session.DatabaseSessionFactory is responsible for parallel.
+        return this.loopResources.isDisposed();
     }
 
     @Override

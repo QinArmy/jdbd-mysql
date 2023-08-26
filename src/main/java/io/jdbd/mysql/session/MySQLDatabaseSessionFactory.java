@@ -69,7 +69,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     private final String name;
 
-    private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean factoryClosed = new AtomicBoolean(false);
 
 
     private MySQLDatabaseSessionFactory(MySQLProtocolFactory protocolFactory, boolean forPoolVendor) {
@@ -85,7 +85,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public Publisher<LocalDatabaseSession> localSession() {
-        if (this.closed.get()) {
+        if (this.factoryClosed.get()) {
             return Mono.error(MySQLExceptions.factoryClosed(this.name));
         }
         return this.protocolFactory.createProtocol()
@@ -94,7 +94,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public Mono<RmDatabaseSession> rmSession() {
-        if (this.closed.get()) {
+        if (this.factoryClosed.get()) {
             return Mono.error(MySQLExceptions.factoryClosed(this.name));
         }
         return this.protocolFactory.createProtocol()
@@ -125,11 +125,25 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public <T> Publisher<T> close() {
-        if (this.closed.get()) {
-            return Mono.empty();
+        return Mono.defer(this::closeFactory);
+    }
+
+    @Override
+    public boolean isClosed() {
+        return this.factoryClosed.get();
+    }
+
+    /**
+     * @see #close()
+     */
+    private <T> Mono<T> closeFactory() {
+        final Mono<T> mono;
+        if (this.factoryClosed.compareAndSet(false, true)) {
+            mono = this.protocolFactory.close();
+        } else {
+            mono = Mono.empty();
         }
-        this.closed.set(true);
-        return this.protocolFactory.close();
+        return mono;
     }
 
     @Override

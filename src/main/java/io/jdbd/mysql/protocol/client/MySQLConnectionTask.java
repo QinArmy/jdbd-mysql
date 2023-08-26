@@ -659,7 +659,7 @@ final class MySQLConnectionTask extends CommunicationTask implements Authenticat
                 | (serverCapability & Capabilities.CLIENT_PS_MULTI_RESULTS)  // We always allow multiple result sets for SSPS
                 | (serverCapability & Capabilities.CLIENT_LONG_FLAG)      //
 
-                // | (serverCapability & Capabilities.CLIENT_DEPRECATE_EOF )  // jdbd-mysql don't deprecate eof ,because distinguish a normal resultset from an OUT parameter set.
+                | (serverCapability & Capabilities.CLIENT_DEPRECATE_EOF)
                 | (serverCapability & Capabilities.CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA)
                 | (env.getOrDefault(MySQLKey.USE_COMPRESSION) ? (serverCapability & Capabilities.CLIENT_COMPRESS) : 0)
                 | (useConnectWithDb ? (serverCapability & Capabilities.CLIENT_CONNECT_WITH_DB) : 0)

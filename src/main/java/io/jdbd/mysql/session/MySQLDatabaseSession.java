@@ -28,6 +28,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -55,6 +56,8 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     private final AtomicInteger savePointIndex = new AtomicInteger(0);
 
+    private final AtomicBoolean sessionClosed = new AtomicBoolean(false);
+
     MySQLDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
         super(protocol);
         this.factory = factory;
@@ -68,7 +71,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final long sessionIdentifier() {
-        if (this.protocol.isClosed()) {
+        if (this.isClosed()) {
             throw MySQLExceptions.sessionHaveClosed();
         }
         return this.protocol.sessionIdentifier();
@@ -192,7 +195,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final boolean inTransaction() throws JdbdException {
-        if (this.protocol.isClosed()) {
+        if (this.isClosed()) {
             throw MySQLExceptions.sessionHaveClosed();
         }
         return this.protocol.inTransaction();
@@ -236,7 +239,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final DatabaseMetaData databaseMetaData() throws JdbdException {
-        if (this.protocol.isClosed()) {
+        if (this.isClosed()) {
             throw MySQLExceptions.sessionHaveClosed();
         }
         return MySQLDatabaseMetadata.create(this.protocol);
@@ -346,11 +349,6 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return this.protocol.valueOf(option);
     }
 
-    @Override
-    public final boolean isClosed() {
-        return this.protocol.isClosed();
-    }
-
 
     @Override
     public final boolean isSameFactory(DatabaseSession session) {
@@ -361,7 +359,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final <T> Publisher<T> close() {
-        return this.protocol.close();
+        return Mono.defer(this::closeSession);
+    }
+
+    @Override
+    public final boolean isClosed() {
+        return this.sessionClosed.get() || this.protocol.isClosed();
     }
 
 
@@ -406,6 +409,20 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     private PreparedStatement createPreparedStatement(final PrepareTask task) {
         return MySQLPreparedStatement.create(this, task);
+    }
+
+
+    /**
+     * @see #close()
+     */
+    private <T> Mono<T> closeSession() {
+        final Mono<T> mono;
+        if (this.sessionClosed.compareAndSet(false, true)) {
+            mono = this.protocol.close();
+        } else {
+            mono = Mono.empty();
+        }
+        return mono;
     }
 
 

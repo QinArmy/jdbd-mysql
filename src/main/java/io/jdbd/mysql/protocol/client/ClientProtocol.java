@@ -11,7 +11,6 @@ import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
@@ -29,8 +28,6 @@ final class ClientProtocol implements MySQLProtocol {
     final TaskAdjutant adjutant;
 
     private final ProtocolManager manager;
-
-    private final AtomicBoolean userCloseSession = new AtomicBoolean(false);
 
     private ClientProtocol(final ProtocolManager manager) {
         this.manager = manager;
@@ -235,13 +232,14 @@ final class ClientProtocol implements MySQLProtocol {
 
     @Override
     public <T> Mono<T> close() {
-        final Mono<T> mono;
-        if (this.userCloseSession.compareAndSet(false, true)) {
-            mono = QuitTask.quit(this.adjutant);
-        } else {
-            mono = Mono.empty();
-        }
-        return mono;
+        // io.jdbd.session.DatabaseSession is responsible for parallel.
+        return Mono.defer(this::closeProtocol);
+    }
+
+    @Override
+    public boolean isClosed() {
+        // io.jdbd.session.DatabaseSession is responsible for parallel.
+        return !this.adjutant.isActive();
     }
 
 
@@ -266,12 +264,24 @@ final class ClientProtocol implements MySQLProtocol {
         return this.adjutant.handshake10().serverVersion;
     }
 
-    @Override
-    public boolean isClosed() {
-        return !this.adjutant.isActive();
-    }
+
 
     /*################################## blow private method ##################################*/
+
+
+    /**
+     * @see #close()
+     */
+    private <T> Mono<T> closeProtocol() {
+        // io.jdbd.session.DatabaseSession is responsible for parallel.
+        final Mono<T> mono;
+        if (this.adjutant.isActive()) {
+            mono = QuitTask.quit(this.adjutant);
+        } else {
+            mono = Mono.empty();
+        }
+        return mono;
+    }
 
 
 }

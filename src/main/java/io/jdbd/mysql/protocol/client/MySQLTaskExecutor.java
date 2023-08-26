@@ -9,11 +9,7 @@ import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
 import io.jdbd.mysql.util.MySQLCollections;
-import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
-import io.jdbd.session.Isolation;
-import io.jdbd.session.XaStates;
-import io.jdbd.session.Xid;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
@@ -175,14 +171,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         private volatile int serverStatus = 0;
 
-        /**
-         * <p>
-         *     <ul>
-         *         <li>c</li>
-         *     </ul>
-         * </p>
-         */
-        private volatile CurrentTxOption currentTxOption;
 
         private MySQLTaskAdjutant(MySQLTaskExecutor taskExecutor) {
             super(taskExecutor);
@@ -303,9 +291,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public int serverStatus() {
-            if (!this.taskExecutor.connection.channel().isActive()) {
-                throw MySQLExceptions.sessionHaveClosed();
-            }
             return this.serverStatus;
         }
 
@@ -463,44 +448,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
     }// MySQLTaskAdjutant
-
-    private static abstract class CurrentTxOption {
-
-        final Isolation isolation;
-
-        private CurrentTxOption(@Nullable Isolation isolation) {
-            this.isolation = isolation;
-        }
-
-    }//CurrentTransactionOption
-
-    private static final class LocalTxOption extends CurrentTxOption {
-
-        private final Boolean withConsistentSnapshot;
-
-        private LocalTxOption(@Nullable Isolation isolation, @Nullable Boolean withConsistentSnapshot) {
-            super(isolation);
-            this.withConsistentSnapshot = withConsistentSnapshot;
-        }
-
-    }//LocalTxOption
-
-    private static final class XaTxOption extends CurrentTxOption {
-
-        private final Xid xid;
-
-        private final XaStates xaStates;
-
-        private final int flags;
-
-        private XaTxOption(@Nullable Isolation isolation, Xid xid, XaStates xaStates, int flags) {
-            super(isolation);
-            this.xid = xid;
-            this.xaStates = xaStates;
-            this.flags = flags;
-        }
-
-    } // XaTxOption
 
 
 }
