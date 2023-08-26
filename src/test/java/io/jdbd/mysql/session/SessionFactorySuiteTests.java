@@ -14,6 +14,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 
+import java.net.URLEncoder;
+
 /**
  * <p>
  * This class is test class of {@link MySQLDatabaseSessionFactory}.
@@ -33,16 +35,27 @@ public class SessionFactorySuiteTests {
     }
 
 
-    @Test//(invocationCount = 2000,threadPoolSize = 10)
-    public void localSession() {
-        final DatabaseSessionFactory sessionFactory;
-        sessionFactory = this.sessionFactory;
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_socket">socket</a>
+     */
+    @Test(enabled = false)
+    public void unixDomainSocket() throws Exception {
+        // /tmp/mysql.sock
+        // select @@Global.socket;
+        // https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_socket
+        LOG.info(URLEncoder.encode("/tmp/mysql.sock", "utf-8"));
+    }
 
-        Flux.from(sessionFactory.localSession())
+    @Test//(invocationCount = 10000, threadPoolSize = 30)
+    public void localSession() {
+
+        Flux.from(this.sessionFactory.localSession())
+                .doOnError(error -> LOG.error("", error))
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)
+                .flatMap(session -> session.ping(200))
                 .flatMap(DatabaseSession::close)
                 .then()
                 .block();
@@ -51,14 +64,14 @@ public class SessionFactorySuiteTests {
 
     @Test
     public void rmSession() {
-        final DatabaseSessionFactory sessionFactory;
-        sessionFactory = this.sessionFactory;
 
-        Flux.from(sessionFactory.rmSession())
+        Flux.from(this.sessionFactory.rmSession())
+                .doOnError(error -> LOG.error("", error))
                 //.repeat(8)
                 .doOnNext(session -> LOG.debug("{}", session))
                 .map(PoolRmDatabaseSession.class::cast)
                 .flatMap(PoolRmDatabaseSession::reset)
+                .flatMap(session -> session.ping(200))
                 .flatMap(DatabaseSession::close)
                 .blockLast();
 

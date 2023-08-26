@@ -1,7 +1,6 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.meta.DataType;
-import io.jdbd.meta.NullMode;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.util.MySQLCollections;
@@ -84,8 +83,8 @@ final class MySQLColumnMeta implements ColumnMeta {
     /**
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html">Protocol::ColumnDefinition41</a>
      */
-    MySQLColumnMeta(int columnIndex, final ByteBuf cumulateBuffer, final Charset metaCharset,
-                    final Map<Integer, CustomCollation> customCollationMap, final FixedEnv env) {
+    private MySQLColumnMeta(int columnIndex, final ByteBuf cumulateBuffer, final Charset metaCharset,
+                            final Map<Integer, CustomCollation> customCollationMap, final FixedEnv env) {
 
         this.columnIndex = columnIndex;
         // 1. catalog
@@ -229,11 +228,11 @@ final class MySQLColumnMeta implements ColumnMeta {
     }
 
 
-    final boolean isEnum() {
+    boolean isEnum() {
         return (this.definitionFlags & ENUM_FLAG) != 0;
     }
 
-    final boolean isSetType() {
+    boolean isSetType() {
         return (this.definitionFlags & SET_FLAG) != 0;
     }
 
@@ -241,59 +240,52 @@ final class MySQLColumnMeta implements ColumnMeta {
         return (this.definitionFlags & BINARY_FLAG) != 0;
     }
 
-    final boolean isBlob() {
-        return (this.definitionFlags & BLOB_FLAG) != 0;
-    }
 
-    final boolean isAutoIncrement() {
+    boolean isAutoIncrement() {
         return (this.definitionFlags & AUTO_INCREMENT_FLAG) != 0;
-    }
-
-    final boolean isPrimaryKey() {
-        return (this.definitionFlags & PRI_KEY_FLAG) != 0;
-    }
-
-    final boolean isMultipleKey() {
-        return (this.definitionFlags & MULTIPLE_KEY_FLAG) != 0;
-    }
-
-    final boolean isUniqueKey() {
-        return (this.definitionFlags & UNIQUE_KEY_FLAG) != 0;
-    }
-
-
-    final NullMode getNullMode() {
-        final NullMode nullMode;
-        if ((this.definitionFlags & NOT_NULL_FLAG) != 0 || (this.definitionFlags & PRI_KEY_FLAG) != 0) {
-            nullMode = NullMode.NON_NULL;
-        } else {
-            nullMode = NullMode.NULLABLE;
-        }
-        return nullMode;
     }
 
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("MySQLColumnMeta{");
-        sb.append("\ncatalogName='").append(catalogName).append('\'')
-                .append(",\n schemaName='").append(schemaName).append('\'')
-                .append(",\n tableName='").append(tableName).append('\'')
-                .append(",\n tableAlias='").append(tableLabel).append('\'')
-                .append(",\n columnName='").append(columnName).append('\'')
-                .append(",\n columnAlias='").append(columnLabel).append('\'')
-                .append(",\n collationIndex=").append(collationIndex)
-                .append(",\n fixedLength=").append(fixedLength)
-                .append(",\n length=").append(length)
-                .append(",\n typeFlag=").append(typeFlag)
+        final StringBuilder builder = new StringBuilder(725);
+        builder.append(getClass().getSimpleName())
+                .append("{\ncatalogName='")
+                .append(catalogName)
+                .append('\'')
+                .append(",\n schemaName='")
+                .append(schemaName)
+                .append('\'')
+                .append(",\n tableName='")
+                .append(tableName)
+                .append('\'')
+                .append(",\n tableAlias='")
+                .append(tableLabel)
+                .append('\'')
+                .append(",\n columnName='")
+                .append(columnName)
+                .append('\'')
+                .append(",\n columnAlias='")
+                .append(columnLabel)
+                .append('\'')
+                .append(",\n collationIndex=")
+                .append(collationIndex)
+                .append(",\n fixedLength=")
+                .append(fixedLength)
+                .append(",\n length=")
+                .append(length)
+                .append(",\n typeFlag=")
+                .append(typeFlag)
                 .append(",\n definitionFlags={\n");
 
-        appendDefinitionFlag(sb);
+        appendDefinitionFlag(builder);
 
-        sb.append(",decimals=").append(decimals)
-                .append(",\n mysqlType=").append(sqlType)
-                .append('}');
-        return sb.toString();
+        return builder.append(",decimals=")
+                .append(decimals)
+                .append(",\n mysqlType=")
+                .append(sqlType)
+                .append('}')
+                .toString();
     }
 
     private void appendDefinitionFlag(final StringBuilder builder) {

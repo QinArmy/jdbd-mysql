@@ -1,6 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.vendor.task.DisposeTask;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -13,7 +14,7 @@ import java.util.function.Consumer;
 /**
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_quit.html">Protocol::COM_QUIT</a>
  */
-final class QuitTask extends MySQLTask {
+final class QuitTask extends MySQLTask implements DisposeTask {
 
     static <T> Mono<T> quit(TaskAdjutant adjutant) {
         return Mono.create(sink -> {

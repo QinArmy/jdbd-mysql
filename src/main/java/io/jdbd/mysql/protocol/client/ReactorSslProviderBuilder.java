@@ -1,7 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.AuthenticateAssistant;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
@@ -36,7 +36,7 @@ final class ReactorSslProviderBuilder {
         return new ReactorSslProviderBuilder(assistant);
     }
 
-    private final MySQLHost host;
+    private final MySQLHostInfo host;
 
     private final MySQLServerVersion serverVersion;
 
@@ -60,7 +60,7 @@ final class ReactorSslProviderBuilder {
 //    }
 
     public SslHandler buildSslHandler() throws JdbdException {
-        final MySQLHost host = this.host;
+        final MySQLHostInfo host = this.host;
         return buildSslContext().newHandler(this.allocator, host.host(), host.port());
     }
 

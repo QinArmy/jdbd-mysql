@@ -4,7 +4,7 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.SessionEnv;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
@@ -35,11 +35,8 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
-    static Mono<MySQLTaskExecutor> create(final ClientProtocolFactory factory) {
-
-        return factory.tcpClient
-                .connect()
-                .map(connection -> new MySQLTaskExecutor(connection, factory));
+    static MySQLTaskExecutor create(final ClientProtocolFactory factory, final Connection connection) {
+        return new MySQLTaskExecutor(connection, factory);
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLTaskExecutor.class);
@@ -69,7 +66,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
     @Override
     protected JdbdHost obtainHostInfo() {
-        return this.factory.host;
+        return this.factory.mysqlHost;
     }
 
     @Override
@@ -121,7 +118,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
     protected void onChannelClosed() {
         ((MySQLTaskAdjutant) this.taskAdjutant).onSessionClose();
     }
-
 
 
     Mono<Void> setCustomCollation(final Map<String, MyCharset> customCharsetMap,
@@ -291,8 +287,8 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         }
 
         @Override
-        public MySQLHost host() {
-            return this.taskExecutor.factory.host;
+        public MySQLHostInfo host() {
+            return this.taskExecutor.factory.mysqlHost;
         }
 
 

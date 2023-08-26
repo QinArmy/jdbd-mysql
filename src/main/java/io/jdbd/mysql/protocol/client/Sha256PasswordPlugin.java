@@ -1,7 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.AuthenticateAssistant;
 import io.jdbd.mysql.protocol.ClientConstants;
@@ -47,7 +47,7 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin {
 
     protected final AuthenticateAssistant assistant;
 
-    protected final MySQLHost host;
+    protected final MySQLHostInfo host;
 
     protected final Environment env;
 
@@ -209,7 +209,7 @@ public class Sha256PasswordPlugin implements AuthenticationPlugin {
     /*################################## blow static method ##################################*/
 
     @Nullable
-    protected static String tryLoadPublicKeyString(MySQLHost host) {
+    protected static String tryLoadPublicKeyString(MySQLHostInfo host) {
         final Path path;
         path = host.properties().get(MySQLKey.SERVER_RSA_PUBLIC_KEY_FILE);
         if (path == null) {

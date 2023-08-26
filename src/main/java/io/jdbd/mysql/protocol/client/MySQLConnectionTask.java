@@ -1,7 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.AuthenticateAssistant;
 import io.jdbd.mysql.protocol.Constants;
@@ -70,7 +70,7 @@ final class MySQLConnectionTask extends CommunicationTask implements Authenticat
 
     private final MonoSink<AuthenticateResult> sink;
 
-    private final MySQLHost host;
+    private final MySQLHostInfo host;
 
     private final Environment env;
 
@@ -107,7 +107,7 @@ final class MySQLConnectionTask extends CommunicationTask implements Authenticat
         factory = adjutant.getFactory();
 
         this.fixedEnv = factory;
-        this.host = factory.host;
+        this.host = factory.mysqlHost;
         this.env = factory.env;
 
 
@@ -133,7 +133,7 @@ final class MySQLConnectionTask extends CommunicationTask implements Authenticat
     }
 
     @Override
-    public MySQLHost getHostInfo() {
+    public MySQLHostInfo getHostInfo() {
         return this.host;
     }
 
@@ -158,10 +158,6 @@ final class MySQLConnectionTask extends CommunicationTask implements Authenticat
         this.sslConsumer = sslConsumer;
     }
 
-    @Override
-    public boolean reconnect() {
-        return false;
-    }
 
     @Override
     public boolean disconnect() {

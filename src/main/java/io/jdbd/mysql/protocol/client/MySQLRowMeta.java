@@ -237,6 +237,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
      * <p>
      * jdbd-mysql support following options :
      *     <ul>
+     *         <li>{@link Option#SERVER_ZONE}</li>
      *         <li>{@link #COLLATION_INDEX}</li>
      *         <li>{@link #CHARSET}</li>
      *         <li>{@link #FIXED_LENGTH}</li>
@@ -253,7 +254,9 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         meta = this.columnMetaArray[checkIndex(indexBasedZero)];
 
         final Object value;
-        if (COLLATION_INDEX.equals(option)) {
+        if (Option.SERVER_ZONE == option) {
+            value = this.serverZone;
+        } else if (COLLATION_INDEX.equals(option)) {
             value = meta.collationIndex;
         } else if (CHARSET.equals(option)) {
             value = meta.columnCharset;
@@ -334,7 +337,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         flags = this.columnMetaArray[checkIndex(indexBasedZero)].definitionFlags;
 
         final NullMode mode;
-        if ((flags & MySQLColumnMeta.NOT_NULL_FLAG) != 0) {
+        if ((flags & MySQLColumnMeta.NOT_NULL_FLAG) != 0 || (flags & MySQLColumnMeta.PRI_KEY_FLAG) != 0) {
             mode = NullMode.NON_NULL;
         } else {
             mode = NullMode.NULLABLE;

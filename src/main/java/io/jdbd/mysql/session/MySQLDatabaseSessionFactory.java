@@ -3,7 +3,7 @@ package io.jdbd.mysql.session;
 import io.jdbd.DriverVersion;
 import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLDriver;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.env.MySQLUrlParser;
 import io.jdbd.mysql.env.Protocol;
 import io.jdbd.mysql.protocol.MySQLProtocol;
@@ -39,7 +39,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
 
     private static MySQLProtocolFactory createProtocolFactory(String url, Map<String, Object> properties) {
-        final List<MySQLHost> hostList;
+        final List<MySQLHostInfo> hostList;
         hostList = MySQLUrlParser.parse(url, properties);
 
         final MySQLProtocolFactory protocolFactory;
@@ -125,8 +125,11 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public <T> Publisher<T> close() {
+        if (this.closed.get()) {
+            return Mono.empty();
+        }
         this.closed.set(true);
-        return Mono.empty();
+        return this.protocolFactory.close();
     }
 
     @Override

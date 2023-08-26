@@ -9,12 +9,18 @@ import reactor.core.publisher.MonoSink;
 
 import java.util.function.Consumer;
 
+/**
+ * Ping task
+ *
+ * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_ping.html">Protocol::COM_PING</a>
+ * @since 1.0
+ */
 final class PingTask extends MySQLTask {
 
-    static Mono<Void> ping(final int timeout, final TaskAdjutant adjutant) {
+    static Mono<Void> ping(final int timeoutMills, final TaskAdjutant adjutant) {
         return Mono.create(sink -> {
             try {
-                PingTask task = new PingTask(sink, timeout, adjutant);
+                PingTask task = new PingTask(sink, timeoutMills, adjutant);
                 task.submit(sink::error);
             } catch (Throwable e) {
                 sink.error(MySQLExceptions.wrapIfNonJvmFatal(e));
@@ -30,10 +36,10 @@ final class PingTask extends MySQLTask {
     private boolean taskEnd;
 
 
-    private PingTask(MonoSink<Void> sink, int timeout, TaskAdjutant adjutant) {
+    private PingTask(MonoSink<Void> sink, int timeoutMills, TaskAdjutant adjutant) {
         super(adjutant, sink::error);
         this.sink = sink;
-        this.timeout = timeout;
+        this.timeout = timeoutMills;
     }
 
     @Override
@@ -41,7 +47,7 @@ final class PingTask extends MySQLTask {
         final ByteBuf packet = this.adjutant.allocator().buffer(5);
         Packets.writeInt3(packet, 1);
         packet.writeByte(0);
-        packet.writeByte(0x0E);
+        packet.writeByte(0x0E); // COM_PING
         return Mono.just(packet);
     }
 
@@ -54,9 +60,10 @@ final class PingTask extends MySQLTask {
         payloadLength = Packets.readInt3(cumulateBuffer);
         cumulateBuffer.readByte(); // skip sequenceId
         final OkPacket ok;
-        ok = OkPacket.read(cumulateBuffer.readSlice(payloadLength), this.adjutant.capability());
+        ok = OkPacket.readCumulate(cumulateBuffer, payloadLength, this.adjutant.capability());
         serverStatusConsumer.accept(ok);
         this.taskEnd = true;
+        this.sink.success();
         return true;
     }
 

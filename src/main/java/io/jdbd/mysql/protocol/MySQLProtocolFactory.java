@@ -1,14 +1,18 @@
 package io.jdbd.mysql.protocol;
 
+import io.jdbd.session.Closeable;
 import io.jdbd.session.OptionSpec;
 import reactor.core.publisher.Mono;
 
-public interface MySQLProtocolFactory extends OptionSpec {
+public interface MySQLProtocolFactory extends OptionSpec, Closeable {
 
     String factoryName();
 
     Mono<MySQLProtocol> createProtocol();
 
+
+    @Override
+    <T> Mono<T> close();
 
     /**
      * override {@link Object#toString()}

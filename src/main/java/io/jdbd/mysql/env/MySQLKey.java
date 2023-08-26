@@ -4,14 +4,19 @@ import io.jdbd.Driver;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.client.Enums;
 import io.jdbd.mysql.protocol.client.MySQLNativePasswordPlugin;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.env.Key;
 import io.jdbd.vendor.env.Redefine;
 import reactor.netty.resources.ConnectionProvider;
+import reactor.netty.tcp.TcpResources;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Supplier;
 
 public final class MySQLKey<T> extends Key<T> {
 
@@ -233,13 +238,12 @@ public final class MySQLKey<T> extends Key<T> {
 
     /**
      * <p>
-     * The class name that must is the implementation of {@link ConnectionProvider}.
-     * The class must provide public static factory getInstance().For example :
-     * <pre><br/>
-     *   public static ConnectionProvider getInstance() {
-     *       return instance;
-     *   }
-     * </pre>
+     * The Supplier func reference , for example :
+     *     <ul>
+     *         <li>reactor.netty.tcp.TcpResources::get , see {@link TcpResources#get()}</li>
+     *         <li>reactor.netty.resources.ConnectionProvider::newConnection , see  {@link ConnectionProvider#newConnection()}</li>
+     *     </ul>
+     *     The default default is {@link ConnectionProvider#newConnection()} , see {@link io.jdbd.vendor.env.Environment#get(Key, Supplier)} .
      * </p>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketFactory</a>
@@ -266,10 +270,10 @@ public final class MySQLKey<T> extends Key<T> {
      */
     public static final MySQLKey<Boolean> DNS_SRV = new MySQLKey<>("dnsSrv", Boolean.class, Boolean.FALSE);
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">localSocketAddress</a>
-     */
-    public static final MySQLKey<String> LOCAL_SOCKET_ADDRESS = new MySQLKey<>("localSocketAddress", String.class, null);
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">localSocketAddress</a>
+//     */
+//    public static final MySQLKey<String> LOCAL_SOCKET_ADDRESS = new MySQLKey<>("localSocketAddress", String.class, null);
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">maxAllowedPacket</a>
@@ -1274,9 +1278,28 @@ public final class MySQLKey<T> extends Key<T> {
     public static final MySQLKey<String> FACTORY_NAME = new MySQLKey<>(Driver.FACTORY_NAME, String.class, "unnamed");
 
 
+    private static final List<MySQLKey<?>> KEY_LIST = createKeyList();
+
+
     private MySQLKey(String name, Class<T> valueClass, @Nullable T defaultValue) {
         super(name, valueClass, defaultValue);
     }
 
+
+    public static List<MySQLKey<?>> keyList() {
+        return KEY_LIST;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<MySQLKey<?>> createKeyList() {
+        try {
+            List<MySQLKey<?>> list = MySQLCollections.arrayList();
+            addAllKey(MySQLKey.class, list::add);
+
+            return Collections.unmodifiableList(MySQLCollections.arrayList(list));
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 }

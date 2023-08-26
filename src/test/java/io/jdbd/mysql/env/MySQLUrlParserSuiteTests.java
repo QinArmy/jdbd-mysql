@@ -47,12 +47,12 @@ public class MySQLUrlParserSuiteTests {
         final Map<String, Object> propMap;
         propMap = Collections.singletonMap(Driver.USER, "army_w");
 
-        final List<MySQLHost> hostList;
+        final List<MySQLHostInfo> hostList;
         hostList = MySQLUrlParser.parse(url, propMap);
 
         Assert.assertEquals(hostList.size(), 1);
 
-        final MySQLHost myHost = hostList.get(0);
+        final MySQLHostInfo myHost = hostList.get(0);
 
         Assert.assertEquals(myHost.protocol(), Protocol.SINGLE_CONNECTION, "protocolType");
 
@@ -75,12 +75,12 @@ public class MySQLUrlParserSuiteTests {
         final Map<String, Object> propMap;
         propMap = Collections.singletonMap(Driver.USER, "army_w");
 
-        final List<MySQLHost> hostList;
+        final List<MySQLHostInfo> hostList;
         hostList = MySQLUrlParser.parse(url, propMap);
 
         Assert.assertEquals(hostList.size(), 1);
 
-        final MySQLHost myHost = hostList.get(0);
+        final MySQLHostInfo myHost = hostList.get(0);
 
         Assert.assertEquals(myHost.protocol(), Protocol.SINGLE_CONNECTION, "protocolType");
 

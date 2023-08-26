@@ -6,11 +6,18 @@ import io.jdbd.vendor.env.SimpleEnvironment;
 
 import java.util.Map;
 
-final class MySQLJdbdHost implements MySQLHost {
+final class MySQLJdbdHost implements MySQLHostInfo {
 
 
     static MySQLJdbdHost create(Protocol protocol, Map<String, Object> properties) {
-        return new MySQLJdbdHost(protocol, properties);
+        final MySQLJdbdHost host;
+        host = new MySQLJdbdHost(protocol, properties);
+        // check all key value
+        final Environment env = host.env;
+        for (MySQLKey<?> key : MySQLKey.keyList()) {
+            env.get(key);
+        }
+        return host;
     }
 
 

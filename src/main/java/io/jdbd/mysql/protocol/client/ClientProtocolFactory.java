@@ -5,7 +5,7 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.SessionEnv;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
@@ -28,10 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.netty.Connection;
+import reactor.netty.resources.ConnectionProvider;
 import reactor.netty.resources.LoopResources;
 import reactor.netty.tcp.TcpClient;
-import reactor.netty.tcp.TcpResources;
 
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -51,7 +53,7 @@ import java.util.*;
  */
 public final class ClientProtocolFactory extends FixedEnv implements MySQLProtocolFactory {
 
-    public static ClientProtocolFactory from(MySQLHost host) {
+    public static ClientProtocolFactory from(MySQLHostInfo host) {
         return new ClientProtocolFactory(host);
     }
 
@@ -59,26 +61,22 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     private static final Logger LOG = LoggerFactory.getLogger(ClientProtocolFactory.class);
 
 
-    final MySQLHost host;
+    final MySQLHostInfo mysqlHost;
 
     final int factoryTaskQueueSize;
 
-    final TcpClient tcpClient;
+    private final ConnectionProvider connectionProvider;
 
+    private final LoopResources loopResources;
 
-    private ClientProtocolFactory(final MySQLHost host) {
+    private ClientProtocolFactory(final MySQLHostInfo host) {
         super(host.properties());
-        this.host = host;
+        this.mysqlHost = host;
 
         final Environment env = this.env;
         this.factoryTaskQueueSize = env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
-
-        this.tcpClient = TcpClient.create(env.get(MySQLKey.CONNECTION_PROVIDER, TcpResources::get))
-                .option(ChannelOption.SO_KEEPALIVE, env.isOn(MySQLKey.TCP_KEEP_ALIVE))
-                .option(ChannelOption.TCP_NODELAY, env.isOn(MySQLKey.TCP_NO_DELAY))
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, env.getOrDefault(MySQLKey.CONNECT_TIMEOUT))
-                .runOn(createEventLoopGroup(this.env), true)
-                .remoteAddress(() -> hostAddress(this.host));
+        this.connectionProvider = env.get(MySQLKey.CONNECTION_PROVIDER, ConnectionProvider::newConnection);
+        this.loopResources = createEventLoopGroup(env);
     }
 
 
@@ -89,9 +87,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     @Override
     public Mono<MySQLProtocol> createProtocol() {
-        return MySQLTaskExecutor.create(this)//1. create network connection
-                .onErrorMap(this::mapConnectionError)
-                .map(executor -> new ClientProtocolManager(executor, this))//2. create  ClientProtocolManager
+        return this.newConnection() //1. create network connection
+                .map(this::mapProtocolManager) // 2. map ClientProtocolManager
                 .flatMap(ClientProtocolManager::authenticate) //3. authenticate
                 .flatMap(ClientProtocolManager::initializing)//4. initializing
                 .map(ClientProtocol::create);         //5. create ClientProtocol
@@ -102,6 +99,15 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     public <T> T valueOf(Option<T> option) {
         //TODO
         return null;
+    }
+
+    @Override
+    public <T> Mono<T> close() {
+        if (this.loopResources.isDisposed()) {
+            return Mono.empty();
+        }
+        return this.loopResources.disposeLater() // TODO config
+                .then(Mono.empty());
     }
 
     @Override
@@ -116,6 +122,75 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .toString();
     }
 
+
+
+    /*-------------------below private instance method -------------------*/
+
+
+    /**
+     * <p>
+     * create new connection
+     * </p>
+     *
+     * @see #createProtocol()
+     */
+    private Mono<? extends Connection> newConnection() {
+        final SocketAddress address;
+        address = hostAddress();
+
+        final boolean tcp = address instanceof InetSocketAddress;
+        final Environment env = this.env;
+
+        return TcpClient.create(this.connectionProvider)
+                .option(ChannelOption.SO_KEEPALIVE, tcp ? env.isOn(MySQLKey.TCP_KEEP_ALIVE) : null)
+                .option(ChannelOption.TCP_NODELAY, tcp ? env.isOn(MySQLKey.TCP_NO_DELAY) : null)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, tcp ? env.getOrDefault(MySQLKey.CONNECT_TIMEOUT) : null)
+                .runOn(this.loopResources, true)
+                .remoteAddress(() -> address)
+                .connect()
+                .onErrorMap(ClientProtocolFactory::mapConnectionError);
+    }
+
+    /**
+     * @see #newConnection()
+     */
+    private ClientProtocolManager mapProtocolManager(Connection connection) {
+        return new ClientProtocolManager(MySQLTaskExecutor.create(this, connection), this);
+    }
+
+    /**
+     * @see #newConnection()
+     */
+    private SocketAddress hostAddress() {
+        MySQLHostInfo hostInfo = this.mysqlHost;
+        final String address;
+        address = hostInfo.host();
+        final SocketAddress socketAddress;
+        if (address.indexOf('/') > -1) {
+            socketAddress = new DomainSocketAddress(address);
+        } else {
+            socketAddress = InetSocketAddress.createUnresolved(address, hostInfo.port());
+        }
+        return socketAddress;
+    }
+
+    /*-------------------below static method -------------------*/
+
+    private static JdbdException mapConnectionError(final Throwable cause) {
+        final JdbdException error;
+        if (cause instanceof JdbdException) {
+            error = (JdbdException) cause;
+        } else if (cause instanceof ClosedChannelException) {
+            error = new JdbdException("connect failure,possibly server too busy", cause);
+        } else if (cause instanceof ConnectException) {
+            error = new JdbdException(String.format("connect failure, %s", cause.getMessage()), cause);
+        } else {
+            error = new JdbdException("connect error, unknown error", cause);
+        }
+        return error;
+    }
+
+
     private static LoopResources createEventLoopGroup(final Environment env) {
         final int workerCount;
         workerCount = env.getInRange(MySQLKey.FACTORY_WORKER_COUNT, 2, Integer.MAX_VALUE);
@@ -125,30 +200,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             selectCount = workerCount;
         }
         return LoopResources.create("jdbd-mysql", selectCount, workerCount, true);
-    }
-
-    private static SocketAddress hostAddress(final MySQLHost host) {
-        final String address;
-        address = host.host();
-        final SocketAddress socketAddress;
-        if (address.indexOf('/') > -1) {
-            socketAddress = new DomainSocketAddress(address);
-        } else {
-            socketAddress = InetSocketAddress.createUnresolved(address, host.port());
-        }
-        return socketAddress;
-    }
-
-    private JdbdException mapConnectionError(final Throwable cause) {
-        final JdbdException error;
-        if (cause instanceof JdbdException) {
-            error = (JdbdException) cause;
-        } else if (cause instanceof ClosedChannelException) {
-            error = new JdbdException("connect timeout,possibly server too busy", cause);
-        } else {
-            error = new JdbdException("connect error, unknown error", cause);
-        }
-        return error;
     }
 
 

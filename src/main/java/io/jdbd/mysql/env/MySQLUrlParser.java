@@ -64,7 +64,7 @@ public abstract class MySQLUrlParser {
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html">Connection URL Syntax</a>
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.1/en/connector-j-unix-socket.html">Connecting Using Unix Domain Sockets</a>
      */
-    public static List<MySQLHost> parse(final @Nullable String url, final @Nullable Map<String, Object> properties) {
+    public static List<MySQLHostInfo> parse(final @Nullable String url, final @Nullable Map<String, Object> properties) {
         if (url == null) {
             throw new NullPointerException("url is null");
         } else if (properties == null) {
@@ -122,17 +122,17 @@ public abstract class MySQLUrlParser {
     /*-------------------below private method -------------------*/
 
 
-    private static List<MySQLHost> parseHostList(final String url, final String schema, final String authority,
-                                                 final Map<String, Object> queryProperties) {
+    private static List<MySQLHostInfo> parseHostList(final String url, final String schema, final String authority,
+                                                     final Map<String, Object> queryProperties) {
         final Protocol protocol;
 
-        final List<MySQLHost> hostList;
+        final List<MySQLHostInfo> hostList;
         if (MySQLStrings.hasText(authority)) {
             final List<Map<String, Object>> propertyList;
             propertyList = parseHostPropertyList(authority);
             protocol = Protocol.fromValue(url, schema, propertyList.size());
 
-            final List<MySQLHost> tempList = MySQLCollections.arrayList(propertyList.size());
+            final List<MySQLHostInfo> tempList = MySQLCollections.arrayList(propertyList.size());
             Map<String, Object> map;
             for (Map<String, Object> hostProperties : propertyList) {
                 map = MySQLCollections.hashMap(queryProperties);

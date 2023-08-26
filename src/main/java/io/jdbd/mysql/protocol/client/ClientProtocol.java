@@ -235,8 +235,13 @@ final class ClientProtocol implements MySQLProtocol {
 
     @Override
     public <T> Mono<T> close() {
-        this.userCloseSession.set(true);
-        return QuitTask.quit(this.adjutant);
+        final Mono<T> mono;
+        if (this.userCloseSession.compareAndSet(false, true)) {
+            mono = QuitTask.quit(this.adjutant);
+        } else {
+            mono = Mono.empty();
+        }
+        return mono;
     }
 
 
@@ -246,8 +251,8 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public Mono<Void> ping(final int timeSeconds) {
-        return PingTask.ping(timeSeconds, this.adjutant);
+    public Mono<Void> ping(final int timeoutMills) {
+        return PingTask.ping(timeoutMills, this.adjutant);
     }
 
 

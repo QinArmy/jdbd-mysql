@@ -1,7 +1,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.SessionEnv;
-import io.jdbd.mysql.env.MySQLHost;
+import io.jdbd.mysql.env.MySQLHostInfo;
 import io.netty.buffer.ByteBufAllocator;
 import reactor.util.annotation.Nullable;
 
@@ -35,7 +35,7 @@ interface ClientProtocolAdjutant extends ResultRowAdjutant {
 
     ByteBufAllocator allocator();
 
-    MySQLHost host();
+    MySQLHostInfo host();
 
 
     SessionEnv sessionEnv();
