@@ -7,6 +7,8 @@ import io.jdbd.mysql.protocol.AuthenticateAssistant;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
+import io.jdbd.mysql.protocol.auth.AuthenticationPlugin;
+import io.jdbd.mysql.protocol.auth.Sha256PasswordPlugin;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;

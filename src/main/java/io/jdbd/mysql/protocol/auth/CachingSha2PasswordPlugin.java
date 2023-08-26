@@ -1,8 +1,9 @@
-package io.jdbd.mysql.protocol.client;
+package io.jdbd.mysql.protocol.auth;
 
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.AuthenticateAssistant;
+import io.jdbd.mysql.protocol.client.Packets;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;

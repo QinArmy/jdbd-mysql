@@ -88,5 +88,10 @@ final class MySQLJdbdHost implements MySQLHostInfo {
         return this.env;
     }
 
+    @Override
+    public boolean isUnixDomainSocket() {
+        return this.host.indexOf('/') > -1;
+    }
+
 
 }

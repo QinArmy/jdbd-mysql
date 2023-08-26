@@ -1,4 +1,4 @@
-package io.jdbd.mysql.protocol.client;
+package io.jdbd.mysql.protocol.auth;
 
 import io.netty.buffer.ByteBuf;
 

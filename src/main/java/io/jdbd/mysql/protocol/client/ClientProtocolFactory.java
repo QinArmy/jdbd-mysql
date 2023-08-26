@@ -54,6 +54,9 @@ import java.util.*;
 public final class ClientProtocolFactory extends FixedEnv implements MySQLProtocolFactory {
 
     public static ClientProtocolFactory from(MySQLHostInfo host) {
+        if (host.isUnixDomainSocket()) {
+            LOG.debug("use unix domain socket : {}", host.host());
+        }
         return new ClientProtocolFactory(host);
     }
 
@@ -72,7 +75,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     private ClientProtocolFactory(final MySQLHostInfo host) {
         super(host.properties());
         this.mysqlHost = host;
-
         final Environment env = this.env;
         this.factoryTaskQueueSize = env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
         this.connectionProvider = env.get(MySQLKey.CONNECTION_PROVIDER, ConnectionProvider::newConnection);

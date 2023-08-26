@@ -1,6 +1,7 @@
-package io.jdbd.mysql.protocol.client;
+package io.jdbd.mysql.protocol.auth;
 
 import io.jdbd.mysql.protocol.AuthenticateAssistant;
+import io.jdbd.mysql.protocol.client.Packets;
 import io.netty.buffer.ByteBuf;
 
 import java.nio.charset.Charset;

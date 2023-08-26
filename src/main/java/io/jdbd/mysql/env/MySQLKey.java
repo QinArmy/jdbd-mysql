@@ -2,8 +2,8 @@ package io.jdbd.mysql.env;
 
 import io.jdbd.Driver;
 import io.jdbd.lang.Nullable;
+import io.jdbd.mysql.protocol.auth.MySQLNativePasswordPlugin;
 import io.jdbd.mysql.protocol.client.Enums;
-import io.jdbd.mysql.protocol.client.MySQLNativePasswordPlugin;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.env.Key;

@@ -21,7 +21,7 @@ import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
-abstract class Packets {
+public abstract class Packets {
 
 
     private Packets() {

@@ -38,7 +38,7 @@ public class SessionFactorySuiteTests {
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_socket">socket</a>
      */
-    @Test(enabled = false)
+    @Test//(enabled = false)
     public void unixDomainSocket() throws Exception {
         // /tmp/mysql.sock
         // select @@Global.socket;
