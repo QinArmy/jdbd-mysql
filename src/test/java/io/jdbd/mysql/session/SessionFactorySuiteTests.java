@@ -1,19 +1,13 @@
 package io.jdbd.mysql.session;
 
-import io.jdbd.Driver;
-import io.jdbd.mysql.ClientTestUtils;
-import io.jdbd.mysql.TestKey;
 import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.pool.PoolRmDatabaseSession;
-import io.jdbd.session.*;
-import io.jdbd.vendor.env.Environment;
+import io.jdbd.session.DatabaseSession;
+import io.jdbd.session.LocalDatabaseSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 
@@ -23,29 +17,15 @@ import java.net.URLEncoder;
  * </p>
  */
 @Test
-public class SessionFactorySuiteTests {
+public class SessionFactorySuiteTests extends SessionTestSupport {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionFactorySuiteTests.class);
-
-
-    private DatabaseSessionFactory sessionFactory;
-
-    @BeforeClass
-    public void beforeClass() {
-        this.sessionFactory = createSessionFactory();
-    }
-
-    @AfterClass
-    public void afterClass() {
-        Mono.from(this.sessionFactory.close())
-                .block();
-    }
 
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_socket">socket</a>
      */
-    @Test//(enabled = false)
+    @Test(enabled = false)
     public void unixDomainSocket() throws Exception {
         // /tmp/mysql.sock
         // select @@Global.socket;
@@ -53,15 +33,15 @@ public class SessionFactorySuiteTests {
         LOG.info(URLEncoder.encode("/tmp/mysql.sock", "utf-8"));
     }
 
-    @Test//(invocationCount = 1000, threadPoolSize = 20)
+
+    @Test//(invocationCount = 20_000, threadPoolSize = 30)
     public void localSession() {
 
         Flux.from(this.sessionFactory.localSession())
                 .doOnError(error -> LOG.error("", error))
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
-                .flatMap(session -> session.startTransaction(TransactionOption.builder().option(Option.READ_ONLY, Boolean.FALSE)
-                        .option(Option.WITH_CONSISTENT_SNAPSHOT, Boolean.TRUE).build()))
+                .flatMap(LocalDatabaseSession::startTransaction)
                 .doOnNext(session -> LOG.debug("{}", session))
                 .flatMap(LocalDatabaseSession::commit)
                 .map(PoolLocalDatabaseSession.class::cast)
@@ -89,17 +69,6 @@ public class SessionFactorySuiteTests {
     }
 
 
-    private DatabaseSessionFactory createSessionFactory() {
-        final Environment testEnv;
-        testEnv = ClientTestUtils.getTestConfig();
-        final String url;
-        url = testEnv.getRequired(TestKey.URL);
-
-        final Driver driver;
-        driver = Driver.findDriver(url);
-        //LOG.debug("driver {} ", driver);
-        return driver.forPoolVendor(url, testEnv.sourceMap());
-    }
 
 
 }

@@ -60,6 +60,10 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         protocol.addTransactionEndListener(this::onTransactionEnd);
     }
 
+    @Override
+    public Publisher<LocalDatabaseSession> startTransaction() {
+        return this.startTransaction(TransactionOption.option(null, false), HandleMode.ERROR_IF_EXISTS);
+    }
 
     @Override
     public final Publisher<LocalDatabaseSession> startTransaction(TransactionOption option) {

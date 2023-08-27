@@ -76,13 +76,14 @@ final class QuitTask extends MySQLTask implements DisposeTask {
     }
 
     @Override
-    protected Action onError(Throwable e) {
+    protected Action onError(final Throwable e) {
         if (this.taskEnd) {
             LOG.debug("Unknown error.", e);
         } else if (e instanceof SessionCloseException) {
             this.taskEnd = true;
             this.sink.success();
         } else {
+            this.taskEnd = true;
             this.sink.error(MySQLExceptions.wrap(e));
         }
         return Action.TASK_END;

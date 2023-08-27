@@ -16,6 +16,8 @@ import io.jdbd.session.LocalDatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.session.RmDatabaseSession;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -63,6 +65,8 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     }
 
 
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLDatabaseSessionFactory.class);
+
     private final MySQLProtocolFactory protocolFactory;
 
     private final boolean forPoolVendor;
@@ -88,16 +92,17 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
         if (this.factoryClosed.get()) {
             return Mono.error(MySQLExceptions.factoryClosed(this.name));
         }
-        return this.protocolFactory.createProtocol()
+        return Mono.defer(this.protocolFactory::createProtocol)
                 .map(this::createLocalSession);
     }
+
 
     @Override
     public Mono<RmDatabaseSession> rmSession() {
         if (this.factoryClosed.get()) {
             return Mono.error(MySQLExceptions.factoryClosed(this.name));
         }
-        return this.protocolFactory.createProtocol()
+        return Mono.defer(this.protocolFactory::createProtocol)
                 .map(this::createRmSession);
     }
 
@@ -139,7 +144,11 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     private <T> Mono<T> closeFactory() {
         final Mono<T> mono;
         if (this.factoryClosed.compareAndSet(false, true)) {
-            mono = this.protocolFactory.close();
+            final String className = getClass().getName();
+            LOG.debug("close {}[{}] ...", className, this.name);
+            mono = this.protocolFactory.close()
+                    .doOnSuccess(v -> LOG.debug("close {}[{}] success", className, this.name))
+                    .then(Mono.empty());
         } else {
             mono = Mono.empty();
         }

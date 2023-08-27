@@ -4,6 +4,7 @@ import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.util.*;
+import io.jdbd.type.LongParameter;
 import io.jdbd.type.Point;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.util.JdbdExceptions;
@@ -15,7 +16,6 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
@@ -55,8 +55,7 @@ final class QueryCommandWriter extends BinaryWriter {
 
         try {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                new QueryCommandWriter(sequenceId, adjutant)
-                        .writeQueryAttribute(packet, stmt);
+                writeQueryAttrForStatic(packet, stmt.getStmtVarList(), sequenceId, adjutant);
             }
             packet.writeBytes(sqlBytes);
             return Packets.createPacketPublisher(packet, sequenceId, adjutant);
@@ -90,8 +89,7 @@ final class QueryCommandWriter extends BinaryWriter {
 
         try {
             if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                new QueryCommandWriter(sequenceId, adjutant)
-                        .writeQueryAttribute(packet, stmt);
+                writeQueryAttrForStatic(packet, stmt.getStmtVarList(), sequenceId, adjutant);
             }
             String sql;
             for (int i = 0; i < sqlSize; i++) {
@@ -174,8 +172,8 @@ final class QueryCommandWriter extends BinaryWriter {
         packet = Packets.createStmtPacket(adjutant.allocator(), multiStmt);
         packet.writeByte(Packets.COM_QUERY);
         try {
-            if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                writeQueryAttribute(packet, multiStmt);
+            if (Capabilities.supportQueryAttr(this.capability)) {
+                writeQueryAttribute(packet, multiStmt.getStmtVarList());
             }
             for (int i = 0; i < size; i++) {
                 if (i > 0) {
@@ -205,8 +203,8 @@ final class QueryCommandWriter extends BinaryWriter {
         packet = Packets.createStmtPacket(adjutant.allocator(), stmt);
         packet.writeByte(Packets.COM_QUERY);
         try {
-            if (Capabilities.supportQueryAttr(adjutant.capability())) {
-                writeQueryAttribute(packet, stmt);
+            if (Capabilities.supportQueryAttr(this.capability)) {
+                writeQueryAttribute(packet, stmt.getStmtVarList());
             }
             doWriteBindableCommand(-1, staticSqlList, stmt.getParamGroup(), packet);
             return Packets.createPacketPublisher(packet, this.sequenceId, adjutant);
@@ -233,8 +231,8 @@ final class QueryCommandWriter extends BinaryWriter {
         packet = Packets.createStmtPacket(this.adjutant.allocator(), stmt);
         packet.writeByte(Packets.COM_QUERY);
         try {
-            if (Capabilities.supportQueryAttr(this.adjutant.capability())) {
-                writeQueryAttribute(packet, stmt);
+            if (Capabilities.supportQueryAttr(this.capability)) {
+                writeQueryAttribute(packet, stmt.getStmtVarList());
             }
             for (int i = 0; i < stmtCount; i++) {
                 if (i > 0) {
@@ -278,7 +276,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 packet.writeBytes(nullBytes);
                 continue;
             }
-            if (value instanceof Publisher || value instanceof Path) {
+            if (value instanceof LongParameter) {
                 // Statement no bug,never here
                 throw MySQLExceptions.nonSupportBindSqlTypeError(batchIndex, paramValue);
             }
@@ -508,20 +506,20 @@ final class QueryCommandWriter extends BinaryWriter {
     private void writeOneEscapesValue(final ByteBuf packet, final byte[] value) {
         if (this.hexEscape) {
             packet.writeByte('X');
-            packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+            packet.writeByte(Constants.QUOTE);
             packet.writeBytes(MySQLBuffers.hexEscapes(true, value, value.length));
         } else {
-            packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+            packet.writeByte(Constants.QUOTE);
             writeByteEscapes(packet, value, value.length);
         }
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        packet.writeByte(Constants.QUOTE);
     }
 
     private void writeHexEscape(final ByteBuf packet, final byte[] value) {
         packet.writeByte('X');
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        packet.writeByte(Constants.QUOTE);
         packet.writeBytes(MySQLBuffers.hexEscapes(true, value, value.length));
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        packet.writeByte(Constants.QUOTE);
     }
 
 
@@ -552,9 +550,9 @@ final class QueryCommandWriter extends BinaryWriter {
         value = bindToBit(batchIndex, bindValue);
 
         packet.writeByte('B');
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        packet.writeByte(Constants.QUOTE);
         packet.writeBytes(value.getBytes(this.clientCharset));
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        packet.writeByte(Constants.QUOTE);
     }
 
 
@@ -571,9 +569,12 @@ final class QueryCommandWriter extends BinaryWriter {
             value = MySQLBinds.bindToLocalTime(batchIndex, bindValue)
                     .format(MySQLTimes.TIME_FORMATTER_6);
         }
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
-        packet.writeBytes(value.getBytes(this.clientCharset));
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        final Charset clientCharset = this.clientCharset;
+
+        packet.writeBytes("TIME ".getBytes(clientCharset));
+        packet.writeByte(Constants.QUOTE);
+        packet.writeBytes(value.getBytes(clientCharset));
+        packet.writeByte(Constants.QUOTE);
 
     }
 
@@ -586,9 +587,13 @@ final class QueryCommandWriter extends BinaryWriter {
         value = MySQLBinds.bindToLocalDate(batchIndex, bindValue)
                 .format(DateTimeFormatter.ISO_LOCAL_DATE);
 
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
-        packet.writeBytes(value.getBytes(this.clientCharset));
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        final Charset clientCharset = this.clientCharset;
+
+        packet.writeBytes("DATE ".getBytes(clientCharset));
+        packet.writeByte(Constants.QUOTE);
+        packet.writeBytes(value.getBytes(clientCharset));
+        packet.writeByte(Constants.QUOTE);
+
     }
 
     /**
@@ -604,9 +609,12 @@ final class QueryCommandWriter extends BinaryWriter {
         } else {
             value = MySQLBinds.bindToLocalDateTime(batchIndex, bindValue).format(MySQLTimes.DATETIME_FORMATTER_6);
         }
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
-        packet.writeBytes(value.getBytes(this.clientCharset));
-        packet.writeByte(Constants.QUOTE_CHAR_BYTE);
+        final Charset clientCharset = this.clientCharset;
+
+        packet.writeBytes("TIMESTAMP ".getBytes(clientCharset));
+        packet.writeByte(Constants.QUOTE);
+        packet.writeBytes(value.getBytes(clientCharset));
+        packet.writeByte(Constants.QUOTE);
 
     }
 
@@ -669,7 +677,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 packet.writeByte('Z');
                 lastWritten = i + 1;
             } else if (b == Constants.BACK_SLASH_BYTE
-                    || b == Constants.QUOTE_CHAR_BYTE
+                    || b == Constants.QUOTE
                     || b == Constants.DOUBLE_QUOTE_BYTE) {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
@@ -688,24 +696,26 @@ final class QueryCommandWriter extends BinaryWriter {
     }
 
 
-    /*################################## blow private static method ##################################*/
-
-
     /**
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY</a>
      */
-    private void writeQueryAttribute(final ByteBuf packet, final Stmt stmt) {
-
-        final List<NamedValue> attrList;
-        attrList = stmt.getStmtVarList();
-
+    private void writeQueryAttribute(final ByteBuf packet, final List<NamedValue> attrList) {
         final int paramCount = attrList.size();
         Packets.writeIntLenEnc(packet, paramCount);// Number of parameters
         Packets.writeIntLenEnc(packet, 1);// Number of parameter sets. Currently, always 1
-
-        if (paramCount == 0) {
-            return;
+        if (paramCount > 0) {
+            writeQueryAttrValues(packet, attrList);
         }
+    }
+
+
+    /**
+     * @see #writeQueryAttrValues(ByteBuf, List)
+     * @see #writeQueryAttrForStatic(ByteBuf, List, IntSupplier, TaskAdjutant)
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY</a>
+     */
+    private void writeQueryAttrValues(final ByteBuf packet, final List<NamedValue> attrList) {
+        final int paramCount = attrList.size();
 
         final byte[] nullBitMap = new byte[(paramCount + 7) >> 3];
         final int nullBitMapWriterIndex = packet.writerIndex();
@@ -727,6 +737,27 @@ final class QueryCommandWriter extends BinaryWriter {
             }
             writeBinary(packet, -1, namedValue, -1);
         }
+    }
+
+
+    /*################################## blow private static method ##################################*/
+
+    /**
+     * @see #staticCommand(Stmt, IntSupplier, TaskAdjutant)
+     * @see #staticBatchCommand(StaticBatchStmt, IntSupplier, TaskAdjutant)
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY</a>
+     */
+    private static void writeQueryAttrForStatic(final ByteBuf packet, final List<NamedValue> attrList,
+                                                final IntSupplier sequenceId, final TaskAdjutant adjutant) {
+        final int paramCount = attrList.size();
+        Packets.writeIntLenEnc(packet, paramCount);// Number of parameters
+        Packets.writeIntLenEnc(packet, 1);// Number of parameter sets. Currently, always 1
+
+        if (paramCount > 0) {
+            new QueryCommandWriter(sequenceId, adjutant)
+                    .writeQueryAttrValues(packet, attrList);
+        }
+
 
     }
 

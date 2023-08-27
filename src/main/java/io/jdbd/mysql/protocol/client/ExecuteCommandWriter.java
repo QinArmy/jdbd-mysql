@@ -6,6 +6,7 @@ import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.statement.ValueParameter;
+import io.jdbd.type.LongParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
@@ -14,7 +15,6 @@ import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
@@ -64,7 +64,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
 
         final TaskAdjutant adjutant = this.adjutant;
-        this.supportQueryAttr = (adjutant.capability() & Capabilities.CLIENT_QUERY_ATTRIBUTES) != 0;
+        this.supportQueryAttr = Capabilities.supportQueryAttr(adjutant.capability());
         this.supportZoneOffset = adjutant.handshake10().serverVersion.isSupportZoneOffset();
         this.fixedEnv = adjutant.getFactory();
         this.serverZone = adjutant.serverZone();
@@ -91,7 +91,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
                 throw MySQLExceptions.bindValueParamIndexNotMatchError(batchIndex, paramValue, i);
             }
             value = paramValue.get();
-            if (value instanceof Publisher || value instanceof Path) {
+            if (value instanceof LongParameter) {
                 if (longParamList == null) {
                     longParamList = MySQLCollections.arrayList();
                 }

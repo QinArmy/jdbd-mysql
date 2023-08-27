@@ -43,10 +43,11 @@ abstract class BinaryWriter {
 
     final ZoneOffset serverZone;
 
-
     final boolean supportZoneOffset;
 
-    BinaryWriter(TaskAdjutant adjutant) {
+    final int capability;
+
+    BinaryWriter(final TaskAdjutant adjutant) {
         this.adjutant = adjutant;
         this.clientCharset = adjutant.charsetClient();
         this.serverZone = adjutant.serverZone();
@@ -54,6 +55,7 @@ abstract class BinaryWriter {
         final MySQLServerVersion serverVersion;
         serverVersion = adjutant.handshake10().serverVersion;
         this.supportZoneOffset = serverVersion.isSupportZoneOffset();
+        this.capability = adjutant.capability();
     }
 
 
@@ -185,14 +187,9 @@ abstract class BinaryWriter {
             case DATETIME:
                 writeDatetime(packet, batchIndex, paramValue, precision);
                 break;
-            case TIME: {
-                if (serverZone == null) {
-                    // no bug never here
-                    throw new NullPointerException("serverZone is null");
-                }
+            case TIME:
                 writeTime(packet, batchIndex, paramValue, precision);
-            }
-            break;
+                break;
             case DATE: {
                 final LocalDate value;
                 value = MySQLBinds.bindToLocalDate(batchIndex, paramValue);
@@ -385,20 +382,20 @@ abstract class BinaryWriter {
             value = JdbdTimes.truncatedIfNeed(precision, (OffsetDateTime) nonNull);
             if (this.supportZoneOffset) {
                 final byte[] bytes;
-                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(clientCharset);
+                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(this.clientCharset);
                 Packets.writeStringLenEnc(packet, bytes);
             } else {
-                writeLocalDateTime(packet, value.withOffsetSameInstant(serverZone).toLocalDateTime());
+                writeLocalDateTime(packet, value.withOffsetSameInstant(this.serverZone).toLocalDateTime());
             }
         } else if (nonNull instanceof ZonedDateTime) {
             final ZonedDateTime value;
             value = JdbdTimes.truncatedIfNeed(precision, (ZonedDateTime) nonNull);
             if (this.supportZoneOffset) {
                 final byte[] bytes;
-                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(clientCharset);
+                bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(this.clientCharset);
                 Packets.writeStringLenEnc(packet, bytes);
             } else {
-                writeLocalDateTime(packet, value.withZoneSameInstant(serverZone).toLocalDateTime());
+                writeLocalDateTime(packet, value.withZoneSameInstant(this.serverZone).toLocalDateTime());
             }
         } else {
             final LocalDateTime value;

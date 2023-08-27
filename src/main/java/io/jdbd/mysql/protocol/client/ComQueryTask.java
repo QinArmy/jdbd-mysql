@@ -846,30 +846,6 @@ final class ComQueryTask extends MySQLCommandTask {
         return responseType;
     }
 
-    /**
-     * @see #detectComQueryResponseType(ByteBuf, int)
-     */
-    private static int obtainLenEncIntByteCount(ByteBuf byteBuf, final int index) {
-        int byteCount;
-        switch (Packets.getInt1AsInt(byteBuf, index)) {
-            case Packets.ENC_0:
-                throw MySQLExceptions.createFatalIoException("MyServer ComQuery response unknown packet", null);
-            case Packets.ENC_3:
-                byteCount = 3;
-                break;
-            case Packets.ENC_4:
-                byteCount = 4;
-                break;
-            case Packets.ENC_9:
-                byteCount = 9;
-                break;
-            default:
-                // ENC_1
-                byteCount = 1;
-        }
-        return byteCount;
-    }
-
 
     /**
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response.html">Protocol::COM_QUERY Response</a>

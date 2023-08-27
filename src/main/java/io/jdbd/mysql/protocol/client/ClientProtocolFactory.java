@@ -110,11 +110,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         if (this.loopResources.isDisposed()) {
             return Mono.empty();
         }
-        final boolean debugEnabled;
-        debugEnabled = LOG.isDebugEnabled();
-        if (debugEnabled) {
-            LOG.debug("close {}[{}] ...", this.getClass().getName(), factoryName());
-        }
+
         final Environment env = this.env;
 
         final Duration shutdownQuietPeriod, shutdownTimeout;
@@ -122,11 +118,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         shutdownTimeout = Duration.ofMillis(env.getOrDefault(MySQLKey.SHUTDOWN_TIMEOUT));
 
         return this.loopResources.disposeLater(shutdownQuietPeriod, shutdownTimeout)
-                .doOnSuccess(v -> {
-                    if (debugEnabled) {
-                        LOG.debug("close {}[{}] success", this.getClass().getName(), factoryName());
-                    }
-                })
                 .then(Mono.empty());
     }
 
@@ -161,10 +152,16 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
      * @see #createProtocol()
      */
     private Mono<? extends Connection> newConnection() {
-        final SocketAddress address;
-        address = hostAddress();
-
-        final boolean tcp = address instanceof InetSocketAddress;
+        final MySQLHostInfo hostInfo = this.mysqlHost;
+        final SocketAddress socketAddress;
+        final boolean tcp;
+        if (hostInfo.isUnixDomainSocket()) {
+            socketAddress = new DomainSocketAddress(hostInfo.host());
+            tcp = false;
+        } else {
+            socketAddress = InetSocketAddress.createUnresolved(hostInfo.host(), hostInfo.port());
+            tcp = true;
+        }
         final Environment env = this.env;
 
         return TcpClient.create(this.connectionProvider)
@@ -172,7 +169,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .option(ChannelOption.TCP_NODELAY, tcp ? env.isOn(MySQLKey.TCP_NO_DELAY) : null)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, tcp ? env.getOrDefault(MySQLKey.CONNECT_TIMEOUT) : null)
                 .runOn(this.loopResources, true)
-                .remoteAddress(() -> address)
+                .remoteAddress(() -> socketAddress)
                 .connect()
                 .onErrorMap(ClientProtocolFactory::mapConnectionError);
     }
@@ -184,21 +181,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         return new ClientProtocolManager(MySQLTaskExecutor.create(this, connection), this);
     }
 
-    /**
-     * @see #newConnection()
-     */
-    private SocketAddress hostAddress() {
-        MySQLHostInfo hostInfo = this.mysqlHost;
-        final String address;
-        address = hostInfo.host();
-        final SocketAddress socketAddress;
-        if (address.indexOf('/') > -1) {
-            socketAddress = new DomainSocketAddress(address);
-        } else {
-            socketAddress = InetSocketAddress.createUnresolved(address, hostInfo.port());
-        }
-        return socketAddress;
-    }
 
     /*-------------------below static method -------------------*/
 
@@ -341,11 +323,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                     .append(utcEpochSecond)
                     .append("),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@GLOBAL.local_infile localInfile");
 
-            final String sql;
-            sql = builder.toString();
-
-            LOG.debug("reset environment multi-statement length : {} ;  sql : {}", sql.length(), sql);
-            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(sql), this.adjutant))
+            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
                     .filter(ResultItem::isRowItem)
                     .last()
                     .map(ResultRow.class::cast)

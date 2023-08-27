@@ -1,7 +1,6 @@
 package io.jdbd.mysql.util;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -318,7 +317,7 @@ public abstract class MySQLCodes {
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-error-sqlstates.html">Mapping MySQL Error Numbers to JDBC SQLState Codes</a>
      */
     private static Map<Integer, String> createMySQLErrorNumberToSQLStatesMap() {
-        Map<Integer, String> map = new HashMap<>((int) (228 / 0.75F));
+        Map<Integer, String> map = MySQLCollections.hashMap((int) (228 / 0.75F));
 
         map.put(ER_DUP_KEY, MySQLStates.INTEGRITY_CONSTRAINT_VIOLATION);
         map.put(ER_OUTOFMEMORY, MySQLStates.MEMORY_ALLOCATION_ERROR);
