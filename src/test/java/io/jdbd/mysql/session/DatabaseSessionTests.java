@@ -69,7 +69,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
         Assert.assertNotNull(resultStates);
 
-        LOG.info("{} affectedRows : {}", methodName, resultStates.affectedRows());
+        LOG.debug("{} affectedRows : {}", methodName, resultStates.affectedRows());
 
     }
 
@@ -103,7 +103,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
         Assert.assertNotNull(resultStates);
 
-        LOG.info("{} affectedRows : {}", methodName, resultStates.affectedRows());
+        LOG.debug("{} affectedRows : {}", methodName, resultStates.affectedRows());
 
     }
 
@@ -137,9 +137,9 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
         Assert.assertEquals(resultStates.rowCount(), rowCount);
 
-        LOG.info("{} result row count {} , column count {}", methodName, rowCount, columnCount);
+        LOG.debug("{} result row count {} , column count {}", methodName, rowCount, columnCount);
 
-        // LOG.info("row list : \n{}",JSON.toJSONString(mapList));
+        // LOG.debug("row list : \n{}",JSON.toJSONString(mapList));
 
 
     }
@@ -196,7 +196,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
         Assert.assertNotNull(rowList);
 
-        LOG.info("{} result row count {} ", methodName, rowList.size());
+        LOG.debug("{} result row count {} ", methodName, rowList.size());
 
     }
 
@@ -222,7 +222,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
         resultRowList = Mono.from(multiResult.nextUpdate())                 // result 1
                 .then(Mono.from(multiResult.nextUpdate()))                  // result 2
                 .thenMany(multiResult.nextQuery())                          // result 3
-                .thenMany(multiResult.nextQuery())                          // result 4
+                .thenMany(multiResult.nextQuery(CurrentRow::asResultRow))                          // result 4
                 .concatWith(Flux.from(multiResult.nextQueryFlux())         // result 5
                         .filter(ResultItem::isRowItem)
                         .map(ResultRow.class::cast)
@@ -231,7 +231,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
         Assert.assertNotNull(resultRowList);
 
-        LOG.info("{} result row count {} ", methodName, resultRowList.size());
+        LOG.debug("{} result row count {} ", methodName, resultRowList.size());
     }
 
     /**
@@ -318,6 +318,28 @@ public class DatabaseSessionTests extends SessionTestSupport {
                 .block();
 
         Assert.assertEquals(match, Boolean.TRUE);
+    }
+
+    /**
+     * @see DatabaseSession#transactionStatus()
+     */
+    @Test
+    public void transactionStatus(final LocalDatabaseSession session, final String methodName) {
+
+        Mono.from(session.startTransaction(TransactionOption.option(Isolation.READ_COMMITTED, false)))
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .doOnSuccess(status -> {
+                    Assert.assertTrue(status.inTransaction());
+                    Assert.assertFalse(status.isReadOnly());
+                    Assert.assertEquals(status.isolation(), Isolation.READ_COMMITTED);
+                })
+                .then(Mono.from(session.commit())) // driver don't send message to database server before subscribing.
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .doOnSuccess(status -> {
+                    Assert.assertFalse(status.inTransaction());
+                    LOG.debug("{} session isolation : {} , session read only : {}", methodName, status.isolation().name(), status.isReadOnly());
+                })
+                .block();
 
     }
 

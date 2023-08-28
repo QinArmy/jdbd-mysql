@@ -50,7 +50,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
     @Override
     Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
-        return ComQueryTask.paramQuery(stmt, DatabaseProtocol.ROW_FUNC, adjutant);
+        return ComQueryTask.paramQuery(stmt, DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant);
     }
 
     @Override
@@ -86,7 +86,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
 
     /**
-     * @see ComQueryTask#query(StaticStmt, java.util.function.Function, TaskAdjutant)
+     * @see ComQueryTask#query(StaticStmt, java.util.function.Function, java.util.function.Consumer, TaskAdjutant)
      */
     @Test(timeOut = TIME_OUT)
     public void query() {
@@ -97,7 +97,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
         sql = "SELECT t.id,t.name,t.create_time as createTime FROM mysql_types as t ORDER BY t.id LIMIT 50";
 
-        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql, resultStatesHolder::set), DatabaseProtocol.ROW_FUNC, adjutant)
+        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, resultStatesHolder::set, adjutant)
                 .collectList()
                 .block();
 
@@ -143,7 +143,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
         sql = "SELECT u.id,u.name FROM mysql_types as u WHERE u.id = 1";
 
-        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, adjutant)
+        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant)
                 .collectList()
                 .block();
 
@@ -200,9 +200,6 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
         releaseConnection(adjutant);
     }
 
-    /**
-     * @see ComQueryTask#query(StaticStmt, java.util.function.Function, TaskAdjutant)
-     */
     @Test(timeOut = TIME_OUT)
     public void queryIsUpdate() {
         LOG.info("queryIsUpdate test start");
@@ -210,7 +207,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
         String sql = "UPDATE mysql_types as u SET u.name = 'simonyi4' WHERE u.id = 30";
 
         try {
-            ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, adjutant)
+            ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant)
                     .map(row -> {
                         fail("queryIsUpdate test failure.");
                         return row;

@@ -89,7 +89,7 @@ public class TaskTestAdvice extends AbstractTaskSuiteTests {
         LOG.info("mysqlTypeMatch test start");
         final TaskAdjutant adjutant = obtainTaskAdjutant();
 
-        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(createQuerySqlForMySQLTypeMatch()), DatabaseProtocol.ROW_FUNC, adjutant)
+        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(createQuerySqlForMySQLTypeMatch()), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant)
                 .collectList()
                 .doOnError(this::printMultiError)
                 .block();

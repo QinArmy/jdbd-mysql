@@ -7,7 +7,6 @@ import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.*;
 import io.jdbd.pool.PoolRmDatabaseSession;
-import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
@@ -317,7 +316,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else if ((flags & TM_START_RSCAN) != 0) {
             flux = Flux.empty();
         } else {
-            flux = this.protocol.query(Stmts.stmt("XA RECOVER CONVERT XID"), CurrentRow::asResultRow)
+            flux = this.protocol.query(Stmts.stmt("XA RECOVER CONVERT XID"), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES)
                     .map(this::mapRecoverResult);
         }
         return flux;

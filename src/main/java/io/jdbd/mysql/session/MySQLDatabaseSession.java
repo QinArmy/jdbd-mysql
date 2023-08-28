@@ -87,12 +87,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final Publisher<ResultRow> executeQuery(String sql) {
-        return this.executeQuery(sql, CurrentRow::asResultRow, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
     public final <R> Publisher<R> executeQuery(String sql, Function<CurrentRow, R> function) {
-        return this.executeQuery(sql, function, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, function, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
@@ -101,7 +101,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (!MySQLStrings.hasText(sql)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.query(Stmts.stmtWithSession(sql, consumer, this), function);
+        return this.protocol.query(Stmts.stmtWithSession(sql, this), function, consumer);
     }
 
     @Override

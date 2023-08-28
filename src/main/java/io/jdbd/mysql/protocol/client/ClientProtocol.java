@@ -11,6 +11,7 @@ import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -48,8 +49,8 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public <R> Flux<R> query(StaticStmt stmt, Function<CurrentRow, R> function) {
-        return ComQueryTask.query(stmt, function, this.adjutant);
+    public <R> Flux<R> query(StaticStmt stmt, Function<CurrentRow, R> function, Consumer<ResultStates> consumer) {
+        return ComQueryTask.query(stmt, function, consumer, this.adjutant);
     }
 
     @Override
@@ -89,12 +90,13 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public <R> Flux<R> paramQuery(ParamStmt stmt, boolean usePrepare, Function<CurrentRow, R> function) {
+    public <R> Flux<R> paramQuery(ParamStmt stmt, boolean usePrepare, Function<CurrentRow, R> function,
+                                  Consumer<ResultStates> consumer) {
         final Flux<R> flux;
-        if (usePrepare || stmt.getFetchSize() > 0) {
-            flux = ComPreparedTask.query(stmt, function, this.adjutant);
+        if (usePrepare) {
+            flux = ComPreparedTask.query(stmt, function, consumer, this.adjutant);
         } else {
-            flux = ComQueryTask.paramQuery(stmt, function, this.adjutant);
+            flux = ComQueryTask.paramQuery(stmt, function, consumer, this.adjutant);
         }
         return flux;
     }

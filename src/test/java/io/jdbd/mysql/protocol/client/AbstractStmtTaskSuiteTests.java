@@ -50,7 +50,7 @@ public abstract class AbstractStmtTaskSuiteTests extends AbstractTaskSuiteTests 
         final TaskAdjutant taskAdjutant = obtainTaskAdjutant();
 
         List<ResultRow> resultRowList;
-        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), DatabaseProtocol.ROW_FUNC, taskAdjutant)
+        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, taskAdjutant)
                 .collectList()
                 .block();
 
@@ -63,7 +63,7 @@ public abstract class AbstractStmtTaskSuiteTests extends AbstractTaskSuiteTests 
 
         // string bigint
         bindValue = JdbdValues.paramValue(0, MySQLType.BIGINT, Long.toString(id));
-        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), DatabaseProtocol.ROW_FUNC, taskAdjutant)
+        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, taskAdjutant)
                 .collectList()
                 .block();
 

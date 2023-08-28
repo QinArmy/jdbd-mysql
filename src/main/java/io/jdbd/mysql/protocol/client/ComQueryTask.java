@@ -90,11 +90,12 @@ final class ComQueryTask extends MySQLCommandTask {
      * </p>
      *
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
-     * @see ClientProtocol#query(StaticStmt, Function)
+     * @see ClientProtocol#query(StaticStmt, Function, Consumer)
      */
     static <R> Flux<R> query(final StaticStmt stmt, final Function<CurrentRow, R> function,
+                             final Consumer<ResultStates> consumer,
                              final TaskAdjutant adjutant) {
-        return MultiResults.query(function, stmt.getStatusConsumer(), sink -> {
+        return MultiResults.query(function, consumer, sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
                 task.submit(sink::error);
@@ -231,11 +232,12 @@ final class ComQueryTask extends MySQLCommandTask {
      * </ul>
      * </p>
      *
-     * @see ClientProtocol#paramQuery(ParamStmt, boolean, Function)
+     * @see ClientProtocol#paramQuery(ParamStmt, boolean, Function, Consumer)
      */
     static <R> Flux<R> paramQuery(final ParamStmt stmt, final Function<CurrentRow, R> function,
+                                  final Consumer<ResultStates> consumer,
                                   final TaskAdjutant adjutant) {
-        return MultiResults.query(function, stmt.getStatusConsumer(), sink -> {
+        return MultiResults.query(function, consumer, sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
                 task.submit(sink::error);

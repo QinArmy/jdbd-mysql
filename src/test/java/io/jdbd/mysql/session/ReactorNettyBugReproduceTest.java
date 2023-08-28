@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
+@Test(enabled = false)
 public class ReactorNettyBugReproduceTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReactorNettyBugReproduceTest.class);

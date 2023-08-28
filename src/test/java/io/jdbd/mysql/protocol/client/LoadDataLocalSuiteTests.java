@@ -57,7 +57,7 @@ public class LoadDataLocalSuiteTests extends AbstractStmtTaskSuiteTests {
 
     @Override
     Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
-        return ComQueryTask.paramQuery(stmt, DatabaseProtocol.ROW_FUNC, adjutant);
+        return ComQueryTask.paramQuery(stmt, DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant);
     }
 
     @Override

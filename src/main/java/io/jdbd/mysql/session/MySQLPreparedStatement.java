@@ -14,6 +14,7 @@ import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -204,12 +205,12 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public Publisher<ResultRow> executeQuery() {
-        return this.executeQuery(CurrentRow::asResultRow, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
     public <R> Publisher<R> executeQuery(Function<CurrentRow, R> function) {
-        return this.executeQuery(function, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(function, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
@@ -242,7 +243,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
         final Flux<R> flux;
         if (error == null) {
-            flux = this.stmtTask.executeQuery(Stmts.paramStmt(this.sql, paramGroup, consumer, this), function);
+            flux = this.stmtTask.executeQuery(Stmts.paramStmt(this.sql, paramGroup, this), function, consumer);
         } else {
             this.stmtTask.closeOnBindError(error); // close prepare statement.
             flux = Flux.error(MySQLExceptions.wrap(error));

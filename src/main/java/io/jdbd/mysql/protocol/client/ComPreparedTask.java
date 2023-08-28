@@ -81,10 +81,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * </p>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
-     * @see ComQueryTask#paramQuery(ParamStmt, Function, TaskAdjutant)
+     * @see ComQueryTask#paramQuery(ParamStmt, Function, Consumer, TaskAdjutant)
      */
-    static <R> Flux<R> query(final ParamStmt stmt, final Function<CurrentRow, R> function, final TaskAdjutant adjutant) {
-        return MultiResults.query(function, stmt.getStatusConsumer(), sink -> {
+    static <R> Flux<R> query(final ParamStmt stmt, final Function<CurrentRow, R> function,
+                             final Consumer<ResultStates> consumer, final TaskAdjutant adjutant) {
+        return MultiResults.query(function, consumer, sink -> {
             try {
                 ComPreparedTask task = new ComPreparedTask(stmt, sink, adjutant);
                 task.submit(sink::error);
@@ -223,7 +224,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     private Warning warning;
 
-    private Phase phase = Phase.PREPARED;
+    private TaskPhase phase = TaskPhase.PREPARED;
 
     private MySQLColumnMeta[] paramMetas;
 
@@ -300,8 +301,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
 
     @Override
-    public <R> Flux<R> executeQuery(final ParamStmt stmt, Function<CurrentRow, R> function) {
-        return MultiResults.query(function, stmt.getStatusConsumer(), sink -> executeAfterBinding(sink, stmt));
+    public <R> Flux<R> executeQuery(final ParamStmt stmt, Function<CurrentRow, R> function, Consumer<ResultStates> consumer) {
+        return MultiResults.query(function, consumer, sink -> executeAfterBinding(sink, stmt));
     }
 
     /**
@@ -411,14 +412,14 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         Publisher<ByteBuf> publisher;
         try {
             publisher = createPreparePacket();
-            this.phase = Phase.READ_PREPARE_RESPONSE;
+            this.phase = TaskPhase.READ_PREPARE_RESPONSE;
 
             if (LOG.isTraceEnabled()) {
                 LOG.trace(" {} prepare with stmt[{}]", this, this.stmt.getClass().getSimpleName());
             }
         } catch (Throwable e) {
             publisher = null;
-            this.phase = Phase.ERROR_ON_START;
+            this.phase = TaskPhase.ERROR_ON_START;
             addError(e);
         }
         return publisher;
@@ -427,7 +428,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     protected boolean decode(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatusConsumer) {
-        if (this.phase == Phase.ERROR_ON_START) {
+        if (this.phase == TaskPhase.ERROR_ON_START) {
             publishError(this.sink::error);
             return true;
         }
@@ -438,8 +439,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     if (canReadPrepareResponse(cumulateBuffer)) {
                         // possibly PreparedStatement bind occur error
                         taskEnd = readPrepareResponse(cumulateBuffer, serverStatusConsumer)
-                                || this.phase == Phase.ERROR_ON_BINDING
-                                || this.phase == Phase.ABANDON_BINDING;
+                                || this.phase == TaskPhase.ERROR_ON_BINDING
+                                || this.phase == TaskPhase.ABANDON_BINDING;
                     }
                     continueDecode = false;
                 }
@@ -459,7 +460,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     if (readResetResponse(cumulateBuffer, serverStatusConsumer)) {
                         taskEnd = true;
                     } else {
-                        this.phase = Phase.EXECUTE;
+                        this.phase = TaskPhase.EXECUTE;
                         taskEnd = executeNextGroup(); // execute command
                     }
                     continueDecode = false;
@@ -470,7 +471,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                         taskEnd = true;
                         continueDecode = false;
                     } else {
-                        this.phase = Phase.READ_RESULT_SET;
+                        this.phase = TaskPhase.READ_RESULT_SET;
                         continueDecode = Packets.hasOnePacket(cumulateBuffer);
                     }
                 }
@@ -480,8 +481,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
             }
         }
         if (taskEnd) {
-            if (this.phase != Phase.READ_PREPARE_RESPONSE) {
-                this.phase = Phase.END;
+            if (this.phase != TaskPhase.READ_PREPARE_RESPONSE) {
+                this.phase = TaskPhase.END;
                 this.packetPublisher = Mono.just(createCloseStatementPacket());
             }
             if (hasError()) {
@@ -516,7 +517,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     protected void onChannelClose() {
-        if (this.phase != Phase.END) {
+        if (this.phase != TaskPhase.END) {
             this.sink.error(new SessionCloseException("Database session unexpected close."));
         }
     }
@@ -531,7 +532,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     void handleReadResultSetEnd() {
-        this.phase = Phase.READ_EXECUTE_RESPONSE;
+        this.phase = TaskPhase.READ_EXECUTE_RESPONSE;
     }
 
     @Override
@@ -546,7 +547,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         if (stmt instanceof ParamBatchStmt) {
             moreGroup = this.batchIndex < ((ParamBatchStmt) stmt).getGroupList().size();
             if (moreGroup) {
-                this.phase = Phase.EXECUTE;
+                this.phase = TaskPhase.EXECUTE;
             }
         } else {
             moreGroup = false;
@@ -560,11 +561,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see #handleReadPrepareComplete()
      */
     boolean executeNextGroup() {
-        assertPhase(Phase.EXECUTE);
+        assertPhase(TaskPhase.EXECUTE);
 
         if (this.nextGroupNeedReset) {
             this.packetPublisher = Mono.just(createResetPacket());
-            this.phase = Phase.READ_RESET_RESPONSE;
+            this.phase = TaskPhase.READ_RESET_RESPONSE;
             return false;
         }
 
@@ -588,7 +589,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         boolean taskEnd = false;
         try {
             this.packetPublisher = this.commandWriter.writeCommand(batchIndex);
-            this.phase = Phase.READ_EXECUTE_RESPONSE;
+            this.phase = TaskPhase.READ_EXECUTE_RESPONSE;
         } catch (Throwable e) {
             taskEnd = true;
             addError(e);
@@ -603,7 +604,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      */
     @Override
     boolean executeNextFetch() {
-        assertPhase(Phase.READ_EXECUTE_RESPONSE);
+        assertPhase(TaskPhase.READ_EXECUTE_RESPONSE);
 
         final int fetchSize = getActualStmt().getFetchSize();
         final boolean taskEnd;
@@ -675,15 +676,15 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 try {
                     ((MySQLPrepareStmt) this.stmt).setStmt(stmt);
                     ((PrepareSink) this.sink).setSink(sink);
-                    this.phase = Phase.EXECUTE;
+                    this.phase = TaskPhase.EXECUTE;
                     if (executeNextGroup()) {
                         endTaskForErrorOnWaitForBinding();
                     } else {
-                        this.phase = Phase.READ_EXECUTE_RESPONSE;
+                        this.phase = TaskPhase.READ_EXECUTE_RESPONSE;
                     }
                 } catch (Throwable e) {
                     // here bug
-                    this.phase = Phase.ERROR_ON_BINDING;
+                    this.phase = TaskPhase.ERROR_ON_BINDING;
                     endTaskForErrorOnWaitForBinding();
                     sink.error(e);
                 }
@@ -713,7 +714,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         // error can't be emitted to sink ,because not actual sink now.
         switch (this.phase) {
             case WAIT_FOR_BINDING: {
-                this.phase = Phase.ABANDON_BINDING;
+                this.phase = TaskPhase.ABANDON_BINDING;
                 endTaskForErrorOnWaitForBinding();
             }
             break;
@@ -748,7 +749,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         // error can't be emitted to sink ,because not actual sink now.
         switch (this.phase) {
             case WAIT_FOR_BINDING: {
-                this.phase = Phase.ERROR_ON_BINDING;
+                this.phase = TaskPhase.ERROR_ON_BINDING;
                 endTaskForErrorOnWaitForBinding();
             }
             break;
@@ -781,7 +782,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         if (!this.inDecodeMethod()) {
             this.packetPublisher = Mono.just(createCloseStatementPacket());
             this.sendPacketSignal(true)
-                    .doOnSuccess(v -> this.phase = Phase.END)
+                    .doOnSuccess(v -> this.phase = TaskPhase.END)
                     .subscribe();
         }
 
@@ -852,7 +853,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response">COM_STMT_PREPARE Response</a>
      */
     private boolean readPrepareResponse(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatusConsumer) {
-        assertPhase(Phase.READ_PREPARE_RESPONSE);
+        assertPhase(TaskPhase.READ_PREPARE_RESPONSE);
 
         final int headFlag = Packets.getHeaderFlag(cumulateBuffer);
         final boolean taskEnd;
@@ -945,7 +946,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see #readPrepareResponse(ByteBuf, Consumer)
      */
     private boolean handleReadPrepareComplete() {
-        assertPhase(Phase.READ_PREPARE_RESPONSE);
+        assertPhase(TaskPhase.READ_PREPARE_RESPONSE);
         if (this.paramMetas == null) {
             throw new IllegalStateException("this.paramMetas is null.");
         }
@@ -953,11 +954,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         final boolean taskEnd;
         if (stmt instanceof PrepareStmt) {
             final PrepareSink sink = (PrepareSink) this.sink;
-            this.phase = Phase.WAIT_FOR_BINDING; // first modify phase to WAIT_FOR_BINDING
+            this.phase = TaskPhase.WAIT_FOR_BINDING; // first modify phase to WAIT_FOR_BINDING
             sink.statementSink.success(this);
             taskEnd = false;
         } else {
-            this.phase = Phase.EXECUTE;
+            this.phase = TaskPhase.EXECUTE;
             taskEnd = executeNextGroup();
         }
         return taskEnd;
@@ -991,7 +992,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see #executeNextGroup()
      */
     private boolean readExecuteResponse(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatusConsumer) {
-        assertPhase(Phase.READ_EXECUTE_RESPONSE);
+        assertPhase(TaskPhase.READ_EXECUTE_RESPONSE);
 
         final boolean traceEnabled = LOG.isTraceEnabled();
         if (traceEnabled) {
@@ -1010,7 +1011,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
             }
             break;
             default: {
-                this.phase = Phase.READ_RESULT_SET;
+                this.phase = TaskPhase.READ_RESULT_SET;
                 taskEnd = readResultSet(cumulateBuffer, serverStatusConsumer);
             }
         }
@@ -1089,7 +1090,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
 
-    private void assertPhase(Phase expectedPhase) {
+    private void assertPhase(TaskPhase expectedPhase) {
         if (this.phase != expectedPhase) {
             throw new IllegalStateException(String.format("this.phase isn't %s.", expectedPhase));
         }
@@ -1225,7 +1226,9 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
 
-    enum Phase {
+    enum TaskPhase {
+
+        NONE,
         ERROR_ON_START,
         PREPARED,
 

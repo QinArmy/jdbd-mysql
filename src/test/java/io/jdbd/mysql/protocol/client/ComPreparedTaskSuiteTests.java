@@ -47,7 +47,7 @@ public class ComPreparedTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
     @Override
     Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
-        return ComPreparedTask.query(stmt, DatabaseProtocol.ROW_FUNC, adjutant);
+        return ComPreparedTask.query(stmt, DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant);
     }
 
     @Override

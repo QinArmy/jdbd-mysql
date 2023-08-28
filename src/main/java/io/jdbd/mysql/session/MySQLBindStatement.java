@@ -14,6 +14,7 @@ import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.Parameter;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.util.JdbdBinds;
@@ -61,7 +62,6 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     public boolean isForcePrepare() {
         return this.forcePrepare;
     }
-
 
 
     @Override
@@ -189,12 +189,12 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public Publisher<ResultRow> executeQuery() {
-        return this.executeQuery(CurrentRow::asResultRow, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
     public <R> Publisher<R> executeQuery(Function<CurrentRow, R> function) {
-        return this.executeQuery(function, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(function, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
@@ -216,7 +216,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         if (error == null) {
             final ParamStmt stmt;
             stmt = Stmts.paramStmt(this.sql, paramGroup, this);
-            flux = this.session.protocol.paramQuery(stmt, isUsePrepare(), function);
+            flux = this.session.protocol.paramQuery(stmt, isUsePrepare(), function, consumer);
         } else {
             flux = Flux.error(MySQLExceptions.wrap(error));
         }

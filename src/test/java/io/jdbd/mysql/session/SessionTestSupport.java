@@ -7,14 +7,15 @@ import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.result.DataRow;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
+import io.jdbd.statement.Statement;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterSuite;
+import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.DataProvider;
 import reactor.core.publisher.Mono;
 
@@ -27,28 +28,34 @@ public abstract class SessionTestSupport {
     protected final Logger LOG = LoggerFactory.getLogger(getClass());
 
 
-    protected DatabaseSessionFactory sessionFactory;
+    protected static DatabaseSessionFactory sessionFactory;
 
 
-    @BeforeClass
-    public final void beforeClass() {
-        if (this.sessionFactory == null) {
-            this.sessionFactory = createSessionFactory();
+    @BeforeSuite
+    public final void beforeSuiteCreateSessionFactory() {
+        if (sessionFactory == null) {
+            sessionFactory = createSessionFactory();
         }
 
     }
 
-    @AfterClass
-    public final void afterClass() {
-        Mono.from(this.sessionFactory.close())
-                .block();
+    @AfterSuite
+    public final void afterSuiteCloseSessionFactory() {
+        DatabaseSessionFactory sessionFactory = SessionTestSupport.sessionFactory;
+
+        if (sessionFactory != null) {
+            Mono.from(sessionFactory.close())
+                    .block();
+        }
+
     }
 
     @AfterMethod
     public final void closeSessionAfterTest(final Method method, final ITestContext context) {
         boolean match = false;
         for (Class<?> parameterType : method.getParameterTypes()) {
-            if (DatabaseSession.class.isAssignableFrom(parameterType)) {
+            if (DatabaseSession.class.isAssignableFrom(parameterType)
+                    || Statement.class.isAssignableFrom(parameterType)) {
                 match = true;
                 break;
             }
@@ -99,10 +106,10 @@ public abstract class SessionTestSupport {
                                              final ITestContext context) {
         final DatabaseSession session;
         if (local) {
-            session = Mono.from(this.sessionFactory.localSession())
+            session = Mono.from(sessionFactory.localSession())
                     .block();
         } else {
-            session = Mono.from(this.sessionFactory.rmSession())
+            session = Mono.from(sessionFactory.rmSession())
                     .block();
         }
 

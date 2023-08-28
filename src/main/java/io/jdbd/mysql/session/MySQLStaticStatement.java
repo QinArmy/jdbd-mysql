@@ -5,6 +5,7 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
 import io.jdbd.statement.StaticStatement;
+import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
@@ -47,12 +48,12 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public Publisher<ResultRow> executeQuery(String sql) {
-        return this.executeQuery(sql, CurrentRow::asResultRow, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
     public <R> Publisher<R> executeQuery(String sql, Function<CurrentRow, R> function) {
-        return this.executeQuery(sql, function, Stmts.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, function, DatabaseProtocol.IGNORE_RESULT_STATES);
     }
 
     @Override
@@ -63,7 +64,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
         if (!MySQLStrings.hasText(sql)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
         }
-        return this.session.protocol.query(Stmts.stmt(sql, consumer, this), function);
+        return this.session.protocol.query(Stmts.stmt(sql, this), function, consumer);
     }
 
     @Override

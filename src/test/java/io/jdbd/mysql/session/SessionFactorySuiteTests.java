@@ -37,7 +37,7 @@ public class SessionFactorySuiteTests extends SessionTestSupport {
     @Test//(invocationCount = 20_000, threadPoolSize = 30)
     public void localSession() {
 
-        Flux.from(this.sessionFactory.localSession())
+        Flux.from(sessionFactory.localSession())
                 .doOnError(error -> LOG.error("", error))
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
@@ -56,7 +56,7 @@ public class SessionFactorySuiteTests extends SessionTestSupport {
     @Test
     public void rmSession() {
 
-        Flux.from(this.sessionFactory.rmSession())
+        Flux.from(sessionFactory.rmSession())
                 .doOnError(error -> LOG.error("", error))
                 //.repeat(8)
                 .doOnNext(session -> LOG.debug("{}", session))
@@ -67,8 +67,6 @@ public class SessionFactorySuiteTests extends SessionTestSupport {
                 .blockLast();
 
     }
-
-
 
 
 }
