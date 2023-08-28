@@ -12,7 +12,6 @@ import java.time.Duration;
 public interface Constants {
 
 
-
     //    String OS_NAME = System.getProperty("");
 //    String OS_ARCH = System.getProperty("");
 //    String OS_VERSION = System.getProperty("");
@@ -35,6 +34,13 @@ public interface Constants {
     String LOCAL = "LOCAL";
 
     String SERVER = "SERVER";
+
+    String TIME_SPACE = "TIME ";
+
+    String DATE_SPACE = "DATE ";
+
+    String TIMESTAMP_SPACE = "TIMESTAMP ";
+
 
     byte EMPTY_CHAR_BYTE = '\0';
 

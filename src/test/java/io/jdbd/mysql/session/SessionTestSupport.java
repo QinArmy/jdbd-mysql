@@ -3,10 +3,10 @@ package io.jdbd.mysql.session;
 import io.jdbd.Driver;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
+import io.jdbd.mysql.util.MySQLCollections;
+import io.jdbd.result.DataRow;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
-import io.jdbd.session.LocalDatabaseSession;
-import io.jdbd.session.RmDatabaseSession;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +19,8 @@ import org.testng.annotations.DataProvider;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.Map;
 
 public abstract class SessionTestSupport {
 
@@ -30,7 +32,10 @@ public abstract class SessionTestSupport {
 
     @BeforeClass
     public final void beforeClass() {
-        this.sessionFactory = createSessionFactory();
+        if (this.sessionFactory == null) {
+            this.sessionFactory = createSessionFactory();
+        }
+
     }
 
     @AfterClass
@@ -65,9 +70,42 @@ public abstract class SessionTestSupport {
 
     @DataProvider(name = "localSessionProvider", parallel = true)
     public final Object[][] createLocalSession(final ITestNGMethod targetMethod, final ITestContext context) {
-        final LocalDatabaseSession session;
-        session = Mono.from(this.sessionFactory.localSession())
-                .block();
+        return createDatabaseSession(true, targetMethod, context);
+    }
+
+    @DataProvider(name = "rmSessionProvider", parallel = true)
+    public final Object[][] createRmSession(final ITestNGMethod targetMethod, final ITestContext context) {
+        return createDatabaseSession(false, targetMethod, context);
+    }
+
+    /**
+     * @return a unmodified map
+     */
+    protected final Map<String, ?> mapCurrentRowToMap(final DataRow row) {
+        final int columnCount = row.getColumnCount();
+
+        final Map<String, Object> map = MySQLCollections.hashMap((int) (columnCount / 0.75f));
+        for (int i = 0; i < columnCount; i++) {
+            if (row.isNull(i)) {
+                continue;
+            }
+            map.put(row.getColumnLabel(i), row.get(i));
+        }
+        return Collections.unmodifiableMap(map);
+    }
+
+
+    private Object[][] createDatabaseSession(final boolean local, final ITestNGMethod targetMethod,
+                                             final ITestContext context) {
+        final DatabaseSession session;
+        if (local) {
+            session = Mono.from(this.sessionFactory.localSession())
+                    .block();
+        } else {
+            session = Mono.from(this.sessionFactory.rmSession())
+                    .block();
+        }
+
 
         final String methodName, key;
         methodName = targetMethod.getMethodName();
@@ -87,14 +125,6 @@ public abstract class SessionTestSupport {
             result = new Object[][]{{session}};
         }
         return result;
-    }
-
-    @DataProvider(name = "rmSessionProvider", parallel = true)
-    public final Object[][] createRmSession() {
-        final RmDatabaseSession session;
-        session = Mono.from(this.sessionFactory.rmSession())
-                .block();
-        return new Object[][]{{session}};
     }
 
     private static DatabaseSessionFactory createSessionFactory() {

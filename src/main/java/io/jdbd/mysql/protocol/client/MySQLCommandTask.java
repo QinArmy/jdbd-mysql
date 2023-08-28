@@ -39,7 +39,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
     private int sequenceId = 0;
 
-    private int resultIndex;
+    private int resultNo = 0;
 
     private boolean downstreamCanceled;
 
@@ -121,7 +121,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
     @Override
     public final int nextResultNo() {
-        return this.resultIndex++;
+        return ++this.resultNo;
     }
 
 

@@ -571,7 +571,7 @@ final class QueryCommandWriter extends BinaryWriter {
         }
         final Charset clientCharset = this.clientCharset;
 
-        packet.writeBytes("TIME ".getBytes(clientCharset));
+        packet.writeBytes(Constants.TIME_SPACE.getBytes(clientCharset));
         packet.writeByte(Constants.QUOTE);
         packet.writeBytes(value.getBytes(clientCharset));
         packet.writeByte(Constants.QUOTE);
@@ -589,7 +589,7 @@ final class QueryCommandWriter extends BinaryWriter {
 
         final Charset clientCharset = this.clientCharset;
 
-        packet.writeBytes("DATE ".getBytes(clientCharset));
+        packet.writeBytes(Constants.DATE_SPACE.getBytes(clientCharset));
         packet.writeByte(Constants.QUOTE);
         packet.writeBytes(value.getBytes(clientCharset));
         packet.writeByte(Constants.QUOTE);
@@ -611,7 +611,7 @@ final class QueryCommandWriter extends BinaryWriter {
         }
         final Charset clientCharset = this.clientCharset;
 
-        packet.writeBytes("TIMESTAMP ".getBytes(clientCharset));
+        packet.writeBytes(Constants.TIMESTAMP_SPACE.getBytes(clientCharset));
         packet.writeByte(Constants.QUOTE);
         packet.writeBytes(value.getBytes(clientCharset));
         packet.writeByte(Constants.QUOTE);
