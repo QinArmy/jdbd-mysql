@@ -901,18 +901,23 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 capability = this.capability;
 
                 int packetNumber = 0;
-                if (payloadLength > 12) {
+                if (payloadLength >= 12) {
                     cumulateBuffer.skipBytes(2); // skip warning_count
                     if ((capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) == 0
                             || cumulateBuffer.readByte() == RESULTSET_METADATA_FULL) {
                         packetNumber = numColumns + numParams;
                     }
-                } else if ((capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) == 0) {
+                } else {
                     packetNumber = numColumns + numParams;
                 }
 
                 if (packetNumber > 0 && (capability & Capabilities.CLIENT_DEPRECATE_EOF) == 0) {
-                    packetNumber += 2;
+                    if (numParams > 0) {
+                        packetNumber++;
+                    }
+                    if (numColumns > 0) {
+                        packetNumber++;
+                    }
                 }
 
                 cumulateBuffer.readerIndex(payloadIndex + payloadLength); // to next packet,avoid tailor filler.
@@ -964,7 +969,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 cumulateBuffer.readByte(); //5. skip filler
 
                 final boolean hasMeta;
-                if (payloadLength > 12) {
+                if (payloadLength >= 12) {
                     final int warnings = Packets.readInt2AsInt(cumulateBuffer);//6. warning_count
                     if (warnings > 0) {
                         this.warning = JdbdWarning.create(String.format("produce %s warnings", warnings), Collections.emptyMap());
@@ -973,15 +978,15 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     hasMeta = (capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) == 0
                             || cumulateBuffer.readByte() == RESULTSET_METADATA_FULL;
                 } else {
-                    hasMeta = (capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) == 0;
+                    hasMeta = (numParams + numColumns) > 0;
                 }
                 cumulateBuffer.readerIndex(payloadIndex + payloadLength); //avoid tailor filler.
 
+                // below read param and column meta data
+                final boolean readEof = (capability & Capabilities.CLIENT_DEPRECATE_EOF) == 0;
 
-                if (hasMeta) {
-                    // below read param and column meta data
-                    final boolean readEof = (capability & Capabilities.CLIENT_DEPRECATE_EOF) == 0;
-                    final MySQLColumnMeta[] paramMetas = numParams == 0 ? MySQLColumnMeta.EMPTY : new MySQLColumnMeta[numParams];
+                if (numParams > 0 && hasMeta) {
+                    final MySQLColumnMeta[] paramMetas = new MySQLColumnMeta[numParams];
 
                     final Set<Integer> unknownCollationSet;
                     unknownCollationSet = MySQLColumnMeta.readMetas(cumulateBuffer, paramMetas, this);
@@ -992,6 +997,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     if (readEof) {
                         readEofOfMeta(cumulateBuffer, serverStatusConsumer);
                     }
+                } else {
+                    this.paramMetas = MySQLColumnMeta.EMPTY;
+                }
+
+                if (numColumns > 0 && hasMeta) {
                     final MySQLRowMeta resultMeta;
                     this.rowMeta = resultMeta = MySQLRowMeta.readForPrepare(cumulateBuffer, numColumns, this);
                     if (resultMeta.unknownCollationSet.size() > 0 && !containsError(UnrecognizedCollationException.class)) {
@@ -1001,7 +1011,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                         readEofOfMeta(cumulateBuffer, serverStatusConsumer);
                     }
                 } else {
-                    this.paramMetas = MySQLColumnMeta.EMPTY;
                     this.rowMeta = MySQLRowMeta.EMPTY;
                 }
                 taskEnd = handleReadPrepareComplete();

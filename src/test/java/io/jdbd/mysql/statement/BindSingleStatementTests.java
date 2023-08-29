@@ -1,8 +1,11 @@
 package io.jdbd.mysql.statement;
 
 
+import com.alibaba.fastjson2.JSON;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.session.SessionTestSupport;
+import io.jdbd.result.ResultItem;
+import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.result.ServerException;
 import io.jdbd.statement.BindSingleStatement;
@@ -17,6 +20,8 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.time.*;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -62,14 +67,23 @@ public class BindSingleStatementTests extends SessionTestSupport {
      * @see BindSingleStatement#executeUpdate()
      */
     @Test(invocationCount = 2, dataProvider = "callOutParameterProvider")
-    public void executeUpdateCallOutParameter(final BindSingleStatement statement) {
+    public void executeAsFluxCallOutParameter(final BindSingleStatement statement) {
         statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
                 .bind(1, JdbdType.TIMESTAMP, OutParameter.out("outNow"));
 
+        final List<? extends Map<String, ?>> rowList;
 
-        Flux.from(statement.executeAsFlux())
+        rowList = Flux.from(statement.executeAsFlux())
+                .filter(ResultItem::isRowItem)
+                .map(ResultRow.class::cast)
+                .map(this::mapCurrentRowToMap)
                 .collectList()
                 .block();
+
+        Assert.assertNotNull(rowList);
+        Assert.assertEquals(rowList.size(), 1);
+
+        LOG.info("executeAsFluxCallOutParameter out parameter : \n{}", JSON.toJSONString(rowList));
     }
 
 
