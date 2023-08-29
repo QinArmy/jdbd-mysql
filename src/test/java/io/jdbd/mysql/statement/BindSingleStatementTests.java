@@ -4,18 +4,19 @@ package io.jdbd.mysql.statement;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.ResultStates;
-import io.jdbd.session.DatabaseSession;
+import io.jdbd.result.ServerException;
 import io.jdbd.statement.BindSingleStatement;
+import io.jdbd.statement.OutParameter;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.time.*;
-import java.util.function.Function;
 
 
 /**
@@ -37,7 +38,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      * @see BindSingleStatement#executeUpdate()
      */
     @Test(invocationCount = 2, dataProvider = "insertDatProvider")
-    public final void executeUpdateInsert(final BindSingleStatement statement) {
+    public void executeUpdateInsert(final BindSingleStatement statement) {
 
         statement.bind(0, JdbdType.TIME, LocalTime.now())
                 .bind(1, JdbdType.TIME_WITH_TIMEZONE, OffsetTime.now(ZoneOffset.UTC))
@@ -57,6 +58,20 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
     }
 
+    /**
+     * @see BindSingleStatement#executeUpdate()
+     */
+    @Test(invocationCount = 2, dataProvider = "callOutParameterProvider")
+    public void executeUpdateCallOutParameter(final BindSingleStatement statement) {
+        statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
+                .bind(1, JdbdType.TIMESTAMP, OutParameter.out("outNow"));
+
+
+        Flux.from(statement.executeAsFlux())
+                .collectList()
+                .block();
+    }
+
 
     @DataProvider(name = "insertDatProvider", parallel = true)
     public final Object[][] insertDatProvider(final ITestNGMethod targetMethod, final ITestContext context) {
@@ -64,30 +79,35 @@ public class BindSingleStatementTests extends SessionTestSupport {
         sql = "INSERT mysql_types(my_time,my_time1,my_date,my_datetime,my_datetime6,my_text) VALUES( ? , ? , ? , ? , ? , ? )";
 
 
-        final Function<DatabaseSession, BindSingleStatement> function;
-        function = cacheSession -> {
-            final BindSingleStatement statement;
-            if ((targetMethod.getCurrentInvocationCount() & 1) == 0) {
-                statement = Mono.justOrEmpty(cacheSession)
-                        .switchIfEmpty(Mono.from(sessionFactory.localSession()))
-                        .map(session -> session.bindStatement(sql))
-                        .block();
-            } else {
-                statement = Mono.justOrEmpty(cacheSession)
-                        .switchIfEmpty(Mono.from(sessionFactory.localSession()))
-                        .flatMap(session -> Mono.from(session.prepareStatement(sql)))
-                        .block();
-            }
+        final BindSingleStatement statement;
+        statement = createSingleStatement(targetMethod, context, sql);
 
-            Assert.assertNotNull(statement);
+        return new Object[][]{{statement}};
+    }
 
-            return statement;
-        };
+    @DataProvider(name = "callOutParameterProvider", parallel = true)
+    public final Object[][] callOutParameterProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String procedureSql, sql;
+        procedureSql = "CREATE PROCEDURE army_inout_out_now(INOUT inoutNow DATETIME, OUT outNow DATETIME)\n" +
+                "    LANGUAGE SQL\n" +
+                "BEGIN\n" +
+                "    SELECT current_timestamp(3), DATE_ADD(inoutNow, INTERVAL 1 DAY) INTO outNow,inoutNow;\n" +
+                "END";
+
+        sql = "CALL army_inout_out_now( ? , ?)";
 
 
         final BindSingleStatement statement;
-        statement = invokeDataProvider(targetMethod, context, function);
+        statement = createSingleStatement(targetMethod, context, sql);
 
+        Mono.from(statement.getSession().executeUpdate(procedureSql))
+                .onErrorResume(error -> {
+                    if (error instanceof ServerException && error.getMessage().contains("army_inout_out_now")) {
+                        return Mono.empty();
+                    }
+                    return Mono.error(error);
+                })
+                .block();
         return new Object[][]{{statement}};
     }
 

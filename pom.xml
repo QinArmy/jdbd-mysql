@@ -155,6 +155,11 @@
         <!-- r2dbc -->
         <dependency>
             <groupId>io.r2dbc</groupId>
+            <artifactId>r2dbc-spi</artifactId>
+            <version>1.0.0.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>io.r2dbc</groupId>
             <artifactId>r2dbc-postgresql</artifactId>
             <version>0.8.13.RELEASE</version>
             <scope>test</scope>

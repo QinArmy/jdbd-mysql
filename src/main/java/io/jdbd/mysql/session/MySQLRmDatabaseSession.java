@@ -129,7 +129,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         }
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
-        return Flux.from(this.protocol.executeAsFlux(Stmts.multiStmt(builder.toString())))
+        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(builder.toString())))
                 .doOnNext(item -> handleXaStart(item, isolationHolder, xid, flags))
                 .doOnError(e -> CURRENT_TX_OPTION.set(this, null))
                 .then(Mono.just(this));

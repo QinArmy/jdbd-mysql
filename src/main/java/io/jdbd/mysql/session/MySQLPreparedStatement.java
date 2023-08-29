@@ -253,6 +253,38 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
+    public OrderedFlux executeAsFlux() {
+        this.endStmtOption();
+
+        List<ParamValue> paramGroup = this.paramGroup;
+        final int paramSize = paramGroup == null ? 0 : paramGroup.size();
+
+        final RuntimeException error;
+        if (paramGroup == EMPTY_PARAM_GROUP) {
+            error = MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
+        } else if (this.paramGroupList != null) {
+            error = new SubscribeException(ResultType.FLUX, ResultType.BATCH);
+        } else if (paramSize != this.paramCount) {
+            error = MySQLExceptions.parameterCountMatch(0, this.paramCount, paramSize);
+        } else if (paramGroup == null) {
+            error = null;
+            paramGroup = EMPTY_PARAM_GROUP;
+        } else {
+            error = JdbdBinds.sortAndCheckParamGroup(0, paramGroup);
+        }
+
+        final OrderedFlux flux;
+        if (error == null) {
+            flux = this.stmtTask.executeAsFlux(Stmts.paramStmt(this.sql, paramGroup, this));
+        } else {
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            flux = MultiResults.fluxError(MySQLExceptions.wrap(error));
+        }
+        clearStatementToAvoidReuse();
+        return flux;
+    }
+
+    @Override
     public BatchQuery executeBatchQuery() {
         this.endStmtOption();
 

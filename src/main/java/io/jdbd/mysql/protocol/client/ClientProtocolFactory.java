@@ -324,7 +324,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                     .append(utcEpochSecond)
                     .append("),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@GLOBAL.local_infile localInfile");
 
-            return Flux.from(ComQueryTask.executeAsFlux(Stmts.multiStmt(builder.toString()), this.adjutant))
+            return Flux.from(ComQueryTask.staticMultiStmt(Stmts.multiStmt(builder.toString()), this.adjutant))
                     .filter(ResultItem::isRowItem)
                     .last()
                     .map(ResultRow.class::cast)

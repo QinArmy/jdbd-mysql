@@ -384,7 +384,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         cancelled = task.isCancelled();
 
         outerLoop:
-        for (int payloadLength, packetIndex, writerIndex = 0, limitIndex; Packets.hasOnePacket(cumulateBuffer); ) {
+        for (int payloadLength, packetIndex, writerIndex = 0, limitIndex, i = 0; Packets.hasOnePacket(cumulateBuffer); i++) {
             packetIndex = cumulateBuffer.readerIndex();
             payloadLength = Packets.readInt3(cumulateBuffer);
 
@@ -424,6 +424,10 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 break outerLoop;
                 default: //no-op
 
+            }
+
+            if (!cancelled && ((i & 31) == 0) && this.task.isCancelled()) {
+                cancelled = true;
             }
 
             if (cancelled) {

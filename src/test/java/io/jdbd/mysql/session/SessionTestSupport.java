@@ -1,7 +1,6 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.Driver;
-import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.mysql.util.MySQLCollections;
@@ -13,6 +12,7 @@ import io.jdbd.statement.Statement;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.annotations.AfterMethod;
@@ -24,7 +24,6 @@ import reactor.core.publisher.Mono;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
-import java.util.function.Function;
 
 public abstract class SessionTestSupport {
 
@@ -108,40 +107,39 @@ public abstract class SessionTestSupport {
         return Collections.unmodifiableMap(map);
     }
 
-    /**
-     * @return get cache for data provider.
-     */
-    @Nullable
-    protected final BindSingleStatement invokeDataProvider(final ITestNGMethod targetMethod, final ITestContext context,
-                                                           final Function<DatabaseSession, BindSingleStatement> func) {
+
+    protected final BindSingleStatement createSingleStatement(final ITestNGMethod targetMethod, final ITestContext context,
+                                                              final String sql) {
         Object temp;
         final String keyOfSession;
         keyOfSession = keyNameOfSession(targetMethod);
 
         temp = context.getAttribute(keyOfSession);
 
-        final DatabaseSession cacheSession;
+        final DatabaseSession session;
         if (temp instanceof TestSessionHolder) {
-            cacheSession = ((TestSessionHolder) temp).session;
+            session = ((TestSessionHolder) temp).session;
         } else {
-            cacheSession = null;
+            session = Mono.from(sessionFactory.localSession())
+                    .block();
+            Assert.assertNotNull(session);
         }
 
-        final BindSingleStatement statement;
-        statement = func.apply(cacheSession);
-
         final int currentInvocationCount = targetMethod.getCurrentInvocationCount();
+
+        final BindSingleStatement statement;
+        if ((currentInvocationCount & 1) == 0) {
+            statement = session.bindStatement(sql);
+        } else {
+            statement = Mono.from(session.prepareStatement(sql))
+                    .block();
+            Assert.assertNotNull(session);
+        }
 
         final boolean closeSession;
         closeSession = currentInvocationCount + 1 == targetMethod.getInvocationCount();
 
-        final TestSessionHolder sessionHolder;
-        if (cacheSession == null) {
-            sessionHolder = new TestSessionHolder(statement.getSession(), closeSession);
-        } else {
-            sessionHolder = new TestSessionHolder(cacheSession, closeSession);
-        }
-        context.setAttribute(keyOfSession, sessionHolder);
+        context.setAttribute(keyOfSession, new TestSessionHolder(session, closeSession));
         return statement;
     }
 

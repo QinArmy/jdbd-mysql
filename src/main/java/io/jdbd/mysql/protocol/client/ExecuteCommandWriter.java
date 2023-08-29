@@ -5,6 +5,8 @@ import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.statement.OutParameter;
+import io.jdbd.statement.Parameter;
 import io.jdbd.type.LongParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
@@ -235,11 +237,13 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
             MySQLType type;
             ParamValue paramValue;
+            Object value;
             //1. make nullBitsMap and fill  parameter_types
             final int anonymousParamCount = paramMetaArray.length;
             for (int i = 0; i < anonymousParamCount; i++) {
                 paramValue = paramGroup.get(i);
-                if (paramValue.get() == null) {
+                value = paramValue.get();
+                if (value == null || value instanceof OutParameter) {
                     nullBitsMap[i >> 3] |= (1 << (i & 7));
                 }
                 type = decideActualType(paramValue);
@@ -257,13 +261,13 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             // write nullBitsMap
             Packets.writeBytesAtIndex(packet, nullBitsMap, nullBitsMapIndex);
 
-            Object value;
+
             // write parameter value
             if (anonymousParamCount > 0) {
                 for (int i = 0; i < anonymousParamCount; i++) {
                     paramValue = paramGroup.get(i);
                     value = paramValue.get();
-                    if (value == null || value instanceof LongParameter) {
+                    if (value == null || value instanceof Parameter) {
                         continue;
                     }
                     writeBinary(packet, batchIndex, paramValue, paramMetaArray[i].getScale());

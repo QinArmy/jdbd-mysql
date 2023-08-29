@@ -97,6 +97,24 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     /**
      * <p>
+     * This method is one of underlying api of {@link BindSingleStatement#executeAsFlux()}.
+     * </p>
+     *
+     * @see io.jdbd.mysql.protocol.MySQLProtocol#paramAsFlux(ParamStmt, boolean)
+     */
+    static OrderedFlux asFlux(final ParamStmt stmt, final TaskAdjutant adjutant) {
+        return MultiResults.asFlux(sink -> {
+            try {
+                ComPreparedTask task = new ComPreparedTask(stmt, sink, adjutant);
+                task.submit(sink::error);
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrapIfNonJvmFatal(e));
+            }
+        });
+    }
+
+    /**
+     * <p>
      * This method is one of underlying api of {@link BindStatement#executeBatchUpdate()} method.
      * </p>
      *
@@ -322,6 +340,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         return MultiResults.batchQuery(this.adjutant, sink -> executeAfterBinding(sink, stmt));
     }
 
+    @Override
+    public OrderedFlux executeAsFlux(ParamStmt stmt) {
+        return MultiResults.asFlux(sink -> executeAfterBinding(sink, stmt));
+    }
+
     /**
      * @see PrepareTask#executeBatchAsMulti(ParamBatchStmt)
      */
@@ -500,12 +523,16 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 case READ_EXECUTE_RESPONSE: {
                     // maybe modify this.phase
                     taskEnd = readExecuteResponse(cumulateBuffer, serverStatusConsumer);
-                    continueDecode = false;
+                    continueDecode = !taskEnd
+                            && this.taskPhase == TaskPhase.READ_EXECUTE_RESPONSE
+                            && Packets.hasOnePacket(cumulateBuffer);
                 }
                 break;
                 case READ_RESULT_SET: {
                     taskEnd = readResultSet(cumulateBuffer, serverStatusConsumer);
-                    continueDecode = false;
+                    continueDecode = !taskEnd
+                            && this.taskPhase == TaskPhase.READ_EXECUTE_RESPONSE
+                            && Packets.hasOnePacket(cumulateBuffer);
                 }
                 break;
                 case READ_RESET_RESPONSE: {

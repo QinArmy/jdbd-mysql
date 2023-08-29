@@ -53,6 +53,7 @@ final class ClientProtocol implements MySQLProtocol {
         return ComQueryTask.query(stmt, function, consumer, this.adjutant);
     }
 
+
     @Override
     public Flux<ResultStates> batchUpdate(StaticBatchStmt stmt) {
         return ComQueryTask.batchUpdate(stmt, this.adjutant);
@@ -74,8 +75,8 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public OrderedFlux executeAsFlux(final StaticMultiStmt stmt) {
-        return ComQueryTask.executeAsFlux(stmt, this.adjutant);
+    public OrderedFlux staticMultiStmtAsFlux(StaticMultiStmt stmt) {
+        return ComQueryTask.staticMultiStmt(stmt, this.adjutant);
     }
 
     @Override
@@ -101,6 +102,16 @@ final class ClientProtocol implements MySQLProtocol {
         return flux;
     }
 
+    @Override
+    public OrderedFlux paramAsFlux(ParamStmt stmt, boolean usePrepare) {
+        final OrderedFlux flux;
+        if (usePrepare) {
+            flux = ComPreparedTask.asFlux(stmt, this.adjutant);
+        } else {
+            flux = ComQueryTask.paramAsFlux(stmt, this.adjutant);
+        }
+        return flux;
+    }
 
     @Override
     public Flux<ResultStates> paramBatchUpdate(ParamBatchStmt stmt, boolean usePrepare) {

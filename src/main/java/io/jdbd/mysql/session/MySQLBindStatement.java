@@ -224,6 +224,32 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         return flux;
     }
 
+    @Override
+    public OrderedFlux executeAsFlux() {
+        this.endStmtOption();
+
+        final List<ParamValue> paramGroup = this.paramGroup;
+        final RuntimeException error;
+        if (paramGroup == EMPTY_PARAM_GROUP) {
+            error = MySQLExceptions.cannotReuseStatement(BindStatement.class);
+        } else if (this.paramGroupList != null) {
+            error = new SubscribeException(ResultType.MULTI_RESULT, ResultType.BATCH_UPDATE);
+        } else if (paramGroup == null) {
+            error = null;
+        } else {
+            error = JdbdBinds.sortAndCheckParamGroup(0, paramGroup);
+        }
+        final OrderedFlux flux;
+        if (error == null) {
+            final ParamStmt stmt;
+            stmt = Stmts.paramStmt(this.sql, paramGroup, this);
+            flux = this.session.protocol.paramAsFlux(stmt, isUsePrepare());
+        } else {
+            flux = MultiResults.fluxError(MySQLExceptions.wrap(error));
+        }
+        clearStatementToAvoidReuse();
+        return flux;
+    }
 
     @Override
     public Publisher<ResultStates> executeBatchUpdate() {

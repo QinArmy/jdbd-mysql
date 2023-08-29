@@ -110,14 +110,14 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
 
     @Override
-    public OrderedFlux executeAsFlux(final String multiStmt) {
+    public OrderedFlux executeMultiStmt(final String multiStmt) {
         this.endStmtOption();
 
         final OrderedFlux flux;
         if (!this.session.protocol.supportMultiStmt()) {
             flux = MultiResults.fluxError(MySQLExceptions.dontSupportMultiStmt());
         } else if (MySQLStrings.hasText(multiStmt)) {
-            flux = this.session.protocol.executeAsFlux(Stmts.multiStmt(multiStmt, this));
+            flux = this.session.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(multiStmt, this));
         } else {
             flux = MultiResults.fluxError(MySQLExceptions.sqlIsEmpty());
         }

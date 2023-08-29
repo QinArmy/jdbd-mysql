@@ -277,7 +277,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
         String multiSql = "CALL my_random_update_one() ; SELECT t.* FROM mysql_types AS t LIMIT 20";
 
         final List<ResultStates> statesList;
-        statesList = Flux.from(session.executeAsFlux(multiSql))
+        statesList = Flux.from(session.executeMultiStmt(multiSql))
                 .filter(ResultItem::isStatesItem)
                 .map(ResultStates.class::cast)
                 .collectList()

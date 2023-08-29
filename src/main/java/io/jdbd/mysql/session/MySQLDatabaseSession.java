@@ -137,13 +137,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
     @Override
-    public final OrderedFlux executeAsFlux(final String multiStmt) {
+    public final OrderedFlux executeMultiStmt(final String multiStmt) {
         if (!MySQLStrings.hasText(multiStmt)) {
             return MultiResults.fluxError(MySQLExceptions.sqlIsEmpty());
         }
-        return this.protocol.executeAsFlux(Stmts.multiStmtWithSession(multiStmt, this));
+        return this.protocol.staticMultiStmtAsFlux(Stmts.multiStmtWithSession(multiStmt, this));
     }
-
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/set-transaction.html">SET TRANSACTION Statement</a>
@@ -186,7 +185,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
             builder.append("SELECT @@session.tx_isolation AS txLevel")
                     .append(",@@session.tx_read_only AS txReadOnly");
         }
-        return Flux.from(this.protocol.executeAsFlux(Stmts.multiStmt(builder.toString())))
+        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(builder.toString())))
                 .filter(ResultItem::isRowOrStatesItem)
                 .collectList()
                 .flatMap(this::mapTransactionStatus);

@@ -5,10 +5,7 @@ import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
-import io.jdbd.statement.BindStatement;
-import io.jdbd.statement.MultiStatement;
-import io.jdbd.statement.StaticStatement;
-import io.jdbd.statement.StaticStatementSpec;
+import io.jdbd.statement.*;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.result.ResultSink;
 import io.jdbd.vendor.stmt.*;
@@ -105,6 +102,7 @@ final class ComQueryTask extends MySQLCommandTask {
         });
     }
 
+
     /**
      * <p>
      * This method is underlying api of {@link StaticStatement#executeBatchUpdate(List)} method.
@@ -188,7 +186,7 @@ final class ComQueryTask extends MySQLCommandTask {
      * This method is underlying api of {@link StaticStatement#executeAsFlux(String)} method.
      * </p>
      */
-    static OrderedFlux executeAsFlux(StaticMultiStmt stmt, TaskAdjutant adjutant) {
+    static OrderedFlux staticMultiStmt(final StaticMultiStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.asFlux(sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
@@ -238,6 +236,24 @@ final class ComQueryTask extends MySQLCommandTask {
                                   final Consumer<ResultStates> consumer,
                                   final TaskAdjutant adjutant) {
         return MultiResults.query(function, consumer, sink -> {
+            try {
+                ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
+                task.submit(sink::error);
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrapIfNonJvmFatal(e));
+            }
+        });
+    }
+
+    /**
+     * <p>
+     * This method is one of underlying api of {@link BindSingleStatement#executeAsFlux()}.
+     * </p>
+     *
+     * @see io.jdbd.mysql.protocol.MySQLProtocol#paramAsFlux(ParamStmt, boolean)
+     */
+    static OrderedFlux paramAsFlux(final ParamStmt stmt, final TaskAdjutant adjutant) {
+        return MultiResults.asFlux(sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
                 task.submit(sink::error);
