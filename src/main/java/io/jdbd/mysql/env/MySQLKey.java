@@ -10,8 +10,8 @@ import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.env.Key;
 import io.jdbd.vendor.env.Redefine;
 import reactor.netty.resources.ConnectionProvider;
-import reactor.netty.tcp.TcpResources;
 
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -241,10 +241,13 @@ public final class MySQLKey<T> extends Key<T> {
      * <p>
      * The Supplier func reference , for example :
      *     <ul>
-     *         <li>reactor.netty.tcp.TcpResources::get , see {@link TcpResources#get()}</li>
      *         <li>reactor.netty.resources.ConnectionProvider::newConnection , see  {@link ConnectionProvider#newConnection()}</li>
      *     </ul>
      *     The default default is {@link ConnectionProvider#newConnection()} , see {@link io.jdbd.vendor.env.Environment#get(Key, Supplier)} .
+     * </p>
+     * <p>
+     *     <strong>NOTE</strong> : if {@link ConnectionProvider} is pool ,then netty possibly throw {@link ClosedChannelException} when open new session.
+     *     so {@link ConnectionProvider} should(not must) return new connection not pool connection.
      * </p>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketFactory</a>

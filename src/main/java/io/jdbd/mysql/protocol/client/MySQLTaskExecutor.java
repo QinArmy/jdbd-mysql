@@ -261,7 +261,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
                 // before reset .
                 return MySQLTimes.systemZoneOffset();
             }
-            return server.connZone();
+            return server.serverZone();
         }
 
         @Override

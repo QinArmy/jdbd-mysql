@@ -565,6 +565,9 @@ final class QueryCommandWriter extends BinaryWriter {
         final String value;
         if (nonNull instanceof Duration) {
             value = MySQLTimes.durationToTimeText((Duration) nonNull);
+        } else if (nonNull instanceof OffsetTime) {
+            value = ((OffsetTime) nonNull).withOffsetSameInstant(this.serverZone)
+                    .toLocalTime().format(MySQLTimes.TIME_FORMATTER_6);
         } else {
             value = MySQLBinds.bindToLocalTime(batchIndex, bindValue)
                     .format(MySQLTimes.TIME_FORMATTER_6);

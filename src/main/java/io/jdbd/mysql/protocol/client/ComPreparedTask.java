@@ -224,7 +224,9 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     private Warning warning;
 
-    private TaskPhase phase = TaskPhase.PREPARED;
+    private TaskPhase taskPhase;
+
+    private BindPhase bindPhase = BindPhase.NONE;
 
     private MySQLColumnMeta[] paramMetas;
 
@@ -247,6 +249,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         assert (this.capability & Capabilities.CLIENT_OPTIONAL_RESULTSET_METADATA) == 0; // currently, dont' support cache.
 
         this.stmt = stmt;
+        this.taskPhase = TaskPhase.PREPARED;
         this.commandWriter = ExecuteCommandWriter.create(this);
     }
 
@@ -410,37 +413,86 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     @Override
     protected Publisher<ByteBuf> start() {
         Publisher<ByteBuf> publisher;
-        try {
-            publisher = createPreparePacket();
-            this.phase = TaskPhase.READ_PREPARE_RESPONSE;
+        switch (this.taskPhase) {
+            case PREPARED: {
+                try {
+                    publisher = createPreparePacket();
+                    this.taskPhase = TaskPhase.READ_PREPARE_RESPONSE;
 
-            if (LOG.isTraceEnabled()) {
-                LOG.trace(" {} prepare with stmt[{}]", this, this.stmt.getClass().getSimpleName());
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace(" {} prepare with stmt[{}]", this, this.stmt.getClass().getSimpleName());
+                    }
+                } catch (Throwable e) {
+                    publisher = null;
+                    this.taskPhase = TaskPhase.ERROR_ON_START;
+                    addError(e);
+                }
             }
-        } catch (Throwable e) {
-            publisher = null;
-            this.phase = TaskPhase.ERROR_ON_START;
-            addError(e);
-        }
+            break;
+            case RESUME: {
+                publisher = this.packetPublisher;
+                switch (this.bindPhase) {
+                    case BIND_COMPLETE: {
+                        if (publisher == null) {
+                            // no bug,never here
+                            this.taskPhase = TaskPhase.ERROR_ON_START;
+                            addError(new IllegalStateException("resume for executing,but packetPublisher is null"));
+                        } else {
+                            this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
+                        }
+                    }
+                    break;
+                    case ERROR_ON_BIND:
+                    case ABANDON_BIND: {
+                        // here , close statement
+                        LOG.debug("resume for closing statement {}", this.statementId);
+                        if (publisher != null) {
+                            addError(new IllegalStateException("resume for closing statement,but packetPublisher is non-null"));
+                        }
+                        this.taskPhase = TaskPhase.END;
+                    }
+                    break;
+                    default: { // no bug,never here
+                        publisher = null;
+                        this.taskPhase = TaskPhase.ERROR_ON_START;
+                        addError(MySQLExceptions.unexpectedEnum(this.bindPhase));
+                    }
+                } //inner switch
+            }
+            break;
+            case NONE: // use cache
+            default: {
+                // no bug,never here
+                publisher = null;
+                addError(MySQLExceptions.unexpectedEnum(this.taskPhase));
+                this.taskPhase = TaskPhase.ERROR_ON_START;
+            }
+
+        } // outer switch
+
+        this.packetPublisher = null;
         return publisher;
     }
 
 
     @Override
     protected boolean decode(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatusConsumer) {
-        if (this.phase == TaskPhase.ERROR_ON_START) {
+        if (this.taskPhase == TaskPhase.ERROR_ON_START) {
             publishError(this.sink::error);
             return true;
         }
-        boolean taskEnd = false, continueDecode = Packets.hasOnePacket(cumulateBuffer);
+        boolean taskEnd = this.taskPhase == TaskPhase.END, continueDecode = Packets.hasOnePacket(cumulateBuffer);
         while (continueDecode) {
-            switch (this.phase) {
+            switch (this.taskPhase) {
                 case READ_PREPARE_RESPONSE: {
                     if (canReadPrepareResponse(cumulateBuffer)) {
                         // possibly PreparedStatement bind occur error
-                        taskEnd = readPrepareResponse(cumulateBuffer, serverStatusConsumer)
-                                || this.phase == TaskPhase.ERROR_ON_BINDING
-                                || this.phase == TaskPhase.ABANDON_BINDING;
+                        taskEnd = readPrepareResponse(cumulateBuffer, serverStatusConsumer);
+                    }
+                    if (this.taskPhase == TaskPhase.SUSPEND) {
+                        assert this.packetPublisher == null;
+                        assert this.bindPhase == BindPhase.WAIT_BIND;
+                        taskEnd = true;
                     }
                     continueDecode = false;
                 }
@@ -460,7 +512,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     if (readResetResponse(cumulateBuffer, serverStatusConsumer)) {
                         taskEnd = true;
                     } else {
-                        this.phase = TaskPhase.EXECUTE;
+                        this.taskPhase = TaskPhase.EXECUTE;
                         taskEnd = executeNextGroup(); // execute command
                     }
                     continueDecode = false;
@@ -471,25 +523,37 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                         taskEnd = true;
                         continueDecode = false;
                     } else {
-                        this.phase = TaskPhase.READ_RESULT_SET;
+                        this.taskPhase = TaskPhase.READ_RESULT_SET;
                         continueDecode = Packets.hasOnePacket(cumulateBuffer);
                     }
                 }
                 break;
+                case END: // resume for closing statement
+                    taskEnd = true;
+                    break;
                 default:
-                    throw MySQLExceptions.unexpectedEnum(this.phase);
+                    throw MySQLExceptions.unexpectedEnum(this.taskPhase);
             }
         }
-        if (taskEnd) {
-            if (this.phase != TaskPhase.READ_PREPARE_RESPONSE) {
-                this.phase = TaskPhase.END;
-                this.packetPublisher = Mono.just(createCloseStatementPacket());
-            }
-            if (hasError()) {
-                publishError(this.sink::error);
-            } else {
-                this.sink.complete();
-            }
+        if (taskEnd && this.taskPhase != TaskPhase.SUSPEND) {
+            this.taskPhase = TaskPhase.END;
+            switch (this.bindPhase) {
+                case ABANDON_BIND:
+                case ERROR_ON_BIND:
+                case WAIT_BIND:
+                    // no-op, here no downstream
+                    break;
+                default: {
+                    if (hasError()) {
+                        publishError(this.sink::error);
+                    } else {
+                        this.sink.complete();
+                    }
+                }
+            } // switch
+
+            closeStatementIfNeed();
+            deleteBigColumnFileIfNeed();
         }
         return taskEnd;
     }
@@ -498,7 +562,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     @Override
     protected Action onError(Throwable e) {
         final Action action;
-        switch (this.phase) {
+        switch (this.taskPhase) {
             case PREPARED:
                 action = Action.TASK_END;
                 break;
@@ -517,7 +581,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     protected void onChannelClose() {
-        if (this.phase != TaskPhase.END) {
+        if (this.taskPhase != TaskPhase.END) {
             this.sink.error(new SessionCloseException("Database session unexpected close."));
         }
     }
@@ -532,7 +596,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     void handleReadResultSetEnd() {
-        this.phase = TaskPhase.READ_EXECUTE_RESPONSE;
+        this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
     }
 
     @Override
@@ -547,7 +611,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         if (stmt instanceof ParamBatchStmt) {
             moreGroup = this.batchIndex < ((ParamBatchStmt) stmt).getGroupList().size();
             if (moreGroup) {
-                this.phase = TaskPhase.EXECUTE;
+                this.taskPhase = TaskPhase.EXECUTE;
             }
         } else {
             moreGroup = false;
@@ -565,7 +629,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
         if (this.nextGroupNeedReset) {
             this.packetPublisher = Mono.just(createResetPacket());
-            this.phase = TaskPhase.READ_RESET_RESPONSE;
+            this.taskPhase = TaskPhase.READ_RESET_RESPONSE;
             return false;
         }
 
@@ -589,7 +653,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         boolean taskEnd = false;
         try {
             this.packetPublisher = this.commandWriter.writeCommand(batchIndex);
-            this.phase = TaskPhase.READ_EXECUTE_RESPONSE;
+            this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
         } catch (Throwable e) {
             taskEnd = true;
             addError(e);
@@ -654,7 +718,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     /**
      * @see #executeUpdate(ParamStmt)
-     * @see #executeQuery(ParamStmt, Function)
+     * @see #executeQuery(ParamStmt, Function, Consumer)
      * @see #executeBatchUpdate(ParamBatchStmt)
      * @see #executeBatchAsMulti(ParamBatchStmt)
      * @see #executeBatchAsFlux(ParamBatchStmt)
@@ -671,39 +735,49 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see #executeAfterBinding(ResultSink, ParamSingleStmt)
      */
     private void executeAfterBindingInEventLoop(final ResultSink sink, final ParamSingleStmt stmt) {
-        switch (this.phase) {
-            case WAIT_FOR_BINDING: {
+        switch (this.bindPhase) {
+            case WAIT_BIND: {
                 try {
                     ((MySQLPrepareStmt) this.stmt).setStmt(stmt);
                     ((PrepareSink) this.sink).setSink(sink);
-                    this.phase = TaskPhase.EXECUTE;
+                    this.bindPhase = BindPhase.BIND_COMPLETE;
+
+                    final TaskPhase oldTaskPhase = this.taskPhase;
+
+                    this.taskPhase = TaskPhase.EXECUTE;
                     if (executeNextGroup()) {
-                        endTaskForErrorOnWaitForBinding();
+                        this.taskPhase = TaskPhase.END;
+                        publishError(sink::error);
+                    } else if (oldTaskPhase == TaskPhase.SUSPEND) {
+                        this.taskPhase = TaskPhase.RESUME;
+                        this.resume(sink::error);
                     } else {
-                        this.phase = TaskPhase.READ_EXECUTE_RESPONSE;
+                        this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
                     }
                 } catch (Throwable e) {
                     // here bug
-                    this.phase = TaskPhase.ERROR_ON_BINDING;
-                    endTaskForErrorOnWaitForBinding();
+                    this.bindPhase = BindPhase.ERROR_ON_BIND;
+                    this.taskPhase = TaskPhase.END;
+                    addError(e);
                     sink.error(e);
                 }
             }
             break;
-            case END: {
+            case ABANDON_BIND:
+            case ERROR_ON_BIND:
+            case BIND_COMPLETE: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("{} have ended,but reuse {}", this, PreparedStatement.class.getName());
                 }
                 sink.error(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
             break;
-            default: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("{} is executing,but reuse {}", this, PreparedStatement.class.getName());
-                }
-                sink.error(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
-            }
-        }
+            default:
+                // no bug,never here
+                sink.error(MySQLExceptions.unexpectedEnum(this.bindPhase));
+
+
+        }/// switch
 
     }
 
@@ -712,33 +786,31 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      */
     private void abandonBindInEventLoop() {
         // error can't be emitted to sink ,because not actual sink now.
-        switch (this.phase) {
-            case WAIT_FOR_BINDING: {
-                this.phase = TaskPhase.ABANDON_BINDING;
-                endTaskForErrorOnWaitForBinding();
+        switch (this.bindPhase) {
+            case WAIT_BIND: {
+                this.bindPhase = BindPhase.ABANDON_BIND;
+                if (this.taskPhase == TaskPhase.SUSPEND && isNeedCloseStatement()) {
+                    this.taskPhase = TaskPhase.RESUME;
+                    this.resume(this::addError); // here, no downstream
+
+                } else {
+                    this.taskPhase = TaskPhase.END;
+                }
             }
             break;
-            case END: {
+            case ABANDON_BIND:
+            case ERROR_ON_BIND:
+            case BIND_COMPLETE: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("{} have ended,but reuse {}", this, PreparedStatement.class.getName());
                 }
                 addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
             break;
-            case ERROR_ON_BINDING:
-            case ABANDON_BINDING: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("this.phase is {},but reuse {}", this.phase, PreparedStatement.class.getName());
-                }
-                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
-            }
-            break;
-            default: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("{} is executing,but reuse {}", this, PreparedStatement.class.getName());
-                }
-                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
-            }
+            default:
+                // no bug,never here
+                throw MySQLExceptions.unexpectedEnum(this.bindPhase);
+
         } // switch
     }
 
@@ -747,44 +819,31 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      */
     private void closeOnBindErrorInEventLoop(final Throwable error) {
         // error can't be emitted to sink ,because not actual sink now.
-        switch (this.phase) {
-            case WAIT_FOR_BINDING: {
-                this.phase = TaskPhase.ERROR_ON_BINDING;
-                endTaskForErrorOnWaitForBinding();
-            }
-            break;
-            case END: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("{} have ended,but reuse {}", this, PreparedStatement.class.getName(), error);
+        switch (this.bindPhase) {
+            case WAIT_BIND: {
+                this.bindPhase = BindPhase.ERROR_ON_BIND;
+                LOG.debug("bind occur error ", error);
+                if (this.taskPhase == TaskPhase.SUSPEND && this.isNeedCloseStatement()) {
+                    this.taskPhase = TaskPhase.RESUME;
+                    this.resume(this::addError); // here, no downstream
+                } else {
+                    this.taskPhase = TaskPhase.END;
                 }
             }
             break;
-            case ERROR_ON_BINDING:
-            case ABANDON_BINDING: {
+            case ABANDON_BIND:
+            case ERROR_ON_BIND:
+            case BIND_COMPLETE: {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("this.phase is {},but reuse {}", this.phase, PreparedStatement.class.getName(), error);
+                    LOG.debug("{} have ended,but reuse {}", this, PreparedStatement.class.getName());
                 }
+                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
             break;
-            default: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("{} is executing,but reuse {}", this, PreparedStatement.class.getName(), error);
-                }
-            }
+            default:
+                // no bug,never here
+                throw MySQLExceptions.unexpectedEnum(this.bindPhase);
         } // switch
-
-    }
-
-    /**
-     * @see #closeOnBindErrorInEventLoop(Throwable)
-     */
-    private void endTaskForErrorOnWaitForBinding() {
-        if (!this.inDecodeMethod()) {
-            this.packetPublisher = Mono.just(createCloseStatementPacket());
-            this.sendPacketSignal(true)
-                    .doOnSuccess(v -> this.phase = TaskPhase.END)
-                    .subscribe();
-        }
 
     }
 
@@ -853,7 +912,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response">COM_STMT_PREPARE Response</a>
      */
     private boolean readPrepareResponse(final ByteBuf cumulateBuffer, final Consumer<Object> serverStatusConsumer) {
-        assertPhase(TaskPhase.READ_PREPARE_RESPONSE);
 
         final int headFlag = Packets.getHeaderFlag(cumulateBuffer);
         final boolean taskEnd;
@@ -939,29 +997,57 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     /**
      * <p>
-     * this method will update {@link #phase}.
+     * this method will update {@link #taskPhase}.
      * </p>
      *
      * @return true : task end.
      * @see #readPrepareResponse(ByteBuf, Consumer)
      */
     private boolean handleReadPrepareComplete() {
-        assertPhase(TaskPhase.READ_PREPARE_RESPONSE);
         if (this.paramMetas == null) {
             throw new IllegalStateException("this.paramMetas is null.");
         }
         final ParamSingleStmt stmt = this.stmt;
         final boolean taskEnd;
         if (stmt instanceof PrepareStmt) {
-            final PrepareSink sink = (PrepareSink) this.sink;
-            this.phase = TaskPhase.WAIT_FOR_BINDING; // first modify phase to WAIT_FOR_BINDING
-            sink.statementSink.success(this);
-            taskEnd = false;
+            this.bindPhase = BindPhase.WAIT_BIND; // first modify phase to WAIT_FOR_BINDING
+            ((PrepareSink) this.sink).statementSink.success(this);
+
+            switch (this.bindPhase) {
+                case BIND_COMPLETE:
+                    taskEnd = false;
+                    break;
+                case WAIT_BIND:
+                    taskEnd = true;
+                    this.taskPhase = TaskPhase.SUSPEND;
+                    break;
+                case ABANDON_BIND:
+                case ERROR_ON_BIND:
+                    taskEnd = true;
+                    break;
+                default:
+                    // no bug,never here
+                    throw MySQLExceptions.unexpectedEnum(this.bindPhase);
+            }
+
         } else {
-            this.phase = TaskPhase.EXECUTE;
+            this.taskPhase = TaskPhase.EXECUTE;
             taskEnd = executeNextGroup();
         }
         return taskEnd;
+    }
+
+
+    /**
+     * @see #decode(ByteBuf, Consumer)
+     */
+    private void closeStatementIfNeed() {
+        LOG.debug("close statement id {}", this.statementId);
+        this.packetPublisher = Mono.just(createCloseStatementPacket());
+    }
+
+    private boolean isNeedCloseStatement() {
+        return true;
     }
 
 
@@ -984,7 +1070,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     /**
      * <p>
-     * modify {@link #phase}
+     * modify {@link #taskPhase}
      * </p>
      *
      * @return true: task end.
@@ -1011,7 +1097,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
             }
             break;
             default: {
-                this.phase = TaskPhase.READ_RESULT_SET;
+                this.taskPhase = TaskPhase.READ_RESULT_SET;
                 taskEnd = readResultSet(cumulateBuffer, serverStatusConsumer);
             }
         }
@@ -1091,7 +1177,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
 
     private void assertPhase(TaskPhase expectedPhase) {
-        if (this.phase != expectedPhase) {
+        if (this.taskPhase != expectedPhase) {
             throw new IllegalStateException(String.format("this.phase isn't %s.", expectedPhase));
         }
     }
@@ -1249,7 +1335,20 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         ERROR_ON_BINDING,
         ABANDON_BINDING,
 
+        SUSPEND,
+
+        RESUME,
+
         END
+    }
+
+    private enum BindPhase {
+        NONE,
+        WAIT_BIND,
+        ERROR_ON_BIND,
+        ABANDON_BIND,
+        BIND_COMPLETE
+
     }
 
 

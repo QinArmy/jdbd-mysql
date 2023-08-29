@@ -5,7 +5,6 @@ import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.statement.ValueParameter;
 import io.jdbd.type.LongParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
@@ -223,17 +222,16 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             final int paramCount;
             if (supportQueryAttr && queryAttrSize > 0) { //see createExecutePacket(), when only queryAttrSize > 0 PARAMETER_COUNT_AVAILABLE
                 paramCount = paramMetaArray.length + queryAttrSize;
-                Packets.writeIntLenEnc(packet, paramCount); // parameter_count
             } else {
                 paramCount = paramMetaArray.length;
             }
+            Packets.writeIntLenEnc(packet, paramCount); // parameter_count
 
             final byte[] nullBitsMap = new byte[(paramCount + 7) >> 3];
             final int nullBitsMapIndex = packet.writerIndex();
             packet.writeZero(nullBitsMap.length); // placeholder for fill null_bitmap
             packet.writeByte(1); //fill new_params_bind_flag
 
-            final boolean supportZoneOffset = this.supportZoneOffset;
 
             MySQLType type;
             ParamValue paramValue;
@@ -259,14 +257,29 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             // write nullBitsMap
             Packets.writeBytesAtIndex(packet, nullBitsMap, nullBitsMapIndex);
 
+            Object value;
             // write parameter value
             if (anonymousParamCount > 0) {
-                writeParamValue(packet, batchIndex, paramMetaArray, paramGroup);
+                for (int i = 0; i < anonymousParamCount; i++) {
+                    paramValue = paramGroup.get(i);
+                    value = paramValue.get();
+                    if (value == null || value instanceof LongParameter) {
+                        continue;
+                    }
+                    writeBinary(packet, batchIndex, paramValue, paramMetaArray[i].getScale());
+                }
             }
 
             //  write query attribute
             if (supportQueryAttr && queryAttrSize > 0) {
-                writeParamValue(packet, batchIndex, paramMetaArray, queryAttrList);
+                NamedValue namedValue;
+                for (int i = 0; i < queryAttrSize; i++) {
+                    namedValue = queryAttrList.get(i);
+                    if (namedValue.get() == null) {
+                        continue;
+                    }
+                    writeBinary(packet, batchIndex, namedValue, paramMetaArray[i].getScale());
+                }
             }
 
             this.stmtTask.resetSequenceId(); // reset sequenceId before write header
@@ -279,75 +292,6 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             throw MySQLExceptions.wrap(e);
 
         }
-    }
-
-
-    private void writeParamValue(final ByteBuf packet, final int batchIndex, final MySQLColumnMeta[] paramMetaArray,
-                                 final List<? extends Value> paramList) {
-
-        final ZoneOffset serverZone = this.serverZone;
-        final Charset clientCharset = this.clientCharset;
-
-        final boolean supportZoneOffset, sendFractionalSeconds, sendFractionalSecondsForTime;
-        sendFractionalSeconds = this.fixedEnv.sendFractionalSeconds;
-        sendFractionalSecondsForTime = this.fixedEnv.sendFractionalSecondsForTime;
-        supportZoneOffset = this.supportZoneOffset;
-
-        final int paramSize = paramList.size();
-
-        ZoneOffset zoneOffset;
-
-        Value paramValue;
-        Object value;
-        // below write bind parameter values
-        for (int i = 0, scale; i < paramSize; i++) {
-            paramValue = paramList.get(i);
-            value = paramValue.get();
-            if (value == null || value instanceof ValueParameter) {
-                continue;
-            }
-
-            switch ((MySQLType) paramValue.getType()) {
-                case DATETIME: {
-                    if (sendFractionalSeconds) {
-                        scale = -1;
-                    } else {
-                        scale = paramMetaArray[i].getScale();
-                    }
-                    if (supportZoneOffset) {
-                        zoneOffset = serverZone;
-                    } else {
-                        zoneOffset = null;
-                    }
-                }
-                break;
-                case TIME: {
-                    if (sendFractionalSeconds && sendFractionalSecondsForTime) {
-                        scale = -1;
-                    } else {
-                        scale = paramMetaArray[i].getScale();
-                    }
-                    zoneOffset = null;
-                }
-                break;
-                case TIMESTAMP: {
-                    if (sendFractionalSeconds) {
-                        scale = -1;
-                    } else {
-                        scale = paramMetaArray[i].getScale();
-                    }
-                    zoneOffset = null;
-                }
-                break;
-                default://no-op
-                    scale = -1;
-                    zoneOffset = null;
-            }
-
-            writeBinary(packet, batchIndex, paramValue, scale);
-
-        }
-
     }
 
 

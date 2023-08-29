@@ -1,12 +1,14 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.Driver;
+import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.result.DataRow;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
+import io.jdbd.statement.BindSingleStatement;
 import io.jdbd.statement.Statement;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
@@ -22,6 +24,7 @@ import reactor.core.publisher.Mono;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
+import java.util.function.Function;
 
 public abstract class SessionTestSupport {
 
@@ -65,12 +68,16 @@ public abstract class SessionTestSupport {
         }
 
         final String key;
-        key = method.getDeclaringClass().getName() + '.' + method.getName();
+        key = method.getDeclaringClass().getName() + '.' + method.getName() + "#session";
 
         final Object value;
-        value = context.removeAttribute(key);
+        value = context.getAttribute(key);
         if (value instanceof DatabaseSession) {
+            context.removeAttribute(key);
             Mono.from(((DatabaseSession) value).close())
+                    .block();
+        } else if (value instanceof TestSessionHolder && ((TestSessionHolder) value).close) {
+            Mono.from(((TestSessionHolder) value).session.close())
                     .block();
         }
     }
@@ -99,6 +106,43 @@ public abstract class SessionTestSupport {
             map.put(row.getColumnLabel(i), row.get(i));
         }
         return Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * @return get cache for data provider.
+     */
+    @Nullable
+    protected final BindSingleStatement invokeDataProvider(final ITestNGMethod targetMethod, final ITestContext context,
+                                                           final Function<DatabaseSession, BindSingleStatement> func) {
+        Object temp;
+        final String keyOfSession;
+        keyOfSession = keyNameOfSession(targetMethod);
+
+        temp = context.getAttribute(keyOfSession);
+
+        final DatabaseSession cacheSession;
+        if (temp instanceof TestSessionHolder) {
+            cacheSession = ((TestSessionHolder) temp).session;
+        } else {
+            cacheSession = null;
+        }
+
+        final BindSingleStatement statement;
+        statement = func.apply(cacheSession);
+
+        final int currentInvocationCount = targetMethod.getCurrentInvocationCount();
+
+        final boolean closeSession;
+        closeSession = currentInvocationCount + 1 == targetMethod.getInvocationCount();
+
+        final TestSessionHolder sessionHolder;
+        if (cacheSession == null) {
+            sessionHolder = new TestSessionHolder(statement.getSession(), closeSession);
+        } else {
+            sessionHolder = new TestSessionHolder(cacheSession, closeSession);
+        }
+        context.setAttribute(keyOfSession, sessionHolder);
+        return statement;
     }
 
 
@@ -134,6 +178,12 @@ public abstract class SessionTestSupport {
         return result;
     }
 
+    /*-------------------below static method -------------------*/
+
+    protected static String keyNameOfSession(final ITestNGMethod targetMethod) {
+        return targetMethod.getRealClass().getName() + '.' + targetMethod.getMethodName() + "#session";
+    }
+
     private static DatabaseSessionFactory createSessionFactory() {
         final Environment testEnv;
         testEnv = ClientTestUtils.getTestConfig();
@@ -145,6 +195,25 @@ public abstract class SessionTestSupport {
         //LOG.debug("driver {} ", driver);
         return driver.forPoolVendor(url, testEnv.sourceMap());
     }
+
+
+    /*-------------------below static class  -------------------*/
+
+    /**
+     * for {@link #closeSessionAfterTest(Method, ITestContext)}
+     */
+    protected static final class TestSessionHolder {
+
+        public final DatabaseSession session;
+
+        public final boolean close;
+
+        public TestSessionHolder(DatabaseSession session, boolean close) {
+            this.session = session;
+            this.close = close;
+        }
+
+    }// TestSessionHolder
 
 
 }

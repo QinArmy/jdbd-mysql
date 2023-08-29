@@ -64,14 +64,14 @@ abstract class BinaryWriter {
      * Bind non-null and simple(no {@link org.reactivestreams.Publisher} or {@link java.nio.file.Path}) value with MySQL binary protocol.
      * </p>
      *
-     * @param precision negative if dont' need to truncate micro seconds.
+     * @param scale negative if dont' need to truncate micro seconds.
      * @see #decideActualType(Value)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html">Binary Protocol Resultset</a>
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html">COM_STMT_EXECUTE</a>
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">COM_QUERY CLIENT_QUERY_ATTRIBUTES</a>
      */
     @SuppressWarnings("deprecation")
-    final void writeBinary(final ByteBuf packet, final int batchIndex, final Value paramValue, final int precision) {
+    final void writeBinary(final ByteBuf packet, final int batchIndex, final Value paramValue, final int scale) {
 
         switch ((MySQLType) paramValue.getType()) {
             case BOOLEAN: {
@@ -185,10 +185,10 @@ abstract class BinaryWriter {
             break;
             case TIMESTAMP:
             case DATETIME:
-                writeDatetime(packet, batchIndex, paramValue, precision);
+                writeDatetime(packet, batchIndex, paramValue, scale);
                 break;
             case TIME:
-                writeTime(packet, batchIndex, paramValue, precision);
+                writeTime(packet, batchIndex, paramValue, scale);
                 break;
             case DATE: {
                 final LocalDate value;
@@ -268,7 +268,7 @@ abstract class BinaryWriter {
             }
             break;
             case DATETIME: {
-                if (this.supportZoneOffset || source instanceof OffsetDateTime || source instanceof ZonedDateTime) {
+                if (this.supportZoneOffset && (source instanceof OffsetDateTime || source instanceof ZonedDateTime)) {
                     //As of MySQL 8.0.19 can append zone
                     //Datetime literals that include time zone offsets are accepted as parameter values by prepared statements.
                     bindType = MySQLType.VARCHAR;
@@ -370,16 +370,16 @@ abstract class BinaryWriter {
      *     to {@link MySQLType#DATETIME} or {@link MySQLType#TIMESTAMP}
      * </p>
      *
-     * @param precision negative if dont' need to truncate micro seconds.
+     * @param scale negative if dont' need to truncate micro seconds.
      * @see #writeBinary(ByteBuf, int, Value, int)
      */
     private void writeDatetime(final ByteBuf packet, final int batchIndex, final Value paramValue,
-                               final int precision) {
+                               final int scale) {
         final Object nonNull = paramValue.getNonNull();
 
         if (nonNull instanceof OffsetDateTime) {
             final OffsetDateTime value;
-            value = JdbdTimes.truncatedIfNeed(precision, (OffsetDateTime) nonNull);
+            value = JdbdTimes.truncatedIfNeed(scale, (OffsetDateTime) nonNull);
             if (this.supportZoneOffset) {
                 final byte[] bytes;
                 bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(this.clientCharset);
@@ -389,7 +389,7 @@ abstract class BinaryWriter {
             }
         } else if (nonNull instanceof ZonedDateTime) {
             final ZonedDateTime value;
-            value = JdbdTimes.truncatedIfNeed(precision, (ZonedDateTime) nonNull);
+            value = JdbdTimes.truncatedIfNeed(scale, (ZonedDateTime) nonNull);
             if (this.supportZoneOffset) {
                 final byte[] bytes;
                 bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(this.clientCharset);
@@ -399,7 +399,7 @@ abstract class BinaryWriter {
             }
         } else {
             final LocalDateTime value;
-            value = JdbdTimes.truncatedIfNeed(precision, MySQLBinds.bindToLocalDateTime(batchIndex, paramValue));
+            value = JdbdTimes.truncatedIfNeed(scale, MySQLBinds.bindToLocalDateTime(batchIndex, paramValue));
             writeLocalDateTime(packet, value);
         }
 

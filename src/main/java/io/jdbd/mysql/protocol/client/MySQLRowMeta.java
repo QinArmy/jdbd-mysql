@@ -135,8 +135,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
      */
     private static final Option<String> TABLE_LABEL = Option.from("COLUMN_TABLE_LABEL", String.class);
 
-    private static final Option<Long> PRECISION = Option.from("COLUMN_PRECISION", Long.class);
-
 
     final MySQLColumnMeta[] columnMetaArray;
 
@@ -239,12 +237,12 @@ final class MySQLRowMeta extends VendorResultRowMeta {
      * jdbd-mysql support following options :
      *     <ul>
      *         <li>{@link Option#SERVER_ZONE}</li>
+     *         <li>{@link Option#COLUMN_PRECISION}</li>
      *         <li>{@link #COLLATION_INDEX}</li>
      *         <li>{@link #CHARSET}</li>
      *         <li>{@link #FIXED_LENGTH}</li>
      *         <li>{@link #FLAGS}</li>
      *         <li>{@link #TABLE_LABEL}</li>
-     *         <li>{@link #PRECISION}</li>
      *     </ul>
      * </p>
      */
@@ -257,6 +255,8 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         final Object value;
         if (Option.SERVER_ZONE == option) {
             value = this.serverZone;
+        } else if (Option.COLUMN_PRECISION == option) {
+            value = meta.obtainPrecision(this.customCollationMap);
         } else if (COLLATION_INDEX.equals(option)) {
             value = meta.collationIndex;
         } else if (CHARSET.equals(option)) {
@@ -269,8 +269,6 @@ final class MySQLRowMeta extends VendorResultRowMeta {
             value = meta.definitionFlags;
         } else if (TABLE_LABEL.equals(option)) {
             value = meta.tableLabel;
-        } else if (PRECISION.equals(option)) {
-            value = meta.obtainPrecision(this.customCollationMap);
         } else {
             value = null;
         }

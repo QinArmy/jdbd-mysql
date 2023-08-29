@@ -178,7 +178,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
         final RuntimeException error;
         if (paramGroup == EMPTY_PARAM_GROUP) {
             error = MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
-        } else if (this.rowMeta != null) {
+        } else if (this.rowMeta.getColumnCount() > 0) {
             error = new SubscribeException(ResultType.UPDATE, ResultType.QUERY);
         } else if (this.paramGroupList != null) {
             error = new SubscribeException(ResultType.UPDATE, ResultType.BATCH_UPDATE);
