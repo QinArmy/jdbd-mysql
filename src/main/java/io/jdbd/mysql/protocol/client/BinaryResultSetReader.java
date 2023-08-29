@@ -53,9 +53,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
     @Override
     boolean readOneRow(final ByteBuf payload, final boolean bigPayload, final MySQLMutableCurrentRow currentRow) {
         final MySQLColumnMeta[] metaArray = currentRow.rowMeta.columnMetaArray;
-        if (payload.readByte() != BINARY_ROW_HEADER) {
-            throw new IllegalArgumentException("cumulateBuffer isn't binary row");
-        }
+
         final BinaryMutableCurrentRow binaryCurrentRow = (BinaryMutableCurrentRow) currentRow;
         final Object[] columnValues = currentRow.columnArray;
         final byte[] nullBitMap = binaryCurrentRow.nullBitMap;
@@ -64,6 +62,9 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
         int columnIndex = binaryCurrentRow.columnIndex;
 
         if (columnIndex == 0 && binaryCurrentRow.readNullBitMap) {
+            if (payload.readByte() != BINARY_ROW_HEADER) {
+                throw new IllegalArgumentException("cumulateBuffer isn't binary row");
+            }
             payload.readBytes(nullBitMap); // null_bitmap
             binaryCurrentRow.readNullBitMap = false; // avoid first column is big column
         }
@@ -71,12 +72,14 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
         boolean moreCumulate = false;
         for (int byteIndex, bitIndex; columnIndex < metaArray.length; columnIndex++) {
             columnMeta = metaArray[columnIndex];
-            byteIndex = (columnIndex + 2) & (~7);
+            byteIndex = (columnIndex + 2) >> 3;
             bitIndex = (columnIndex + 2) & 7;
+
             if ((nullBitMap[byteIndex] & (1 << bitIndex)) != 0) {
                 columnValues[columnIndex] = null;
                 continue;
             }
+
             value = readOneColumn(payload, bigPayload, columnMeta, binaryCurrentRow);
             if (value == MORE_CUMULATE_OBJECT) {
                 moreCumulate = true;
@@ -152,7 +155,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
                 final int v;
                 if (readableBytes < 3) {
                     value = MORE_CUMULATE_OBJECT;
-                } else if (((v = Packets.readInt3(payload)) & 0x80_00_00) == 0) {//positive
+                } else if (((v = Packets.readInt4(payload)) & 0x80_00_00) == 0) {//positive
                     value = v;
                 } else {//negative
                     final int complement = (v & 0x7F_FF_FF);
@@ -166,7 +169,7 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
             break;
             case MEDIUMINT_UNSIGNED: {
                 if (readableBytes > 2) {
-                    value = Packets.readInt3(payload);
+                    value = Packets.readInt4(payload);
                 } else {
                     value = MORE_CUMULATE_OBJECT;
                 }

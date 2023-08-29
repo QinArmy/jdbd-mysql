@@ -36,11 +36,12 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     public static MySQLDatabaseSessionFactory create(String url, Map<String, Object> properties, boolean forPoolVendor)
             throws JdbdException {
-        return new MySQLDatabaseSessionFactory(createProtocolFactory(url, properties), forPoolVendor);
+        return new MySQLDatabaseSessionFactory(createProtocolFactory(url, properties, forPoolVendor), forPoolVendor);
     }
 
 
-    private static MySQLProtocolFactory createProtocolFactory(String url, Map<String, Object> properties) {
+    private static MySQLProtocolFactory createProtocolFactory(String url, Map<String, Object> properties,
+                                                              final boolean forPoolVendor) {
         final List<MySQLHostInfo> hostList;
         hostList = MySQLUrlParser.parse(url, properties);
 
@@ -49,7 +50,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
         protocol = hostList.get(0).protocol();
         switch (protocol) {
             case SINGLE_CONNECTION:
-                protocolFactory = ClientProtocolFactory.from(hostList.get(0));
+                protocolFactory = ClientProtocolFactory.from(hostList.get(0), forPoolVendor);
                 break;
             case FAILOVER_CONNECTION:
             case LOADBALANCE_CONNECTION:

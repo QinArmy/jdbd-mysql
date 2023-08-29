@@ -125,19 +125,24 @@ public abstract class SessionTestSupport {
             Assert.assertNotNull(session);
         }
 
-        final int currentInvocationCount = targetMethod.getCurrentInvocationCount();
+        final int currentInvocationCount = targetMethod.getCurrentInvocationCount() + 1;
 
         final BindSingleStatement statement;
-        if ((currentInvocationCount & 1) == 0) {
-            statement = session.bindStatement(sql);
-        } else {
-            statement = Mono.from(session.prepareStatement(sql))
-                    .block();
-            Assert.assertNotNull(session);
-        }
+        switch ((currentInvocationCount % 3)) {
+            case 1:
+                statement = session.bindStatement(sql);
+                break;
+            case 2:
+                statement = session.bindStatement(sql, true);
+                break;
+            default:
+                statement = Mono.from(session.prepareStatement(sql))
+                        .block();
+                Assert.assertNotNull(statement);
 
+        }
         final boolean closeSession;
-        closeSession = currentInvocationCount + 1 == targetMethod.getInvocationCount();
+        closeSession = currentInvocationCount == targetMethod.getInvocationCount();
 
         context.setAttribute(keyOfSession, new TestSessionHolder(session, closeSession));
         return statement;

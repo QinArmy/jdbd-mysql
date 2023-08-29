@@ -46,7 +46,7 @@ public abstract class AbstractTaskSuiteTests {
         map = MySQLCollections.hashMap(ClientTestUtils.loadConfigMap());
 
         map.putAll(props);
-        return ClientProtocolFactory.from(MySQLUrlParser.parse((String) map.get("url"), map).get(0));
+        return ClientProtocolFactory.from(MySQLUrlParser.parse((String) map.get("url"), map).get(0), false);
     }
 
 
@@ -56,7 +56,7 @@ public abstract class AbstractTaskSuiteTests {
         final Map<String, Object> map;
         map = ClientTestUtils.loadConfigMap();
         map.put("sslMode", Enums.SslMode.DISABLED.name());
-        return ClientProtocolFactory.from(MySQLUrlParser.parse((String) map.get("url"), map).get(0));
+        return ClientProtocolFactory.from(MySQLUrlParser.parse((String) map.get("url"), map).get(0), false);
     }
 
 

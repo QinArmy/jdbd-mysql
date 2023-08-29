@@ -270,7 +270,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
     }
 
     /**
-     * @see DatabaseSession#executeAsFlux(String)
+     * @see DatabaseSession#executeMultiStmt(String)
      */
     @Test(dependsOnMethods = {"executeUpdateInsert", "executeUpdateCall"})
     public void executeAsFlux(final DatabaseSession session) {
