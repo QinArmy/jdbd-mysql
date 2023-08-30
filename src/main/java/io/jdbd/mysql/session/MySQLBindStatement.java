@@ -161,6 +161,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     @Override
     public Mono<ResultStates> executeUpdate() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<ParamValue> paramGroup = this.paramGroup;
         if (paramGroup == EMPTY_PARAM_GROUP) {
@@ -178,7 +179,6 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
         final Mono<ResultStates> mono;
         if (error == null) {
-            this.fetchSize = 0;
             mono = this.session.protocol.paramUpdate(Stmts.paramStmt(this.sql, paramGroup, this), isUsePrepare());
         } else {
             mono = Mono.error(MySQLExceptions.wrap(error));
@@ -254,6 +254,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     @Override
     public Publisher<ResultStates> executeBatchUpdate() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -283,6 +284,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     @Override
     public QueryResults executeBatchQuery() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -312,6 +314,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     @Override
     public MultiResult executeBatchAsMulti() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -341,6 +344,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     @Override
     public OrderedFlux executeBatchAsFlux() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;

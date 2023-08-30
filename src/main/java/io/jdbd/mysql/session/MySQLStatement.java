@@ -12,6 +12,7 @@ import io.jdbd.session.ChunkOption;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.statement.BindSingleStatement;
+import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.Parameter;
 import io.jdbd.statement.Statement;
 import io.jdbd.vendor.stmt.JdbdValues;
@@ -156,8 +157,13 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     @SuppressWarnings("unchecked")
     @Override
-    public final S setFetchSize(int fetchSize) throws JdbdException {
-        this.fetchSize = fetchSize;
+    public final S setFetchSize(final int fetchSize) {
+        if (fetchSize < 0) {
+            throw MySQLExceptions.fetchSizeIsNegative(fetchSize);
+        }
+        if (!(this instanceof MultiStatement)) {
+            this.fetchSize = fetchSize;
+        }
         return (S) this;
     }
 

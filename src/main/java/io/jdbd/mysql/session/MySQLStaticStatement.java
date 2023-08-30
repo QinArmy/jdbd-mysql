@@ -39,6 +39,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public Publisher<ResultStates> executeUpdate(final String sql) {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         if (!MySQLStrings.hasText(sql)) {
             return Mono.error(MySQLExceptions.sqlIsEmpty());
@@ -70,6 +71,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public Publisher<ResultStates> executeBatchUpdate(final List<String> sqlGroup) {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
@@ -80,6 +82,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public QueryResults executeBatchQuery(final List<String> sqlGroup) {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.batchQueryError(MySQLExceptions.sqlIsEmpty());
@@ -91,6 +94,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public MultiResult executeBatchAsMulti(final List<String> sqlGroup) {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.multiError(MySQLExceptions.sqlIsEmpty());
@@ -101,6 +105,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public OrderedFlux executeBatchAsFlux(final List<String> sqlGroup) {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.fluxError(MySQLExceptions.sqlIsEmpty());
@@ -112,6 +117,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public OrderedFlux executeMultiStmt(final String multiStmt) {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final OrderedFlux flux;
         if (!this.session.protocol.supportMultiStmt()) {

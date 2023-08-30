@@ -4,6 +4,18 @@
         <classes>
             <class name="io.jdbd.mysql.util.MySQLTimesSuiteTests"/>
             <class name="io.jdbd.mysql.syntax.MySQLParserSuiteTests"/>
+            <class name="io.jdbd.mysql.env.MySQLUrlParserSuiteTests"/>
+
+            <!-- session tests -->
+            <class name="io.jdbd.mysql.session.SessionFactoryTests"/>
+            <class name="io.jdbd.mysql.session.DatabaseSessionTests"/>
+            <class name="io.jdbd.mysql.session.LocalDatabaseSessionTests"/>
+            <class name="io.jdbd.mysql.session.RmDatabaseSessionTests"/>
+
+            <!-- statement tests -->
+            <class name="io.jdbd.mysql.statement.BindSingleStatementTests"/>
+            <class name="io.jdbd.mysql.statement.MultiStatementTests"/>
+            <class name="io.jdbd.mysql.statement.StaticStatementTests"/>
         </classes>
     </test>
 </suite>

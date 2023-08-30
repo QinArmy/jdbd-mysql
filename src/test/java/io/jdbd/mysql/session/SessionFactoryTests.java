@@ -17,9 +17,9 @@ import java.net.URLEncoder;
  * </p>
  */
 @Test
-public class SessionFactorySuiteTests extends SessionTestSupport {
+public class SessionFactoryTests extends SessionTestSupport {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SessionFactorySuiteTests.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SessionFactoryTests.class);
 
 
     /**

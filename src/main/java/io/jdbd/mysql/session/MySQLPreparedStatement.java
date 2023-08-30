@@ -171,6 +171,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     @Override
     public Publisher<ResultStates> executeUpdate() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         List<ParamValue> paramGroup = this.paramGroup;
         final int paramSize = paramGroup == null ? 0 : paramGroup.size();
@@ -193,7 +194,6 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
         final Mono<ResultStates> mono;
         if (error == null) {
-            this.fetchSize = 0;
             mono = this.stmtTask.executeUpdate(Stmts.paramStmt(this.sql, paramGroup, this));
         } else {
             this.stmtTask.closeOnBindError(error); // close prepare statement.
@@ -285,41 +285,8 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
-    public QueryResults executeBatchQuery() {
-        this.endStmtOption();
-
-
-        final List<List<ParamValue>> paramGroupList = this.paramGroupList;
-        final List<ParamValue> paramGroup = this.paramGroup;
-
-        final RuntimeException error;
-        if (paramGroup == EMPTY_PARAM_GROUP) {
-            error = MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
-        } else if (paramGroup != null) {
-            error = MySQLExceptions.noInvokeAddBatch();
-        } else if (paramGroupList == null || paramGroupList.size() == 0) {
-            error = MySQLExceptions.noAnyParamGroupError();
-        } else if (this.rowMeta.getColumnCount() == 0) {
-            error = new SubscribeException(ResultType.BATCH_QUERY, ResultType.UPDATE);
-        } else {
-            error = null;
-        }
-
-        final QueryResults batchQuery;
-        if (error == null) {
-            batchQuery = this.stmtTask.executeBatchQuery(Stmts.paramBatch(this.sql, paramGroupList, this));
-        } else {
-            this.stmtTask.closeOnBindError(error); // close prepare statement.
-            batchQuery = MultiResults.batchQueryError(MySQLExceptions.wrap(error));
-        }
-        clearStatementToAvoidReuse();
-        return batchQuery;
-    }
-
-    @Override
     public Publisher<ResultStates> executeBatchUpdate() {
         this.endStmtOption();
-
         this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
@@ -350,8 +317,42 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
+    public QueryResults executeBatchQuery() {
+        this.endStmtOption();
+        this.fetchSize = 0; // clear
+
+        final List<List<ParamValue>> paramGroupList = this.paramGroupList;
+        final List<ParamValue> paramGroup = this.paramGroup;
+
+        final RuntimeException error;
+        if (paramGroup == EMPTY_PARAM_GROUP) {
+            error = MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
+        } else if (paramGroup != null) {
+            error = MySQLExceptions.noInvokeAddBatch();
+        } else if (paramGroupList == null || paramGroupList.size() == 0) {
+            error = MySQLExceptions.noAnyParamGroupError();
+        } else if (this.rowMeta.getColumnCount() == 0) {
+            error = new SubscribeException(ResultType.BATCH_QUERY, ResultType.UPDATE);
+        } else {
+            error = null;
+        }
+
+        final QueryResults batchQuery;
+        if (error == null) {
+            batchQuery = this.stmtTask.executeBatchQuery(Stmts.paramBatch(this.sql, paramGroupList, this));
+        } else {
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            batchQuery = MultiResults.batchQueryError(MySQLExceptions.wrap(error));
+        }
+        clearStatementToAvoidReuse();
+        return batchQuery;
+    }
+
+
+    @Override
     public MultiResult executeBatchAsMulti() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -382,6 +383,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     @Override
     public OrderedFlux executeBatchAsFlux() {
         this.endStmtOption();
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
