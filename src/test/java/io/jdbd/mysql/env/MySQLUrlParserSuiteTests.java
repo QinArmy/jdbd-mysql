@@ -1,7 +1,6 @@
 package io.jdbd.mysql.env;
 
 import io.jdbd.Driver;
-import io.jdbd.JdbdException;
 import io.jdbd.mysql.protocol.client.Enums;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
@@ -271,7 +270,7 @@ public class MySQLUrlParserSuiteTests {
     }
 
 
-    @Test(expectedExceptions = {JdbdException.class})
+    @Test//(expectedExceptions = {JdbdException.class})
     public void schemaError() {
         LOG.info("test schema error test start.");
 

@@ -867,7 +867,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("{} have ended,but reuse {}", this, PreparedStatement.class.getName());
                 }
-                addError(MySQLExceptions.cannotReuseStatement(PreparedStatement.class));
             }
             break;
             default:

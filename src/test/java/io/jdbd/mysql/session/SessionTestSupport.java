@@ -43,9 +43,9 @@ public abstract class SessionTestSupport {
 
     @AfterSuite
     public final void afterSuiteCloseSessionFactory() {
-        DatabaseSessionFactory sessionFactory = SessionTestSupport.sessionFactory;
+        final DatabaseSessionFactory sessionFactory = SessionTestSupport.sessionFactory;
 
-        if (sessionFactory != null) {
+        if (sessionFactory != null && !sessionFactory.isClosed()) {
             Mono.from(sessionFactory.close())
                     .block();
         }

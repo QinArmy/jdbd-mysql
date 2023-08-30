@@ -12,8 +12,8 @@ import io.jdbd.session.ChunkOption;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.statement.BindSingleStatement;
-import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.Parameter;
+import io.jdbd.statement.PreparedStatement;
 import io.jdbd.statement.Statement;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.NamedValue;
@@ -55,7 +55,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     final MySQLDatabaseSession<?> session;
 
-    private int timeoutSeconds;
+    private int timeoutMillSeconds;
 
     int fetchSize;
 
@@ -100,8 +100,10 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
         }
 
         if (error != null) {
-            this.closeOnBindError(error);
-            throw MySQLExceptions.wrap(error);
+            if (this instanceof PreparedStatement) {
+                closeOnBindError(error);
+            }
+            throw error;
         }
         return (S) this;
     }
@@ -116,7 +118,9 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
         try {
             return sessionClass.cast(this.session);
         } catch (Throwable e) {
-            closeOnBindError(e);
+            if (this instanceof PreparedStatement) {
+                closeOnBindError(e);
+            }
             throw MySQLExceptions.wrap(e);
         }
     }
@@ -144,14 +148,16 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     @SuppressWarnings("unchecked")
     @Override
-    public final S setTimeout(final int seconds) {
-        if (seconds < 0) {
+    public final S setTimeout(final int millSeconds) {
+        if (millSeconds < 0) {
             final IllegalArgumentException error;
-            error = MySQLExceptions.timeoutIsNegative(seconds);
-            closeOnBindError(error);
+            error = MySQLExceptions.timeoutIsNegative(millSeconds);
+            if (this instanceof PreparedStatement) {
+                closeOnBindError(error);
+            }
             throw error;
         }
-        this.timeoutSeconds = seconds;
+        this.timeoutMillSeconds = millSeconds;
         return (S) this;
     }
 
@@ -159,9 +165,14 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     @Override
     public final S setFetchSize(final int fetchSize) {
         if (fetchSize < 0) {
-            throw MySQLExceptions.fetchSizeIsNegative(fetchSize);
+            final IllegalArgumentException error;
+            error = MySQLExceptions.fetchSizeIsNegative(fetchSize);
+            if (this instanceof PreparedStatement) {
+                closeOnBindError(error);
+            }
+            throw error;
         }
-        if (!(this instanceof MultiStatement)) {
+        if (this instanceof BindSingleStatement) {
             this.fetchSize = fetchSize;
         }
         return (S) this;
@@ -171,7 +182,9 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     public final S setImportPublisher(Function<ChunkOption, Publisher<byte[]>> function) throws JdbdException {
         final JdbdException error;
         error = MySQLExceptions.dontSupportImporter(MY_SQL);
-        this.closeOnBindError(error);
+        if (this instanceof PreparedStatement) {
+            closeOnBindError(error);
+        }
         throw error;
     }
 
@@ -179,14 +192,21 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     public final S setExportSubscriber(Function<ChunkOption, Subscriber<byte[]>> function) throws JdbdException {
         final JdbdException error;
         error = MySQLExceptions.dontSupportExporter(MY_SQL);
-        this.closeOnBindError(error);
+        if (this instanceof PreparedStatement) {
+            closeOnBindError(error);
+        }
         throw error;
     }
 
 
     @Override
     public final <T> S setOption(Option<T> option, @Nullable T value) throws JdbdException {
-        throw MySQLExceptions.dontSupportSetOption(option);
+        final JdbdException error;
+        error = MySQLExceptions.dontSupportSetOption(option);
+        if (this instanceof PreparedStatement) {
+            closeOnBindError(error);
+        }
+        throw error;
     }
 
     @Override
@@ -217,7 +237,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     @Override
     public final int getTimeout() {
-        return this.timeoutSeconds;
+        return this.timeoutMillSeconds;
     }
 
     @Override
