@@ -380,7 +380,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         int sequenceId = -1;
 
         ByteBuf bigPayload = this.bigPayload;
-        boolean resultSetEnd = false, oneRowEnd, cancelled;
+        boolean oneRowEnd, cancelled;
         cancelled = task.isCancelled();
 
         outerLoop:
@@ -398,7 +398,6 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                             this.adjutant.errorCharset());
                     this.task.addErrorToTask(error);
                     states = States.END_ON_ERROR;
-                    resultSetEnd = true;
                 }
                 break outerLoop;
                 case EofPacket.EOF_HEADER: {
@@ -406,8 +405,6 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
                     final Terminator terminator;
                     terminator = Terminator.fromCumulate(cumulateBuffer, payloadLength, this.capability);
-                    this.currentRow = null;
-                    resultSetEnd = true;
                     serverStatesConsumer.accept(terminator);
 
                     if (!cancelled) {
@@ -488,16 +485,24 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             this.task.updateSequenceId(sequenceId);
         }
 
-        if (resultSetEnd) {
-            // reset this instance
-            bigPayload = this.bigPayload;
-            if (bigPayload != null && bigPayload.refCnt() > 0) {
-                bigPayload.release();
+        switch (states) {
+            case END_ON_ERROR:
+            case NO_MORE_RESULT:
+            case MORE_RESULT: {
+                // reset this instance
+                bigPayload = this.bigPayload;
+                if (bigPayload != null && bigPayload.refCnt() > 0) {
+                    bigPayload.release();
+                }
+                this.currentRow = null;
+                this.resultSetCharset = null;
+                this.bigPayload = null;
+                this.error = null;
             }
-            this.resultSetCharset = null;
-            this.bigPayload = null;
-            this.currentRow = null;
-            this.error = null;
+            break;
+            case MORE_CUMULATE:
+            case MORE_FETCH:
+            default:// no-op
         }
         return states;
     }

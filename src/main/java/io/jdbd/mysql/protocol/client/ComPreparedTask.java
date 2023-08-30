@@ -248,7 +248,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     private MySQLColumnMeta[] paramMetas;
 
-    private ResultRowMeta rowMeta;
+    private MySQLRowMeta rowMeta;
 
     /**
      * @see #nextGroupReset()
@@ -301,7 +301,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     public boolean isSupportFetch() {
-        return this.rowMeta != null && this.stmt.getFetchSize() > 0;
+        final MySQLRowMeta rowMeta = this.rowMeta;
+        return rowMeta != null && rowMeta.columnMetaArray.length > 0 && this.stmt.getFetchSize() > 0;
     }
 
     @Override
@@ -548,16 +549,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     continueDecode = false;
                 }
                 break;
-                case READ_FETCH_RESPONSE: {
-                    if (readFetchResponse(cumulateBuffer)) {
-                        taskEnd = true;
-                        continueDecode = false;
-                    } else {
-                        this.taskPhase = TaskPhase.READ_RESULT_SET;
-                        continueDecode = Packets.hasOnePacket(cumulateBuffer);
-                    }
-                }
-                break;
                 case END: // resume for closing statement
                     taskEnd = true;
                     break;
@@ -700,19 +691,20 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     boolean executeNextFetch() {
         assertPhase(TaskPhase.READ_EXECUTE_RESPONSE);
 
-        final int fetchSize = getActualStmt().getFetchSize();
+        final int fetchSize = this.stmt.getFetchSize();
         final boolean taskEnd;
-        if (fetchSize > 0 && this.rowMeta != null) {
+        if (fetchSize > 0 && this.rowMeta.getColumnCount() > 0) {
             final ByteBuf packet = this.adjutant.allocator().buffer(13);
 
             Packets.writeInt3(packet, 9);
-            packet.writeByte(nextSequenceId());
+            packet.writeByte(0); // reset sequence_id
 
             packet.writeByte(Packets.COM_STMT_FETCH);
             Packets.writeInt4(packet, this.statementId);
             Packets.writeInt4(packet, fetchSize);
 
             this.packetPublisher = Mono.just(packet);
+            this.taskPhase = TaskPhase.READ_RESULT_SET;
             taskEnd = false;
         } else {
             taskEnd = true;
@@ -1143,21 +1135,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
 
-    /**
-     * @return true: task end.
-     * @see #decode(ByteBuf, Consumer)
-     */
-    private boolean readFetchResponse(final ByteBuf cumulateBuffer) {
-        final int flag = Packets.getInt1AsInt(cumulateBuffer, cumulateBuffer.readerIndex() + Packets.HEADER_SIZE);
-        final boolean taskEnd;
-        if (flag == MySQLServerException.ERROR_HEADER) {
-            readErrorPacket(cumulateBuffer);
-            taskEnd = true;
-        } else {
-            taskEnd = false;
-        }
-        return taskEnd;
-    }
 
     /**
      * @return true : reset occur error,task end.
@@ -1368,6 +1345,8 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         READ_RESET_RESPONSE,
 
         FETCH_STMT,
+
+        @Deprecated
         READ_FETCH_RESPONSE,
 
         ERROR_ON_BINDING,

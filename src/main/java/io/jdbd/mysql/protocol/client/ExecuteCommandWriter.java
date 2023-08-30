@@ -316,7 +316,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
         if (this.stmtTask.isSupportFetch()) {
             flags |= CURSOR_TYPE_READ_ONLY;
         }
-        if (this.supportQueryAttr && this.stmt.getStmtVarList().size() > 0) {
+        if (this.supportQueryAttr) {
             flags |= PARAMETER_COUNT_AVAILABLE;
         }
         packet.writeByte(flags); // flags

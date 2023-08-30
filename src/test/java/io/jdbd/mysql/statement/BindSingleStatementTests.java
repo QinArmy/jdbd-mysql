@@ -73,6 +73,34 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
     }
 
+    @Test(invocationCount = 3, dataProvider = "insertDatProvider")
+    public void executeBatchUpdateInsert(final BindSingleStatement statement) {
+        final int batchItemCount = 800;
+
+        for (int i = 0; i < batchItemCount; i++) {
+
+            statement.bind(0, JdbdType.TIME, LocalTime.now())
+                    .bind(1, JdbdType.TIME_WITH_TIMEZONE, OffsetTime.now(ZoneOffset.UTC))
+                    .bind(2, JdbdType.DATE, LocalDate.now())
+                    .bind(3, JdbdType.TIMESTAMP, LocalDateTime.now())
+
+                    .bind(4, JdbdType.TIMESTAMP_WITH_TIMEZONE, OffsetDateTime.now(ZoneOffset.UTC))
+                    .bind(5, JdbdType.TEXT, "QinArmy's army \\")
+
+                    .addBatch();
+        }
+
+
+        final List<ResultStates> statesList;
+        statesList = Flux.from(statement.executeBatchUpdate())
+                .collectList()
+                .block();
+
+        Assert.assertNotNull(statesList);
+        Assert.assertEquals(statesList.size(), batchItemCount);
+
+    }
+
 
     /**
      * <p>
@@ -381,6 +409,25 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
     }
 
+    /**
+     * @see io.jdbd.statement.Statement#setFetchSize(int)
+     */
+    @Test(invocationCount = 1, dataProvider = "simpleQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
+    public void queryWithFetch(final BindSingleStatement statement) {
+        statement.bind(0, JdbdType.INTEGER, 300_0000)
+                .setFetchSize(20);
+
+        final Long rowCount;
+        rowCount = Flux.from(statement.executeQuery())
+                .count()
+                .block();
+
+        Assert.assertNotNull(rowCount);
+        Assert.assertTrue(rowCount > 0);
+
+        LOG.info("queryWithFetch row :{}", rowCount);
+    }
+
     @DataProvider(name = "queryAttrProvider", parallel = true)
     public final Object[][] queryAttrProvider(final ITestNGMethod targetMethod, final ITestContext context) {
         final String sql;
@@ -440,6 +487,14 @@ public class BindSingleStatementTests extends SessionTestSupport {
                 "AND t.my_time < ? AND t.my_time1 < ? AND t.my_date = ? AND t.my_datetime < ? " +
                 "AND t.my_datetime6 < ? LIMIT ? ";
 
+        final BindSingleStatement statement;
+        statement = createSingleStatement(targetMethod, context, sql);
+        return new Object[][]{{statement}};
+    }
+
+    @DataProvider(name = "simpleQueryProvider", parallel = true)
+    public final Object[][] simpleQueryProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String sql = "SELECT t.* FROM mysql_types AS t LIMIT ?";
         final BindSingleStatement statement;
         statement = createSingleStatement(targetMethod, context, sql);
         return new Object[][]{{statement}};
