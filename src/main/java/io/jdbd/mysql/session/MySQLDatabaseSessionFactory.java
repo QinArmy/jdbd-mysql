@@ -76,7 +76,11 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     private final AtomicBoolean factoryClosed = new AtomicBoolean(false);
 
-
+    /**
+     * <p>
+     * private constructor
+     * </p>
+     */
     private MySQLDatabaseSessionFactory(MySQLProtocolFactory protocolFactory, boolean forPoolVendor) {
         this.protocolFactory = protocolFactory;
         this.forPoolVendor = forPoolVendor;
@@ -85,7 +89,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public String name() {
-        return this.protocolFactory.factoryName();
+        return this.name;
     }
 
     @Override

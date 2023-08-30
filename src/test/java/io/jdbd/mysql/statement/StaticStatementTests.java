@@ -45,8 +45,6 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test
     public void executeUpdateInsert(final DatabaseSession session, final String methodName) {
-        final StaticStatement statement;
-        statement = session.statement();
 
         final StringBuilder builder = new StringBuilder(180);
 
@@ -69,7 +67,7 @@ public class StaticStatementTests extends SessionTestSupport {
                 .append(')');
 
         ResultStates resultStates;
-        resultStates = Mono.from(statement.executeUpdate(builder.toString()))
+        resultStates = Mono.from(session.statement().executeUpdate(builder.toString()))
                 .block();
 
         Assert.assertNotNull(resultStates);
@@ -83,9 +81,6 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test(dependsOnMethods = "executeUpdateInsert")
     public void executeUpdateCall(final DatabaseSession session, final String methodName) {
-        final StaticStatement statement;
-        statement = session.statement();
-
 
         final String procedureName, procedureSql;
         procedureName = "my_random_update_one";
@@ -100,14 +95,14 @@ public class StaticStatementTests extends SessionTestSupport {
 
         ResultStates resultStates;
 
-        resultStates = Mono.from(statement.executeUpdate(procedureSql))
+        resultStates = Mono.from(session.statement().executeUpdate(procedureSql))
                 .onErrorResume(error -> {   // IF NOT EXISTS as of MySQL 8.0.29
                     if (error instanceof ServerException && error.getMessage().contains(procedureName)) {
                         return Mono.empty();
                     }
                     return Mono.error(error);
                 })
-                .then(Mono.from(statement.executeUpdate("call " + procedureName + "()")))
+                .then(Mono.from(session.statement().executeUpdate("call " + procedureName + "()")))
                 .block();
 
         Assert.assertNotNull(resultStates);
@@ -121,15 +116,13 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test(dependsOnMethods = "executeUpdateInsert")
     public void executeQuery(final DatabaseSession session, final String methodName) {
-        final StaticStatement statement;
-        statement = session.statement();
 
         final String sql;
         sql = "SELECT t.* FROM mysql_types AS t LIMIT 20 ";
 
         final AtomicReference<ResultStates> statesHolder = new AtomicReference<>(null);
         final List<? extends Map<String, ?>> mapList;  //TODO 向 idea 提交 泛型 推断 bug,mapList 不需要 <? extends>
-        mapList = Flux.from(statement.executeQuery(sql, this::mapCurrentRowToMap, statesHolder::set))
+        mapList = Flux.from(session.statement().executeQuery(sql, this::mapCurrentRowToMap, statesHolder::set))
                 .collectList()
                 .block();
 
@@ -162,8 +155,6 @@ public class StaticStatementTests extends SessionTestSupport {
     @Test(dependsOnMethods = {"executeUpdateInsert", "executeUpdateCall"})
     public void executeBatchUpdate(final DatabaseSession session) {
 
-        final StaticStatement statement;
-        statement = session.statement();
 
         final String sql;
         sql = "CALL my_random_update_one()";
@@ -175,7 +166,7 @@ public class StaticStatementTests extends SessionTestSupport {
         }
 
         final List<ResultStates> statesList;
-        statesList = Flux.from(statement.executeBatchUpdate(sqlList))
+        statesList = Flux.from(session.statement().executeBatchUpdate(sqlList))
                 .collectList()
                 .block();
 
@@ -190,8 +181,6 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test(dependsOnMethods = "executeUpdateInsert")
     public void executeBatchQuery(final DatabaseSession session, final String methodName) {
-        final StaticStatement statement;
-        statement = session.statement();
 
 
         final String sql;
@@ -202,7 +191,7 @@ public class StaticStatementTests extends SessionTestSupport {
         sqlList.add(sql);
 
         QueryResults batchQuery;
-        batchQuery = statement.executeBatchQuery(sqlList);
+        batchQuery = session.statement().executeBatchQuery(sqlList);
 
 
         final List<ResultRow> rowList;
@@ -226,9 +215,6 @@ public class StaticStatementTests extends SessionTestSupport {
     @Test(dependsOnMethods = {"executeUpdateInsert", "executeUpdateCall"})
     public void executeBatchAsMulti(final DatabaseSession session, final String methodName) {
 
-        final StaticStatement statement;
-        statement = session.statement();
-
 
         final List<String> sqlList = MySQLCollections.arrayList(5);
 
@@ -240,7 +226,7 @@ public class StaticStatementTests extends SessionTestSupport {
         sqlList.add("SELECT t.* FROM mysql_types AS t LIMIT 20 ");
 
         final MultiResult multiResult;
-        multiResult = statement.executeBatchAsMulti(sqlList);
+        multiResult = session.statement().executeBatchAsMulti(sqlList);
 
         final List<ResultRow> resultRowList;
 
@@ -264,8 +250,6 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test(dependsOnMethods = {"executeUpdateInsert", "executeUpdateCall"})
     public void executeBatchAsFlux(final DatabaseSession session) {
-        final StaticStatement statement;
-        statement = session.statement();
 
 
         final List<String> sqlList = MySQLCollections.arrayList(5);
@@ -279,7 +263,7 @@ public class StaticStatementTests extends SessionTestSupport {
 
         final List<ResultStates> statesList;
 
-        statesList = Flux.from(statement.executeBatchAsFlux(sqlList))
+        statesList = Flux.from(session.statement().executeBatchAsFlux(sqlList))
                 .filter(ResultItem::isStatesItem)
                 .map(ResultStates.class::cast)
                 .collectList()
@@ -302,13 +286,11 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test(dependsOnMethods = {"executeUpdateInsert", "executeUpdateCall"})
     public void executeAsFlux(final DatabaseSession session) {
-        final StaticStatement statement;
-        statement = session.statement();
 
         String multiSql = "CALL my_random_update_one() ; SELECT t.* FROM mysql_types AS t LIMIT 20";
 
         final List<ResultStates> statesList;
-        statesList = Flux.from(statement.executeMultiStmt(multiSql))
+        statesList = Flux.from(session.statement().executeMultiStmt(multiSql))
                 .filter(ResultItem::isStatesItem)
                 .map(ResultStates.class::cast)
                 .collectList()
@@ -328,7 +310,7 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test
     public void queryWithQueryAttributes(final DatabaseSession session) {
-        final StaticStatement statement;
+        StaticStatement statement;
         statement = session.statement();
 
         statement.bindStmtVar("rowNum", JdbdType.INTEGER, 1);

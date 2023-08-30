@@ -1,7 +1,7 @@
 package io.jdbd.mysql.syntax;
 
 
-import io.jdbd.mysql.Groups;
+import io.jdbd.JdbdException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -11,7 +11,7 @@ import java.sql.SQLException;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
-@Test(groups = {Groups.SQL_PARSER}, dependsOnGroups = {Groups.MYSQL_URL})
+@Test
 public class MySQLParserSuiteTests {
 
     static final Logger LOG = LoggerFactory.getLogger(MySQLParserSuiteTests.class);
@@ -24,15 +24,15 @@ public class MySQLParserSuiteTests {
         assertTrue(parser.isSingleStmt(sql));
     }
 
-    @Test(expectedExceptions = SQLException.class)
-    public void blockCommentNotClose() throws SQLException {
+    @Test(expectedExceptions = JdbdException.class)
+    public void blockCommentNotClose() {
         final String sql = "/* ping \n\r \n";
         MySQLParser parser = DefaultMySQLParser.getForInitialization();
         parser.isSingleStmt(sql);
     }
 
     @Test
-    public void singleStatement() throws SQLException {
+    public void singleStatement() {
         LOG.info("singleStatement test start");
         MySQLParser parser = DefaultMySQLParser.getForInitialization();
         final String updateSql = "/* this is a single statement. */ update user as u set u.name = 'zoro' where u.id = 2";
@@ -72,8 +72,8 @@ public class MySQLParserSuiteTests {
 
     }
 
-    @Test(expectedExceptions = SQLException.class)
-    public void quoteNotClose() throws SQLException {
+    @Test(expectedExceptions = JdbdException.class)
+    public void quoteNotClose() {
         LOG.info("quoteNotClose test start");
         final String sql = "/* this is a multi statement. */ update user as u set u.name = 'zoro where u.id = 2";
         MySQLParser parser = DefaultMySQLParser.getForInitialization();

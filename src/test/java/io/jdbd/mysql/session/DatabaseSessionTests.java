@@ -388,19 +388,21 @@ public class DatabaseSessionTests extends SessionTestSupport {
                 .flatMap(s -> Mono.from(s.executeUpdate(updateSql)))
 
                 .flatMap(s -> Mono.from(session.setSavePoint()))
-                .flatMap(s -> Mono.from(session.releaseSavePoint(s, option -> null)))
+                .flatMap(s -> Mono.from(session.releaseSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("s1", option -> null)))
-                .flatMap(s -> Mono.from(session.releaseSavePoint(s, option -> null)))
+                .flatMap(s -> Mono.from(session.setSavePoint()))
+                .flatMap(s -> Mono.from(session.rollbackToSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("s2", option -> null)))
-                .flatMap(s -> Mono.from(session.rollbackToSavePoint(s, option -> null)))
+                .flatMap(s -> Mono.from(session.setSavePoint("s1")))
+                .flatMap(s -> Mono.from(session.releaseSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("army's point", option -> null)))
-                .flatMap(s -> Mono.from(session.releaseSavePoint(s, option -> null)))
+                .flatMap(s -> Mono.from(session.setSavePoint("s2")))
+                .flatMap(s -> Mono.from(session.rollbackToSavePoint(s)))
 
+                .flatMap(s -> Mono.from(session.setSavePoint("army's point")))
+                .flatMap(s -> Mono.from(session.releaseSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("888888886666666", option -> null)))
+                .flatMap(s -> Mono.from(session.setSavePoint("888888886666666")))
                 .flatMap(s -> Mono.from(session.rollbackToSavePoint(s, option -> null)))
 
                 .flatMap(s -> Mono.from(s.commit()))

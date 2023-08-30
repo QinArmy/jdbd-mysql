@@ -19,12 +19,12 @@ public class MySQLTimesSuiteTests {
     private static final Logger LOG = LoggerFactory.getLogger(MySQLTimesSuiteTests.class);
 
     @BeforeClass
-    public static void beforeClass() {
+    public void beforeClass() {
         LOG.info("\n {} test start\n", Groups.UTILS);
     }
 
     @AfterClass
-    public static void afterClass() {
+    public void afterClass() {
         LOG.info("\n {} test end\n", Groups.UTILS);
     }
 
@@ -227,7 +227,7 @@ public class MySQLTimesSuiteTests {
 
     }
 
-    @Test(dependsOnMethods = "parseTimeAsDuration", expectedExceptions = IllegalArgumentException.class)
+    @Test(dependsOnMethods = "parseTimeAsDuration", expectedExceptions = DateTimeException.class)
     public void errorDurationToTimeText1() {
         Duration duration;
         duration = Duration.ofSeconds(MySQLTimes.DURATION_MAX_SECOND, 1L);
@@ -236,7 +236,7 @@ public class MySQLTimesSuiteTests {
 
     }
 
-    @Test(dependsOnMethods = "parseTimeAsDuration", expectedExceptions = IllegalArgumentException.class)
+    @Test(dependsOnMethods = "parseTimeAsDuration", expectedExceptions = DateTimeException.class)
     public void errorDurationToTimeText2() {
         Duration duration;
         duration = Duration.ofSeconds(-MySQLTimes.DURATION_MAX_SECOND, 1L);

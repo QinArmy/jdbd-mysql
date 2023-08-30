@@ -22,19 +22,19 @@ public class MySQLUrlParserSuiteTests {
     private static final Logger LOG = LoggerFactory.getLogger(MySQLUrlParserSuiteTests.class);
 
     @BeforeSuite
-    public static void beforeSuite(ITestContext context) {
+    public void beforeSuite(ITestContext context) {
         LOG.info("\n\njdbd-mysql feature test suite start\n");
 
     }
 
 
     @BeforeClass
-    public static void beforeClass() {
+    public void beforeClass() {
         LOG.info("\nmysql url test start\n");
     }
 
     @AfterClass
-    public static void afterClass() {
+    public void afterClass() {
         LOG.info("\nmysql url test end\n");
     }
 
