@@ -257,7 +257,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeBatchAsMulti()
      */
-    @Test(invocationCount = 3, dataProvider = "callOutParameterProvider", dependsOnMethods = "executeBatchUpdate")
+    @Test(invocationCount = 3, dataProvider = "callOutParameterProvider")
     public void executeBatchAsMulti(final BindSingleStatement statement) {
 
         final int batchItemCount = 3;
@@ -308,6 +308,50 @@ public class BindSingleStatementTests extends SessionTestSupport {
         Assert.assertEquals(statesList.size(), batchItemCount);
 
         LOG.info("executeBatchAsMulti  outParamMapList : \n{}", outParamMapList);
+
+    }
+
+    /**
+     * <p>
+     * Test :
+     *     <ul>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
+     *     </ul>
+     * </p>
+     *
+     * @see BindSingleStatement#executeBatchAsMulti()
+     */
+    @Test(invocationCount = 3, dataProvider = "callOutParameterProvider")
+    public void executeBatchAsFlux(final BindSingleStatement statement) {
+
+        final int batchItemCount = 3;
+
+        for (int i = 0; i < batchItemCount; i++) {
+            statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
+                    .bind(1, JdbdType.TIMESTAMP, OutParameter.out("outNow"))
+
+                    .addBatch();
+        }
+
+
+        final List<? extends Map<String, ?>> rowList;
+
+        // each batch item , MySQL server will produce tow result,
+        // result 1 : out parameter result set , just one row.
+        // result 2 : the result of CALL command
+        rowList = Flux.from(statement.executeBatchAsFlux())
+                .filter(ResultItem::isRowItem)
+                .map(ResultRow.class::cast)
+                .map(this::mapCurrentRowToMap)
+                .collectList()
+                .block();
+
+        Assert.assertNotNull(rowList);
+        Assert.assertEquals(rowList.size(), batchItemCount);
+
+        LOG.info("executeBatchAsFlux out parameter : \n{}", rowList);
 
     }
 
