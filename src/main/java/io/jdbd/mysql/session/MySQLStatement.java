@@ -71,7 +71,6 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     @Override
     public final S bindStmtVar(final String name, final @Nullable DataType dataType,
                                final @Nullable Object value) throws JdbdException {
-        checkReuse();
 
         RuntimeException error = null;
         final MySQLType type;
@@ -287,16 +286,19 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     }
 
 
-    final void endStmtOption() {
+    final void endStmtOption(final boolean clearFetchSize) {
         final Map<String, NamedValue> map = this.queryAttrMap;
         if (map == null) {
             this.queryAttrMap = Collections.emptyMap();
         } else if (map instanceof HashMap) {
             this.queryAttrMap = MySQLCollections.unmodifiableMap(map);
         }
+
+        if (clearFetchSize) {
+            this.fetchSize = 0;
+        }
     }
 
-    abstract void checkReuse() throws JdbdException;
 
     /**
      * @see MySQLPreparedStatement

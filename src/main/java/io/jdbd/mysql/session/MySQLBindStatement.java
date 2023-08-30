@@ -160,8 +160,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public Mono<ResultStates> executeUpdate() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<ParamValue> paramGroup = this.paramGroup;
         if (paramGroup == EMPTY_PARAM_GROUP) {
@@ -199,7 +198,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public <R> Publisher<R> executeQuery(final Function<CurrentRow, R> function, final Consumer<ResultStates> consumer) {
-        this.endStmtOption();
+        this.endStmtOption(false);
 
         final List<ParamValue> paramGroup = this.paramGroup;
         final RuntimeException error;
@@ -226,7 +225,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public OrderedFlux executeAsFlux() {
-        this.endStmtOption();
+        this.endStmtOption(false);
 
         final List<ParamValue> paramGroup = this.paramGroup;
         final RuntimeException error;
@@ -253,8 +252,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public Publisher<ResultStates> executeBatchUpdate() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -283,8 +281,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public QueryResults executeBatchQuery() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -313,8 +310,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public MultiResult executeBatchAsMulti() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -343,8 +339,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     @Override
     public OrderedFlux executeBatchAsFlux() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -392,12 +387,6 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
 
     /*################################## blow packet template method ##################################*/
 
-    @Override
-    void checkReuse() throws JdbdException {
-        if (this.paramGroup == null) {
-            throw MySQLExceptions.cannotReuseStatement(BindStatement.class);
-        }
-    }
 
     /*################################## blow private method ##################################*/
 

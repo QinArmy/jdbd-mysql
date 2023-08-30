@@ -57,8 +57,6 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
     @Override
     public MultiStatement addStatement(final String sql) throws JdbdException {
 
-        this.endStmtOption();
-
         final List<ParamValue> paramGroup = this.paramGroup;
         final RuntimeException error;
 
@@ -131,7 +129,6 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
         if (this.paramGroup == EMPTY_PARAM_GROUP) {
             return Flux.error(MySQLExceptions.cannotReuseStatement(MultiStatement.class));
         }
-
         this.endMultiStatement();
 
         final List<ParamStmt> stmtGroup = this.stmtGroup;
@@ -221,12 +218,6 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
 
     /*################################## blow MySQLStatement packet template method ##################################*/
 
-    @Override
-    void checkReuse() throws JdbdException {
-        if (this.paramGroup == null && this.stmtGroup.size() > 0) {
-            throw MySQLExceptions.cannotReuseStatement(MultiStatement.class);
-        }
-    }
 
     /*################################## blow private method ##################################*/
 
@@ -237,6 +228,8 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
     }
 
     private void endMultiStatement() {
+        this.endStmtOption(true);
+
         final String lastSql = this.currentSql;
         if (lastSql != null) {
             this.stmtGroup.add(Stmts.paramStmt(lastSql, this.paramGroup, this));

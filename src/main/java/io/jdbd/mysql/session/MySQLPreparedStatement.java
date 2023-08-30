@@ -170,8 +170,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public Publisher<ResultStates> executeUpdate() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         List<ParamValue> paramGroup = this.paramGroup;
         final int paramSize = paramGroup == null ? 0 : paramGroup.size();
@@ -216,7 +215,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     @Override
     public <R> Publisher<R> executeQuery(final @Nullable Function<CurrentRow, R> function,
                                          final @Nullable Consumer<ResultStates> consumer) {
-        this.endStmtOption();
+        this.endStmtOption(false);
 
         List<ParamValue> paramGroup = this.paramGroup;
         final int paramSize = paramGroup == null ? 0 : paramGroup.size();
@@ -254,7 +253,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public OrderedFlux executeAsFlux() {
-        this.endStmtOption();
+        this.endStmtOption(false);
 
         List<ParamValue> paramGroup = this.paramGroup;
         final int paramSize = paramGroup == null ? 0 : paramGroup.size();
@@ -286,8 +285,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public Publisher<ResultStates> executeBatchUpdate() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -318,8 +316,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public QueryResults executeBatchQuery() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -351,8 +348,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public MultiResult executeBatchAsMulti() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -382,8 +378,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     @Override
     public OrderedFlux executeBatchAsFlux() {
-        this.endStmtOption();
-        this.fetchSize = 0; // clear
+        this.endStmtOption(true);
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -434,12 +429,6 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
 
     /*################################## blow packet template method ##################################*/
 
-    @Override
-    void checkReuse() throws JdbdException {
-        if (this.paramGroup == EMPTY_PARAM_GROUP) {
-            throw MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
-        }
-    }
 
     @Override
     void closeOnBindError(Throwable error) {

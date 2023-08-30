@@ -31,6 +31,8 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
         return new MySQLStaticStatement(session);
     }
 
+    private boolean executed;
+
     private MySQLStaticStatement(final MySQLDatabaseSession<?> session) {
         super(session);
     }
@@ -38,11 +40,15 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public Publisher<ResultStates> executeUpdate(final String sql) {
-        this.endStmtOption();
-
+        if (this.executed) {
+            return Mono.error(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
         if (!MySQLStrings.hasText(sql)) {
             return Mono.error(MySQLExceptions.sqlIsEmpty());
         }
+
         return this.session.protocol.update(Stmts.stmt(sql, this));
     }
 
@@ -59,7 +65,11 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     @Override
     public <R> Publisher<R> executeQuery(final String sql, final Function<CurrentRow, R> function,
                                          final Consumer<ResultStates> consumer) {
-        this.endStmtOption();
+        if (this.executed) {
+            return Mono.error(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
 
         if (!MySQLStrings.hasText(sql)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
@@ -69,7 +79,11 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public Publisher<ResultStates> executeBatchUpdate(final List<String> sqlGroup) {
-        this.endStmtOption();
+        if (this.executed) {
+            return Flux.error(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return Flux.error(MySQLExceptions.sqlIsEmpty());
@@ -79,7 +93,11 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public QueryResults executeBatchQuery(final List<String> sqlGroup) {
-        this.endStmtOption();
+        if (this.executed) {
+            return MultiResults.batchQueryError(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.batchQueryError(MySQLExceptions.sqlIsEmpty());
@@ -90,7 +108,11 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public MultiResult executeBatchAsMulti(final List<String> sqlGroup) {
-        this.endStmtOption();
+        if (this.executed) {
+            return MultiResults.multiError(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.multiError(MySQLExceptions.sqlIsEmpty());
@@ -100,7 +122,11 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public OrderedFlux executeBatchAsFlux(final List<String> sqlGroup) {
-        this.endStmtOption();
+        if (this.executed) {
+            return MultiResults.fluxError(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
 
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.fluxError(MySQLExceptions.sqlIsEmpty());
@@ -111,7 +137,11 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     @Override
     public OrderedFlux executeMultiStmt(final String multiStmt) {
-        this.endStmtOption();
+        if (this.executed) {
+            return MultiResults.fluxError(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
+        }
+        this.executed = true;
+        this.endStmtOption(true);
 
         final OrderedFlux flux;
         if (!this.session.protocol.supportMultiStmt()) {
@@ -140,10 +170,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
 
     /*################################## blow Statement packet template method ##################################*/
 
-    @Override
-    void checkReuse() {
-        //no-op
-    }
+
 
     /*################################## blow private static method ##################################*/
 
