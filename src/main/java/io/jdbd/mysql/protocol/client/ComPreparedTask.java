@@ -390,13 +390,16 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     public void suspendTask() {
-
+        throw new UnsupportedOperationException("mysql don't need ,and don't need");
     }
 
-    @Nullable
     @Override
     public ResultRowMeta getRowMeta() {
-        return this.rowMeta;
+        final ResultRowMeta meta = this.rowMeta;
+        if (meta == null) {
+            throw new IllegalStateException("meta is null");
+        }
+        return meta;
     }
 
     @Override

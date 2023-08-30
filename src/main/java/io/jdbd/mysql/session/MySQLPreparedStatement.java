@@ -224,7 +224,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
         final RuntimeException error;
         if (paramGroup == EMPTY_PARAM_GROUP) {
             error = MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
-        } else if (this.rowMeta == null) {
+        } else if (this.rowMeta.getColumnCount() == 0) {
             error = new SubscribeException(ResultType.QUERY, ResultType.UPDATE);
         } else if (this.paramGroupList != null) {
             error = new SubscribeException(ResultType.QUERY, ResultType.BATCH_UPDATE);
@@ -299,7 +299,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
             error = MySQLExceptions.noInvokeAddBatch();
         } else if (paramGroupList == null || paramGroupList.size() == 0) {
             error = MySQLExceptions.noAnyParamGroupError();
-        } else if (this.rowMeta == null) {
+        } else if (this.rowMeta.getColumnCount() == 0) {
             error = new SubscribeException(ResultType.BATCH_QUERY, ResultType.UPDATE);
         } else {
             error = null;
@@ -320,6 +320,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     public Publisher<ResultStates> executeBatchUpdate() {
         this.endStmtOption();
 
+        this.fetchSize = 0; // clear
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
         final List<ParamValue> paramGroup = this.paramGroup;
@@ -331,7 +332,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
             error = MySQLExceptions.noInvokeAddBatch();
         } else if (paramGroupList == null || paramGroupList.size() == 0) {
             error = MySQLExceptions.noAnyParamGroupError();
-        } else if (this.rowMeta != null) {
+        } else if (this.rowMeta.getColumnCount() > 0) {
             error = new SubscribeException(ResultType.QUERY, ResultType.BATCH_UPDATE);
         } else {
             error = null;
