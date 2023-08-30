@@ -2,6 +2,7 @@ package io.jdbd.mysql.statement;
 
 
 import com.alibaba.fastjson2.JSON;
+import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.*;
@@ -353,6 +354,41 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
         LOG.info("executeBatchAsFlux out parameter : \n{}", rowList);
 
+    }
+
+    /**
+     * @see io.jdbd.statement.Statement#bindStmtVar(String, DataType, Object)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/query-attributes.html">Query Attributes</a>
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY , static statement Query Attributes bind</a>
+     */
+    @Test(invocationCount = 3, dataProvider = "queryAttrProvider")
+    public void queryWithQueryAttributes(final BindSingleStatement statement) {
+
+        statement.bindStmtVar("rowNum", JdbdType.INTEGER, 1);
+
+        statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
+                .bind(1, JdbdType.INTEGER, 2);
+
+        final List<? extends Map<String, ?>> rowList;
+
+        rowList = Flux.from(statement.executeQuery(this::mapCurrentRowToMap))
+                .collectList()
+                .block();
+
+        Assert.assertNotNull(rowList);
+
+        LOG.info("queryWithQueryAttributes : \n{}", JSON.toJSONString(rowList));
+
+    }
+
+    @DataProvider(name = "queryAttrProvider", parallel = true)
+    public final Object[][] queryAttrProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String sql;
+        sql = "SELECT t.id AS id , CAST(mysql_query_attribute_string('rowNum') AS SIGNED ) AS rowNum FROM mysql_types AS t WHERE t.my_datetime < ? LIMIT ? ";
+        final BindSingleStatement statement;
+        statement = createSingleStatement(targetMethod, context, sql);
+
+        return new Object[][]{{statement}};
     }
 
 

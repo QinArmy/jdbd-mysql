@@ -1,11 +1,15 @@
 package io.jdbd.mysql.statement;
 
+import com.alibaba.fastjson2.JSON;
+import io.jdbd.meta.DataType;
+import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.*;
 import io.jdbd.session.DatabaseSession;
+import io.jdbd.statement.Statement;
 import io.jdbd.statement.StaticStatement;
 import org.testng.Assert;
 import org.testng.ITestContext;
@@ -314,6 +318,33 @@ public class StaticStatementTests extends SessionTestSupport {
 
         Assert.assertFalse(statesList.get(0).hasColumn());
         Assert.assertTrue(statesList.get(1).hasColumn());
+
+    }
+
+    /**
+     * @see Statement#bindStmtVar(String, DataType, Object)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/query-attributes.html">Query Attributes</a>
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY , static statement Query Attributes bind</a>
+     */
+    @Test
+    public void queryWithQueryAttributes(final DatabaseSession session) {
+        final StaticStatement statement;
+        statement = session.statement();
+
+        statement.bindStmtVar("rowNum", JdbdType.INTEGER, 1);
+
+        final String sql;
+        sql = "SELECT t.id AS id , CAST(mysql_query_attribute_string('rowNum') AS SIGNED ) AS rowNum FROM mysql_types AS t LIMIT 2 ";
+
+        final List<? extends Map<String, ?>> rowList;
+
+        rowList = Flux.from(statement.executeQuery(sql, this::mapCurrentRowToMap))
+                .collectList()
+                .block();
+
+        Assert.assertNotNull(rowList);
+
+        LOG.info("queryWithQueryAttributes : \n{}", JSON.toJSONString(rowList));
 
     }
 

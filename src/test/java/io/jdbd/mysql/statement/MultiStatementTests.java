@@ -1,5 +1,7 @@
 package io.jdbd.mysql.statement;
 
+import com.alibaba.fastjson2.JSON;
+import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.*;
@@ -209,6 +211,49 @@ public class MultiStatementTests extends SessionTestSupport {
         Assert.assertNotNull(updateStatesHolder.get());
         Assert.assertNotNull(rowList);
 
+
+    }
+
+
+    /**
+     * @see io.jdbd.statement.Statement#bindStmtVar(String, DataType, Object)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/query-attributes.html">Query Attributes</a>
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY , static statement Query Attributes bind</a>
+     */
+    @Test
+    public void queryWithQueryAttributes(final DatabaseSession session) {
+        final MultiStatement statement;
+        statement = session.multiStatement();
+
+        statement.bindStmtVar("rowNum", JdbdType.INTEGER, 1);
+
+        final String sql;
+        sql = "SELECT t.id AS id , CAST(mysql_query_attribute_string('rowNum') AS SIGNED ) AS rowNum FROM mysql_types AS t WHERE t.my_datetime < ? LIMIT ? ";
+
+        statement.addStatement(sql)
+                .bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
+                .bind(1, JdbdType.INTEGER, 2)
+
+                .addStatement(sql)
+                .bind(0, JdbdType.TIMESTAMP, LocalDateTime.now().minusDays(2))
+                .bind(1, JdbdType.INTEGER, 1)
+
+                .addStatement(sql)
+                .bind(0, JdbdType.TIMESTAMP, LocalDateTime.now().plusDays(2))
+                .bind(1, JdbdType.INTEGER, 3);
+
+        final List<? extends Map<String, ?>> rowList;
+
+        rowList = Flux.from(statement.executeBatchAsFlux())
+                .filter(ResultItem::isRowItem)
+                .map(ResultRow.class::cast)
+                .map(this::mapCurrentRowToMap)
+                .collectList()
+                .block();
+
+        Assert.assertNotNull(rowList);
+
+        LOG.info("queryWithQueryAttributes : \n{}", JSON.toJSONString(rowList));
 
     }
 
