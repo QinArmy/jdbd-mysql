@@ -163,7 +163,7 @@ public abstract class SessionTestSupport {
 
         final String methodName, key;
         methodName = targetMethod.getMethodName();
-        key = targetMethod.getRealClass().getName() + '.' + methodName;
+        key = targetMethod.getRealClass().getName() + '.' + methodName + "#session";
 
         context.setAttribute(key, session);
 

@@ -183,7 +183,7 @@ final class ComQueryTask extends MySQLCommandTask {
 
     /**
      * <p>
-     * This method is underlying api of {@link StaticStatement#executeAsFlux(String)} method.
+     * This method is underlying api of {@link StaticStatementSpec#executeMultiStmt(String)} method.
      * </p>
      */
     static OrderedFlux staticMultiStmt(final StaticMultiStmt stmt, final TaskAdjutant adjutant) {

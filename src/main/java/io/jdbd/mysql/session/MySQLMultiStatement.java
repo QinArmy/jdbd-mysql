@@ -44,7 +44,7 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
         super(session);
     }
 
-    private final List<ParamStmt> stmtGroup = MySQLCollections.arrayList();
+    private List<ParamStmt> stmtGroup = MySQLCollections.arrayList();
 
     private String currentSql;
 
@@ -233,7 +233,7 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
     private void clearStatementToAvoidReuse() {
         this.currentSql = null;
         this.paramGroup = EMPTY_PARAM_GROUP;
-        this.stmtGroup.clear();
+        this.stmtGroup = null;
     }
 
     private void endMultiStatement() {

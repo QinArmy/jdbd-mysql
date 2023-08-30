@@ -18,7 +18,6 @@ import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAccessor;
 import java.util.BitSet;
 import java.util.List;
 import java.util.function.IntSupplier;
@@ -175,12 +174,16 @@ final class QueryCommandWriter extends BinaryWriter {
             if (Capabilities.supportQueryAttr(this.capability)) {
                 writeQueryAttribute(packet, multiStmt.getStmtVarList());
             }
+            ParamStmt stmt;
+            List<String> staticSqlList;
             for (int i = 0; i < size; i++) {
                 if (i > 0) {
-                    packet.writeByte(Constants.SEMICOLON_BYTE);
+                    packet.writeByte(Constants.SPACE)
+                            .writeByte(Constants.SEMICOLON_BYTE)
+                            .writeByte(Constants.SPACE);
                 }
-                final ParamStmt stmt = stmtGroup.get(i);
-                final List<String> staticSqlList = adjutant.parse(stmt.getSql()).sqlPartList();
+                stmt = stmtGroup.get(i);
+                staticSqlList = adjutant.parse(stmt.getSql()).sqlPartList();
                 doWriteBindableCommand(i, staticSqlList, stmt.getParamGroup(), packet);
             }
             return Packets.createPacketPublisher(packet, this.sequenceId, this.adjutant);
@@ -607,11 +610,24 @@ final class QueryCommandWriter extends BinaryWriter {
         final Object nonNull = bindValue.getNonNull();
 
         final String value;
-        if (this.supportZoneOffset && (nonNull instanceof OffsetDateTime || nonNull instanceof ZonedDateTime)) {
-            value = MySQLTimes.OFFSET_DATETIME_FORMATTER_6.format((TemporalAccessor) nonNull);
+        if (nonNull instanceof OffsetDateTime) {
+            if (this.supportZoneOffset) {
+                value = ((OffsetDateTime) nonNull).format(MySQLTimes.OFFSET_DATETIME_FORMATTER_6);
+            } else {
+                value = ((OffsetDateTime) nonNull).withOffsetSameInstant(this.serverZone)
+                        .toLocalDateTime().format(MySQLTimes.DATETIME_FORMATTER_6);
+            }
+        } else if (nonNull instanceof ZonedDateTime) {
+            if (this.supportZoneOffset) {
+                value = ((ZonedDateTime) nonNull).format(MySQLTimes.OFFSET_DATETIME_FORMATTER_6);
+            } else {
+                value = ((ZonedDateTime) nonNull).withZoneSameInstant(this.serverZone)
+                        .toLocalDateTime().format(MySQLTimes.DATETIME_FORMATTER_6);
+            }
         } else {
             value = MySQLBinds.bindToLocalDateTime(batchIndex, bindValue).format(MySQLTimes.DATETIME_FORMATTER_6);
         }
+
         final Charset clientCharset = this.clientCharset;
 
         packet.writeBytes(Constants.TIMESTAMP_SPACE.getBytes(clientCharset));
