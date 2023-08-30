@@ -227,7 +227,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
         }
 
-        final BatchQuery batchQuery;
+        final QueryResults batchQuery;
         batchQuery = statement.executeBatchQuery();
 
         final Function<CurrentRow, Map<String, ?>> function = this::mapCurrentRowToMap;

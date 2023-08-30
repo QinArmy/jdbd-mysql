@@ -181,7 +181,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
         sqlList.add(sql);
         sqlList.add(sql);
 
-        BatchQuery batchQuery;
+        QueryResults batchQuery;
         batchQuery = session.executeBatchQuery(sqlList);
 
 

@@ -9,9 +9,9 @@ import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
-import io.jdbd.result.BatchQuery;
 import io.jdbd.result.MultiResult;
 import io.jdbd.result.OrderedFlux;
+import io.jdbd.result.QueryResults;
 import io.jdbd.result.ResultStates;
 import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.Parameter;
@@ -146,7 +146,7 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
     }
 
     @Override
-    public BatchQuery executeBatchQuery() {
+    public QueryResults executeBatchQuery() {
         if (this.paramGroup == EMPTY_PARAM_GROUP) {
             return MultiResults.batchQueryError(MySQLExceptions.cannotReuseStatement(MultiStatement.class));
         }
@@ -154,7 +154,7 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
         this.endMultiStatement();
 
         final List<ParamStmt> stmtGroup = this.stmtGroup;
-        final BatchQuery batchQuery;
+        final QueryResults batchQuery;
         if (stmtGroup.size() == 0) {
             batchQuery = MultiResults.batchQueryError(MySQLExceptions.multiStmtNoSql());
         } else {

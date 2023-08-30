@@ -60,7 +60,7 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public BatchQuery batchQuery(StaticBatchStmt stmt) {
+    public QueryResults batchQuery(StaticBatchStmt stmt) {
         return ComQueryTask.batchQuery(stmt, this.adjutant);
     }
 
@@ -125,8 +125,8 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public BatchQuery paramBatchQuery(ParamBatchStmt stmt, boolean usePrepare) {
-        final BatchQuery batchQuery;
+    public QueryResults paramBatchQuery(ParamBatchStmt stmt, boolean usePrepare) {
+        final QueryResults batchQuery;
         if (usePrepare) {
             batchQuery = ComPreparedTask.batchQuery(stmt, this.adjutant);
         } else {
@@ -163,7 +163,7 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public BatchQuery multiStmtBatchQuery(ParamMultiStmt stmt) {
+    public QueryResults multiStmtBatchQuery(ParamMultiStmt stmt) {
         return ComQueryTask.multiStmtBatchQuery(stmt, this.adjutant);
     }
 

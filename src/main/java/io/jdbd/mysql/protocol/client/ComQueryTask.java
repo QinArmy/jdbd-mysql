@@ -131,7 +131,7 @@ final class ComQueryTask extends MySQLCommandTask {
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
      * @see MySQLProtocol#batchQuery(StaticBatchStmt)
      */
-    static BatchQuery batchQuery(final StaticBatchStmt stmt, final TaskAdjutant adjutant) {
+    static QueryResults batchQuery(final StaticBatchStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchQuery(adjutant, sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
@@ -291,7 +291,7 @@ final class ComQueryTask extends MySQLCommandTask {
      * </ul>
      * </p>
      */
-    static BatchQuery paramBatchQuery(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
+    static QueryResults paramBatchQuery(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchQuery(adjutant, sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
@@ -359,7 +359,7 @@ final class ComQueryTask extends MySQLCommandTask {
      * This method is the underlying api of below methods {@link MultiStatement#executeBatchQuery()}.
      * </p>
      */
-    static BatchQuery multiStmtBatchQuery(final ParamMultiStmt stmt, final TaskAdjutant adjutant) {
+    static QueryResults multiStmtBatchQuery(final ParamMultiStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchQuery(adjutant, sink -> {
             try {
                 ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);

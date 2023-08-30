@@ -281,7 +281,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     }
 
     @Override
-    public BatchQuery executeBatchQuery() {
+    public QueryResults executeBatchQuery() {
         this.endStmtOption();
 
         final List<List<ParamValue>> paramGroupList = this.paramGroupList;
@@ -297,7 +297,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         } else {
             error = null;
         }
-        final BatchQuery batchQuery;
+        final QueryResults batchQuery;
         if (error == null) {
             final ParamBatchStmt stmt;
             stmt = Stmts.paramBatch(this.sql, paramGroupList, this);

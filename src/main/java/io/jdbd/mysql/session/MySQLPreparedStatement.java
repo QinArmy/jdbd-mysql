@@ -285,7 +285,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
-    public BatchQuery executeBatchQuery() {
+    public QueryResults executeBatchQuery() {
         this.endStmtOption();
 
 
@@ -305,7 +305,7 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
             error = null;
         }
 
-        final BatchQuery batchQuery;
+        final QueryResults batchQuery;
         if (error == null) {
             batchQuery = this.stmtTask.executeBatchQuery(Stmts.paramBatch(this.sql, paramGroupList, this));
         } else {

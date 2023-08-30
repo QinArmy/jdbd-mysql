@@ -78,7 +78,7 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     }
 
     @Override
-    public BatchQuery executeBatchQuery(final List<String> sqlGroup) {
+    public QueryResults executeBatchQuery(final List<String> sqlGroup) {
         this.endStmtOption();
 
         if (MySQLCollections.isEmpty(sqlGroup)) {

@@ -105,7 +105,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
     @Override
-    public final BatchQuery executeBatchQuery(final List<String> sqlGroup) {
+    public final QueryResults executeBatchQuery(final List<String> sqlGroup) {
         if (MySQLCollections.isEmpty(sqlGroup)) {
             return MultiResults.batchQueryError(MySQLExceptions.sqlIsEmpty());
         }

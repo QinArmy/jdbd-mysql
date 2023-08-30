@@ -141,7 +141,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
      */
-    static BatchQuery batchQuery(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
+    static QueryResults batchQuery(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchQuery(adjutant, sink -> {
             try {
                 ComPreparedTask task = new ComPreparedTask(stmt, sink, adjutant);
@@ -336,7 +336,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
 
     @Override
-    public BatchQuery executeBatchQuery(ParamBatchStmt stmt) {
+    public QueryResults executeBatchQuery(ParamBatchStmt stmt) {
         return MultiResults.batchQuery(this.adjutant, sink -> executeAfterBinding(sink, stmt));
     }
 
