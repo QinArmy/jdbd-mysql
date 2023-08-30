@@ -1,5 +1,8 @@
 package io.jdbd.mysql.util;
 
+
+import io.jdbd.lang.Nullable;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.vendor.util.JdbdStrings;
 
 import java.nio.charset.Charset;
@@ -10,6 +13,50 @@ import java.util.Stack;
 
 public abstract class MySQLStrings extends JdbdStrings {
 
+
+    public static boolean isMySqlSimpleIdentifier(final @Nullable String text) {
+        if (text == null) {
+            return false;
+        }
+        final int length = text.length();
+        char ch;
+        boolean match = true;
+        for (int i = 0; i < length; i++) {
+            ch = text.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_') {
+                continue;
+            }
+            if ((ch >= '0' && ch <= '9') || ch == '$') {
+                if (i == 0) {
+                    match = false;
+                    break;
+                }
+                continue;
+            }
+            match = false;
+            break;
+        }
+        return match;
+    }
+
+    /**
+     * This method don't append space before identifier.
+     *
+     * @return true : contain backtick
+     */
+    public static boolean appendMySqlIdentifier(final String text, final StringBuilder builder) {
+        boolean error = false;
+        if (isMySqlSimpleIdentifier(text)) {
+            builder.append(text);
+        } else if (text.indexOf(Constants.BACKTICK) > -1) {
+            error = true;
+        } else {
+            builder.append(Constants.BACKTICK)
+                    .append(text)
+                    .append(Constants.BACKTICK);
+        }
+        return error;
+    }
 
 
     public static byte[] getBytesNullTerminated(String text, Charset charset) {

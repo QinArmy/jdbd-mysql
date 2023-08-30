@@ -74,6 +74,11 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         return new JdbdException(m, cause);
     }
 
+    public static JdbdException mysqlIdentifierContainBacktickError(String text) {
+        final String m = String.format("%s contain backtick '`' , MySQL don't support", text);
+        return new JdbdException(m, MySQLStates.SYNTAX_ERROR, MySQLCodes.ER_SYNTAX_ERROR);
+    }
+
     public static UnrecognizedCollationException unrecognizedCollationError(final Set<Integer> collationSet) {
         final StringBuilder builder = new StringBuilder(30);
         builder.append("unrecognized collation index : ");

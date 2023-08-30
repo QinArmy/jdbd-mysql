@@ -4,7 +4,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.mysql.MySQLDriver;
-import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLCollections;
@@ -19,7 +18,6 @@ import io.jdbd.statement.StaticStatement;
 import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.result.NamedSavePoint;
-import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.task.PrepareTask;
 import org.reactivestreams.Publisher;
@@ -159,6 +157,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final Isolation isolation;
         isolation = option.isolation();
         if (isolation != null) {
+            builder.append("ISOLATION LEVEL ");
             if (appendIsolation(isolation, builder)) {
                 return Mono.error(MySQLExceptions.unknownIsolation(isolation));
             }
@@ -252,9 +251,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     public final Publisher<SavePoint> setSavePoint() {
         final StringBuilder builder;
         builder = MySQLStrings.builder()
-                .append("jdbd-")
+                .append("jdbd_")
                 .append(this.savePointIndex.getAndIncrement())
-                .append('-')
+                .append('_')
                 .append(ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE));
         return this.setSavePoint(builder.toString(), DatabaseProtocol.OPTION_FUNC);
     }
@@ -276,9 +275,13 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (!MySQLStrings.hasText(name)) {
             return Mono.error(MySQLExceptions.savePointNameIsEmpty());
         }
-        final ParamStmt stmt;
-        stmt = Stmts.single("SAVEPOINT ? ", MySQLType.VARCHAR, name);
-        return this.protocol.paramUpdate(stmt, false)
+        final StringBuilder builder = new StringBuilder(12 + name.length());
+        builder.append("SAVEPOINT ");
+
+        if (MySQLStrings.appendMySqlIdentifier(name, builder)) {
+            return Mono.error(MySQLExceptions.mysqlIdentifierContainBacktickError(name));
+        }
+        return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn(NamedSavePoint.fromName(name));
     }
 
@@ -297,13 +300,18 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @SuppressWarnings("unchecked")
     @Override
     public final Publisher<S> releaseSavePoint(SavePoint savepoint, Function<Option<?>, ?> optionFunc) {
-        if (!(savepoint instanceof NamedSavePoint && MySQLStrings.hasText(savepoint.name()))) {
+        final String name;
+        if (!(savepoint instanceof NamedSavePoint && MySQLStrings.hasText(name = savepoint.name()))) {
             return Mono.error(MySQLExceptions.unknownSavePoint(savepoint));
         }
 
-        final ParamStmt stmt;
-        stmt = Stmts.single("RELEASE SAVEPOINT ? ", MySQLType.VARCHAR, savepoint.name());
-        return this.protocol.paramUpdate(stmt, false)
+        final StringBuilder builder = new StringBuilder(22 + name.length());
+        builder.append("RELEASE SAVEPOINT ");
+
+        if (MySQLStrings.appendMySqlIdentifier(name, builder)) {
+            return Mono.error(MySQLExceptions.mysqlIdentifierContainBacktickError(name));
+        }
+        return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn((S) this);
     }
 
@@ -322,13 +330,18 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @SuppressWarnings("unchecked")
     @Override
     public final Publisher<S> rollbackToSavePoint(SavePoint savepoint, Function<Option<?>, ?> optionFunc) {
-        if (!(savepoint instanceof NamedSavePoint && MySQLStrings.hasText(savepoint.name()))) {
+        final String name;
+        if (!(savepoint instanceof NamedSavePoint && MySQLStrings.hasText(name = savepoint.name()))) {
             return Mono.error(MySQLExceptions.unknownSavePoint(savepoint));
         }
 
-        final ParamStmt stmt;
-        stmt = Stmts.single("ROLLBACK TO SAVEPOINT ? ", MySQLType.VARCHAR, savepoint.name());
-        return this.protocol.paramUpdate(stmt, false)
+        final StringBuilder builder = new StringBuilder(25 + name.length());
+        builder.append("ROLLBACK TO SAVEPOINT ");
+
+        if (MySQLStrings.appendMySqlIdentifier(name, builder)) {
+            return Mono.error(MySQLExceptions.mysqlIdentifierContainBacktickError(name));
+        }
+        return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn((S) this);
     }
 

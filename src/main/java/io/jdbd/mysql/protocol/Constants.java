@@ -64,6 +64,8 @@ public interface Constants {
 
     char SPACE = ' ';
 
+    char BACKTICK = '`';
+
     byte SEMICOLON_BYTE = ';';
 
 

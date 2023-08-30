@@ -1,14 +1,12 @@
 package io.jdbd.mysql.session;
 
 
+import io.jdbd.JdbdException;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.*;
-import io.jdbd.session.DatabaseSession;
-import io.jdbd.session.Isolation;
-import io.jdbd.session.LocalDatabaseSession;
-import io.jdbd.session.TransactionOption;
+import io.jdbd.session.*;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
@@ -339,6 +337,90 @@ public class DatabaseSessionTests extends SessionTestSupport {
                     Assert.assertFalse(status.inTransaction());
                     LOG.debug("{} session isolation : {} , session read only : {}", methodName, status.isolation().name(), status.isReadOnly());
                 })
+                .block();
+
+    }
+
+    /**
+     * @see DatabaseSession#setTransactionCharacteristics(TransactionOption)
+     */
+    @Test
+    public void setTransactionCharacteristics(final DatabaseSession session) {
+        TransactionOption txOption;
+
+        TransactionStatus txStatus;
+
+        txOption = TransactionOption.option(Isolation.READ_COMMITTED, true);
+        txStatus = Mono.from(session.setTransactionCharacteristics(txOption))
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .block();
+
+        Assert.assertNotNull(txStatus);
+        Assert.assertFalse(txStatus.inTransaction());
+        Assert.assertEquals(txStatus.isolation(), Isolation.READ_COMMITTED);
+        Assert.assertTrue(txStatus.isReadOnly());
+
+
+        txOption = TransactionOption.option(null, true);
+        txStatus = Mono.from(session.setTransactionCharacteristics(txOption))
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .block();
+
+        Assert.assertNotNull(txStatus);
+        Assert.assertFalse(txStatus.inTransaction());
+        Assert.assertNotNull(txStatus.isolation());
+        Assert.assertTrue(txStatus.isReadOnly());
+
+    }
+
+    /**
+     * @see DatabaseSession#setSavePoint(String, Function)
+     * @see DatabaseSession#releaseSavePoint(SavePoint, Function)
+     * @see DatabaseSession#rollbackToSavePoint(SavePoint, Function)
+     */
+    @Test(dependsOnMethods = "executeUpdateInsert")
+    public void savePoint(final LocalDatabaseSession session) {
+        final String updateSql;
+        updateSql = "UPDATE mysql_types AS t SET t.my_decimal = t.my_decimal + 888.66 WHERE t.my_datetime < current_timestamp LIMIT 1 ";
+
+
+        Mono.from(session.startTransaction())
+                .flatMap(s -> Mono.from(s.executeUpdate(updateSql)))
+
+                .flatMap(s -> Mono.from(session.setSavePoint()))
+                .flatMap(s -> Mono.from(session.releaseSavePoint(s, option -> null)))
+
+                .flatMap(s -> Mono.from(session.setSavePoint("s1", option -> null)))
+                .flatMap(s -> Mono.from(session.releaseSavePoint(s, option -> null)))
+
+                .flatMap(s -> Mono.from(session.setSavePoint("s2", option -> null)))
+                .flatMap(s -> Mono.from(session.rollbackToSavePoint(s, option -> null)))
+
+                .flatMap(s -> Mono.from(session.setSavePoint("army's point", option -> null)))
+                .flatMap(s -> Mono.from(session.releaseSavePoint(s, option -> null)))
+
+
+                .flatMap(s -> Mono.from(session.setSavePoint("888888886666666", option -> null)))
+                .flatMap(s -> Mono.from(session.rollbackToSavePoint(s, option -> null)))
+
+                .flatMap(s -> Mono.from(s.commit()))
+                .block();
+
+    }
+
+    /**
+     * @see DatabaseSession#setSavePoint(String, Function)
+     */
+    @Test(dependsOnMethods = "executeUpdateInsert", expectedExceptions = JdbdException.class)
+    public void savePointContainBacktick(final LocalDatabaseSession session) {
+
+        final String updateSql;
+        updateSql = "UPDATE mysql_types AS t SET t.my_decimal = t.my_decimal + 888.66 WHERE t.my_datetime < current_timestamp LIMIT 1 ";
+
+        Mono.from(session.startTransaction())
+                .flatMap(s -> Mono.from(s.executeUpdate(updateSql)))
+                .onErrorMap(RuntimeException::new)
+                .flatMap(s -> Mono.from(session.setSavePoint("s1`", option -> null)))
                 .block();
 
     }
