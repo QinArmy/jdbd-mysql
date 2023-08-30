@@ -21,6 +21,7 @@ import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -412,13 +413,13 @@ public class BindSingleStatementTests extends SessionTestSupport {
     /**
      * @see io.jdbd.statement.Statement#setFetchSize(int)
      */
-    @Test(invocationCount = 1, dataProvider = "simpleQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
+    @Test(invocationCount = 3, dataProvider = "simpleQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void queryWithFetch(final BindSingleStatement statement) {
-        statement.bind(0, JdbdType.INTEGER, 300_0000)
-                .setFetchSize(20);
+
+        statement.setFetchSize(20);
 
         final Long rowCount;
-        rowCount = Flux.from(statement.executeQuery())
+        rowCount = Flux.from(statement.executeQuery(row -> Optional.empty()))
                 .count()
                 .block();
 
@@ -494,7 +495,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
     @DataProvider(name = "simpleQueryProvider", parallel = true)
     public final Object[][] simpleQueryProvider(final ITestNGMethod targetMethod, final ITestContext context) {
-        final String sql = "SELECT t.* FROM mysql_types AS t LIMIT ?";
+        final String sql = "SELECT t.* FROM mysql_types AS t ";
         final BindSingleStatement statement;
         statement = createSingleStatement(targetMethod, context, sql);
         return new Object[][]{{statement}};

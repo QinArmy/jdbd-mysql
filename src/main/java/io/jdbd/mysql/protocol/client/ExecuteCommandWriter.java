@@ -104,6 +104,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             // this 'if' block handle no bind parameter.
             final ByteBuf packet;
             packet = createExecutePacket(10);
+            Packets.writeIntLenEnc(packet, 0); // parameter_count
             this.stmtTask.resetSequenceId(); // reset sequenceId before write header
             publisher = Packets.createPacketPublisher(packet, this.sequenceId, this.adjutant);
         } else if (longParamList == null || longParamList.size() == 0) {
