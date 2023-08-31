@@ -143,22 +143,6 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
         return this.factoryClosed.get();
     }
 
-    /**
-     * @see #close()
-     */
-    private <T> Mono<T> closeFactory() {
-        final Mono<T> mono;
-        if (this.factoryClosed.compareAndSet(false, true)) {
-            final String className = getClass().getName();
-            LOG.debug("close {}[{}] ...", className, this.name);
-            mono = this.protocolFactory.close()
-                    .doOnSuccess(v -> LOG.debug("close {}[{}] success", className, this.name))
-                    .then(Mono.empty());
-        } else {
-            mono = Mono.empty();
-        }
-        return mono;
-    }
 
     @Override
     public <T> T valueOf(Option<T> option) {
@@ -183,6 +167,23 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
                 .append(System.identityHashCode(this))
                 .append(" ]")
                 .toString();
+    }
+
+    /**
+     * @see #close()
+     */
+    private <T> Mono<T> closeFactory() {
+        final Mono<T> mono;
+        if (this.factoryClosed.compareAndSet(false, true)) {
+            final String className = getClass().getName();
+            LOG.debug("close {}[{}] ...", className, this.name);
+            mono = this.protocolFactory.close()
+                    .doOnSuccess(v -> LOG.debug("close {}[{}] success", className, this.name))
+                    .then(Mono.empty());
+        } else {
+            mono = Mono.empty();
+        }
+        return mono;
     }
 
     /**

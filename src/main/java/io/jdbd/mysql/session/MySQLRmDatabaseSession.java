@@ -68,6 +68,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     @Override
+    public final Publisher<RmDatabaseSession> start(Xid xid) {
+        return this.start(xid, TM_NO_FLAGS, TransactionOption.option(null, false));
+    }
+
+    @Override
     public final Publisher<RmDatabaseSession> start(final Xid xid, final int flags) {
         return this.start(xid, flags, TransactionOption.option(null, false));
     }
@@ -140,6 +145,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 .then(Mono.just(this));
     }
 
+    @Override
+    public final Publisher<RmDatabaseSession> end(Xid xid) {
+        return this.end(xid, TM_SUCCESS, DatabaseProtocol.OPTION_FUNC);
+    }
 
     @Override
     public final Publisher<RmDatabaseSession> end(final Xid xid, final int flags) {
@@ -221,6 +230,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                     .thenReturn(XA_OK);
         }
         return mono;
+    }
+
+    @Override
+    public final Publisher<RmDatabaseSession> commit(Xid xid) {
+        return this.commit(xid, TM_NO_FLAGS, DatabaseProtocol.OPTION_FUNC);
     }
 
     @Override
@@ -316,6 +330,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     @Override
     public final Publisher<RmDatabaseSession> forget(Xid xid, Function<Option<?>, ?> optionFunc) {
         return Mono.error(new XaException("MySQL don't support forget command", XaException.XAER_RMERR));
+    }
+
+    @Override
+    public final Publisher<Optional<Xid>> recover() {
+        return this.recover(TM_NO_FLAGS, DatabaseProtocol.OPTION_FUNC);
     }
 
     @Override
