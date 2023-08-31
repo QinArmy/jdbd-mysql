@@ -22,6 +22,10 @@ import org.testng.annotations.DataProvider;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
 
@@ -34,19 +38,33 @@ public abstract class SessionTestSupport {
 
 
     @BeforeSuite
-    public final void beforeSuiteCreateSessionFactory() {
-        if (sessionFactory == null) {
-            sessionFactory = createSessionFactory();
+    public final void beforeSuiteCreateSessionFactory() throws Exception {
+        if (sessionFactory != null) {
+            return;
         }
+        sessionFactory = createSessionFactory();
 
+        // create table
+        final Path path;
+        path = Paths.get(ClientTestUtils.getTestResourcesPath().toString(), "ddl/mysqlTypes.sql");
+        final String sql;
+        sql = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+        Mono.from(sessionFactory.localSession())
+                .flatMap(session -> Mono.from(session.executeUpdate(sql)))
+                .block();
     }
 
     @AfterSuite
     public final void afterSuiteCloseSessionFactory() {
         final DatabaseSessionFactory sessionFactory = SessionTestSupport.sessionFactory;
 
+
         if (sessionFactory != null && !sessionFactory.isClosed()) {
-            Mono.from(sessionFactory.close())
+            final String sql = "DROP TABLE IF EXISTS my_types";
+            Mono.from(sessionFactory.localSession())
+                    .flatMap(session -> Mono.from(session.executeUpdate(sql)))
+                    .doOnSuccess(s -> LOG.info("{} ; complete", sql))
+                    .then(Mono.defer(() -> Mono.from(sessionFactory.close())))
                     .block();
         }
 

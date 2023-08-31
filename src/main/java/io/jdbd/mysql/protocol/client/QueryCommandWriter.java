@@ -386,7 +386,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 case FLOAT_UNSIGNED: {
                     final float value;
                     value = MySQLBinds.bindToFloat(batchIndex, paramValue);
-                    if (value < 0.0f) {
+                    if (Float.compare(value, 0.0f) < 0) {
                         throw JdbdExceptions.outOfTypeRange(batchIndex, paramValue, null);
                     }
                     packet.writeBytes(Float.toString(value).getBytes(this.clientCharset));
@@ -401,7 +401,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 case DOUBLE_UNSIGNED: {
                     final double value;
                     value = MySQLBinds.bindToDouble(batchIndex, paramValue);
-                    if (value < 0.0d) {
+                    if (Double.compare(value, 0.0d) < 0) {
                         throw JdbdExceptions.outOfTypeRange(batchIndex, paramValue, null);
                     }
                     packet.writeBytes(Double.toString(value).getBytes(this.clientCharset));
@@ -607,14 +607,14 @@ final class QueryCommandWriter extends BinaryWriter {
 
         final String value;
         if (nonNull instanceof OffsetDateTime) {
-            if (this.supportZoneOffset) {
+            if (this.supportZoneOffset && bindValue.getType() != MySQLType.TIMESTAMP) {
                 value = ((OffsetDateTime) nonNull).format(MySQLTimes.OFFSET_DATETIME_FORMATTER_6);
             } else {
                 value = ((OffsetDateTime) nonNull).withOffsetSameInstant(this.serverZone)
                         .toLocalDateTime().format(MySQLTimes.DATETIME_FORMATTER_6);
             }
         } else if (nonNull instanceof ZonedDateTime) {
-            if (this.supportZoneOffset) {
+            if (this.supportZoneOffset && bindValue.getType() != MySQLType.TIMESTAMP) {
                 value = ((ZonedDateTime) nonNull).format(MySQLTimes.OFFSET_DATETIME_FORMATTER_6);
             } else {
                 value = ((ZonedDateTime) nonNull).withZoneSameInstant(this.serverZone)

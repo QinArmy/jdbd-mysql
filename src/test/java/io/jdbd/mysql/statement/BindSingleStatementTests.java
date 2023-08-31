@@ -4,10 +4,13 @@ package io.jdbd.mysql.statement;
 import com.alibaba.fastjson2.JSON;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
+import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.*;
+import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.BindSingleStatement;
 import io.jdbd.statement.OutParameter;
+import io.jdbd.statement.PreparedStatement;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
@@ -115,7 +118,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeQuery(Function, Consumer)
      */
-    @Test(invocationCount = 3, dataProvider = "executeQueryProvider", dependsOnMethods = "executeUpdateInsert")
+    @Test(invocationCount = 3, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void executeQuery(final BindSingleStatement statement) {
 
         statement.bind(0, JdbdType.BIGINT, 1)
@@ -185,7 +188,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeUpdate()
      */
-    @Test(invocationCount = 3, dataProvider = "insertDatProvider")
+    @Test(invocationCount = 3, dataProvider = "insertDatProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void executeBatchUpdate(final BindSingleStatement statement) {
         final int batchItemCount = 3;
 
@@ -224,7 +227,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeBatchQuery()
      */
-    @Test(invocationCount = 3, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdate")
+    @Test(invocationCount = 3, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void executeBatchQuery(final BindSingleStatement statement) {
 
 
@@ -392,6 +395,16 @@ public class BindSingleStatementTests extends SessionTestSupport {
      */
     @Test(invocationCount = 3, dataProvider = "queryAttrProvider")
     public void queryWithQueryAttributes(final BindSingleStatement statement) {
+        final DatabaseSession session;
+        session = statement.getSession();
+
+        if (!((MySQLServerVersion) session.serverVersion()).isSupportQueryAttr()) {
+            if (statement instanceof PreparedStatement) {
+                ((PreparedStatement) statement).abandonBind();
+            }
+            LOG.info("MySQL server don't support query attributes ignore test.");
+            return;
+        }
 
         statement.bindStmtVar("rowNum", JdbdType.INTEGER, 1);
 

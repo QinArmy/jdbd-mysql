@@ -6,9 +6,11 @@ import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
+import io.jdbd.type.Point;
 import io.jdbd.vendor.stmt.NamedValue;
 import io.jdbd.vendor.stmt.Value;
 import io.jdbd.vendor.util.JdbdExceptions;
+import io.jdbd.vendor.util.JdbdSpatials;
 import io.jdbd.vendor.util.JdbdTimes;
 import io.netty.buffer.ByteBuf;
 
@@ -141,7 +143,7 @@ abstract class BinaryWriter {
             case FLOAT_UNSIGNED: {
                 final float value;
                 value = MySQLBinds.bindToFloat(batchIndex, paramValue);
-                if (value < 0.0) {
+                if (Float.compare(value, 0.0f) < 0) {
                     throw MySQLExceptions.outOfTypeRange(batchIndex, paramValue, null);
                 }
                 Packets.writeInt4(packet, Float.floatToIntBits(value));// here string[4] is Little Endian int4
@@ -156,7 +158,7 @@ abstract class BinaryWriter {
             case DOUBLE_UNSIGNED: {
                 final double value;
                 value = MySQLBinds.bindToDouble(batchIndex, paramValue);
-                if (value < 0.0d) {
+                if (Double.compare(value, 0.0d) < 0) {
                     throw MySQLExceptions.outOfTypeRange(batchIndex, paramValue, null);
                 }
                 Packets.writeInt8(packet, Double.doubleToLongBits(value));// here string[8] is Little Endian int8
@@ -207,7 +209,9 @@ abstract class BinaryWriter {
             break;
             case GEOMETRY: {
                 final Object nonNull = paramValue.getNonNull();
-                if (nonNull instanceof byte[]) {
+                if (nonNull instanceof Point) {
+                    Packets.writeStringLenEnc(packet, JdbdSpatials.writePointToWkb(false, (Point) nonNull));
+                } else if (nonNull instanceof byte[]) {
                     Packets.writeStringLenEnc(packet, (byte[]) nonNull);
                 } else if (nonNull instanceof String) {
                     Packets.writeStringLenEnc(packet, ((String) nonNull).getBytes(this.clientCharset));

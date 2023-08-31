@@ -3,6 +3,7 @@ package io.jdbd.mysql.statement;
 import com.alibaba.fastjson2.JSON;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
+import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.*;
 import io.jdbd.session.DatabaseSession;
@@ -222,6 +223,11 @@ public class MultiStatementTests extends SessionTestSupport {
      */
     @Test
     public void queryWithQueryAttributes(final DatabaseSession session) {
+        if (!((MySQLServerVersion) session.serverVersion()).isSupportQueryAttr()) {
+            LOG.info("MySQL server don't support query attributes ignore test.");
+            return;
+        }
+
         final MultiStatement statement;
         statement = session.multiStatement();
 

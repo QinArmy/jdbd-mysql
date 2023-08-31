@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLTimes;
@@ -310,6 +311,11 @@ public class StaticStatementTests extends SessionTestSupport {
      */
     @Test
     public void queryWithQueryAttributes(final DatabaseSession session) {
+        if (!((MySQLServerVersion) session.serverVersion()).isSupportQueryAttr()) {
+            LOG.info("MySQL server don't support query attributes ignore test.");
+            return;
+        }
+
         StaticStatement statement;
         statement = session.statement();
 
