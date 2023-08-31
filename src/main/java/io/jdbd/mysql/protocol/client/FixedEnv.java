@@ -32,7 +32,6 @@ abstract class FixedEnv {
 
     private static final Map<String, Function<AuthenticateAssistant, AuthenticationPlugin>> BUILDIN_PLUGIN_MAP = createPluginConstructorMap();
 
-    final boolean transformedBitIsBoolean;
 
     final boolean functionsNeverReturnBlobs;
 
@@ -55,7 +54,7 @@ abstract class FixedEnv {
     final Environment env;
 
     FixedEnv(Environment env) {
-        this.transformedBitIsBoolean = env.getOrDefault(MySQLKey.TRANS_FORMED_BIT_IS_BOOLEAN);
+       // this.transformedBitIsBoolean = env.getOrDefault(MySQLKey.TRANS_FORMED_BIT_IS_BOOLEAN);
         this.functionsNeverReturnBlobs = env.getOrDefault(MySQLKey.FUNCTIONS_NEVER_RETURN_BLOBS);
         this.blobsAreStrings = env.getOrDefault(MySQLKey.BLOBS_ARE_STRINGS);
         this.maxAllowedPacket = parseMaxAllowedPacket(env);

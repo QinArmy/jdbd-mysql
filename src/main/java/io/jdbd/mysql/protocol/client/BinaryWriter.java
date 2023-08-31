@@ -93,13 +93,6 @@ abstract class BinaryWriter {
                 break;
             case MEDIUMINT: {
                 final int v = MySQLBinds.bindToInt(batchIndex, paramValue, -0x80_00_00, 0x7F_FF_FF);
-//                if (v >= 0) {
-//                    Packets.writeInt4(packet, v);
-//                } else if (v == -0x80_00_00) {
-//                    Packets.writeInt4(packet, 0x80_00_00);
-//                } else {
-//                    Packets.writeInt4(packet, 0x80_00_00 | ((-v ^ 0x7F_FF_FF) + 1));
-//                }
                 // see io.jdbd.mysql.protocol.client.BinaryWriter.decideActualType() , actually bind INT type
                 Packets.writeInt4(packet, v);
             }
@@ -262,9 +255,9 @@ abstract class BinaryWriter {
      * @see #writeBinary(ByteBuf, int, Value, int)
      * @see MySQLServerVersion#isSupportZoneOffset()
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/date-and-time-literals.html">Date and Time Literals</a>
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row">Binary Protocol</a>
      */
     final MySQLType decideActualType(final Value paramValue) {
-        final Object source = paramValue.getNonNull();
         final MySQLType type = (MySQLType) paramValue.getType();
         final MySQLType bindType;
         switch (type) {
@@ -272,6 +265,11 @@ abstract class BinaryWriter {
                 // Server 8.0.27 and before ,can't bind BIT type.
                 //@see writeBit method.
                 bindType = MySQLType.BIGINT;
+            }
+            break;
+            case BOOLEAN: {
+                // @see  https://dev.mysql.com/doc/refman/8.1/en/numeric-type-syntax.html  ; BOOLEAN are synonyms for TINYINT(1).
+                bindType = MySQLType.TINYINT;
             }
             break;
             case MEDIUMINT: {
@@ -292,6 +290,7 @@ abstract class BinaryWriter {
             }
             break;
             case DATETIME: {
+                final Object source = paramValue.get();
                 if (this.supportZoneOffset && (source instanceof OffsetDateTime || source instanceof ZonedDateTime)) {
                     //As of MySQL 8.0.19 can append zone
                     //Datetime literals that include time zone offsets are accepted as parameter values by prepared statements.
@@ -404,7 +403,7 @@ abstract class BinaryWriter {
         if (nonNull instanceof OffsetDateTime) {
             final OffsetDateTime value;
             value = JdbdTimes.truncatedIfNeed(scale, (OffsetDateTime) nonNull);
-            if (this.supportZoneOffset) {
+            if (this.supportZoneOffset && paramValue.getType() != MySQLType.TIMESTAMP) {
                 final byte[] bytes;
                 bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(this.clientCharset);
                 Packets.writeStringLenEnc(packet, bytes);
@@ -414,7 +413,7 @@ abstract class BinaryWriter {
         } else if (nonNull instanceof ZonedDateTime) {
             final ZonedDateTime value;
             value = JdbdTimes.truncatedIfNeed(scale, (ZonedDateTime) nonNull);
-            if (this.supportZoneOffset) {
+            if (this.supportZoneOffset && paramValue.getType() != MySQLType.TIMESTAMP) {
                 final byte[] bytes;
                 bytes = value.format(JdbdTimes.OFFSET_DATETIME_FORMATTER_6).getBytes(this.clientCharset);
                 Packets.writeStringLenEnc(packet, bytes);

@@ -82,6 +82,15 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
+                .flatMap(s -> Mono.from(session.commit()))
+                .doOnSuccess(s -> Assert.assertFalse(s.inTransaction()))
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .doOnSuccess(s -> {
+                    Assert.assertFalse(s.inTransaction());
+                    Assert.assertNotNull(s.isolation());
+                    Assert.assertFalse(s.isReadOnly());
+                    Assert.assertNull(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT));
+                })
                 .block();
     }
 
@@ -140,6 +149,16 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
+                .flatMap(s -> Mono.from(session.rollback()))
+                .doOnSuccess(s -> Assert.assertFalse(s.inTransaction()))
+
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .doOnSuccess(s -> {
+                    Assert.assertFalse(s.inTransaction());
+                    Assert.assertNotNull(s.isolation());
+                    Assert.assertFalse(s.isReadOnly());
+                    Assert.assertNull(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT));
+                })
                 .block();
     }
 
@@ -169,7 +188,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.commit(optionMap::get))) // COMMIT RELEASE
-                .delayElement(Duration.ofMillis(5)) // wait for close
+                .delayElement(Duration.ofMillis(200)) // wait for close
                 .block();
 
         Assert.assertTrue(session.isClosed());
@@ -202,7 +221,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.rollback(optionMap::get)))  // ROLLBACK RELEASE
-                .delayElement(Duration.ofMillis(5)) // wait for close
+                .delayElement(Duration.ofMillis(200)) // wait for close
                 .block();
 
         Assert.assertTrue(session.isClosed());

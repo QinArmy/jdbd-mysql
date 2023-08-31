@@ -415,8 +415,8 @@ public class BindSingleStatementTests extends SessionTestSupport {
      */
     @Test(invocationCount = 3, dataProvider = "simpleQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void queryWithFetch(final BindSingleStatement statement) {
-
-        statement.setFetchSize(20);
+        statement.bind(0, JdbdType.INTEGER, 20)
+                .setFetchSize(5);
 
         final Long rowCount;
         rowCount = Flux.from(statement.executeQuery(row -> Optional.empty()))
@@ -495,7 +495,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
     @DataProvider(name = "simpleQueryProvider", parallel = true)
     public final Object[][] simpleQueryProvider(final ITestNGMethod targetMethod, final ITestContext context) {
-        final String sql = "SELECT t.* FROM mysql_types AS t ";
+        final String sql = "SELECT t.* FROM mysql_types AS t LIMIT ?";
         final BindSingleStatement statement;
         statement = createSingleStatement(targetMethod, context, sql);
         return new Object[][]{{statement}};

@@ -649,11 +649,11 @@ public final class MySQLKey<T> extends Key<T> {
     public static final MySQLKey<Boolean> TINY_INT1_IS_BIT = new MySQLKey<>("tinyInt1isBit", Boolean.class, Boolean.TRUE);
 
 
-    /**
-     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-result-sets.html">transformedBitIsBoolean</a>
-     * @since MySQL Driver  3.1.9
-     */
-    public static final MySQLKey<Boolean> TRANS_FORMED_BIT_IS_BOOLEAN = new MySQLKey<>("transformedBitIsBoolean", Boolean.class, Boolean.FALSE);
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-result-sets.html">transformedBitIsBoolean</a>
+//     * @since MySQL Driver  3.1.9
+//     */
+//    public static final MySQLKey<Boolean> TRANS_FORMED_BIT_IS_BOOLEAN = new MySQLKey<>("transformedBitIsBoolean", Boolean.class, Boolean.FALSE);
 
     /*-------------------below Metadata group-------------------*/
 

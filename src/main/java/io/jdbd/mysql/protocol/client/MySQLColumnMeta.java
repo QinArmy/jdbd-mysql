@@ -483,7 +483,7 @@ final class MySQLColumnMeta implements ColumnMeta {
                 break;
             case Constants.TYPE_TINY: {
                 final boolean unsigned = columnMeta.isUnsigned();
-                if (columnMeta.length == 1 && unsigned && env.transformedBitIsBoolean) {
+                if (columnMeta.length == 1) {
                     type = MySQLType.BOOLEAN;
                 } else {
                     type = unsigned ? MySQLType.TINYINT_UNSIGNED : MySQLType.TINYINT;

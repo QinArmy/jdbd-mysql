@@ -229,7 +229,10 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             } else {
                 paramCount = paramMetaArray.length;
             }
-            Packets.writeIntLenEnc(packet, paramCount); // parameter_count
+
+            if (supportQueryAttr) {
+                Packets.writeIntLenEnc(packet, paramCount); // parameter_count
+            }
 
             final byte[] nullBitsMap = new byte[(paramCount + 7) >> 3];
             final int nullBitsMapIndex = packet.writerIndex();

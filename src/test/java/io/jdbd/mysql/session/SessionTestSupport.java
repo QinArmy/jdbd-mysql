@@ -162,7 +162,7 @@ public abstract class SessionTestSupport {
         cacheSession = context.getAttribute(keyOfSession);
 
         final DatabaseSession session;
-        if (cacheSession instanceof TestSessionHolder) {
+        if (cacheSession instanceof TestSessionHolder && !methodName.contains("Release")) {
             session = ((TestSessionHolder) cacheSession).session;
         } else {
             if (local) {

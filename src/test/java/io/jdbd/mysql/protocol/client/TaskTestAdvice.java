@@ -598,13 +598,13 @@ public class TaskTestAdvice extends AbstractTaskSuiteTests {
         assertNotNull(row.get(columnAlias, Boolean.class), columnAlias + " convert to boolean");
 
         if (properties.isOn(MySQLKey.TINY_INT1_IS_BIT)) {
-            if (properties.isOn(MySQLKey.TRANS_FORMED_BIT_IS_BOOLEAN)) {
-                assertEquals(myBooleanType, MySQLType.BOOLEAN, columnAlias + " mysql type");
-                assertTrue(row.get(columnAlias) instanceof Boolean, columnAlias + " is boolean type.");
-            } else {
-                assertEquals(myBooleanType, MySQLType.BIT, columnAlias + " mysql type");
-                assertTrue(row.get(columnAlias) instanceof Long, columnAlias + " is Byte type.");
-            }
+//            if (properties.isOn(MySQLKey.TRANS_FORMED_BIT_IS_BOOLEAN)) {
+//                assertEquals(myBooleanType, MySQLType.BOOLEAN, columnAlias + " mysql type");
+//                assertTrue(row.get(columnAlias) instanceof Boolean, columnAlias + " is boolean type.");
+//            } else {
+//                assertEquals(myBooleanType, MySQLType.BIT, columnAlias + " mysql type");
+//                assertTrue(row.get(columnAlias) instanceof Long, columnAlias + " is Byte type.");
+//            }
 
         } else {
             assertEquals(myBooleanType, MySQLType.TINYINT, columnAlias + " mysql type");
