@@ -205,6 +205,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
     /**
      * @return {@link Flux} that is created by {@link Flux#fromIterable(Iterable)} method.
+     * @see #writeCommand(int)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html">Protocol::COM_STMT_EXECUTE</a>
      */
     private Publisher<ByteBuf> bindParameters(final int batchIndex, final List<ParamValue> paramGroup)

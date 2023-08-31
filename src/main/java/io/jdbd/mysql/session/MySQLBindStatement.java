@@ -97,7 +97,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
             if (paramGroup == null) {
                 this.paramGroup = paramGroup = MySQLCollections.arrayList(firstGroupSize < 0 ? 0 : firstGroupSize);
             }
-            if (value instanceof Parameter) { // TODO long string or binary
+            if (value instanceof Parameter) { // TODO long string or binary or out parameter
                 this.usePrepare = true;
             }
             paramGroup.add(JdbdValues.paramValue(indexBasedZero, type, value));

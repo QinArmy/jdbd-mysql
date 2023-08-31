@@ -151,6 +151,8 @@ public abstract class SessionTestSupport {
 
     private Object[][] createDatabaseSession(final boolean local, final ITestNGMethod targetMethod,
                                              final ITestContext context) {
+
+
         final DatabaseSession session;
         if (local) {
             session = Mono.from(sessionFactory.localSession())
@@ -170,11 +172,40 @@ public abstract class SessionTestSupport {
         final Class<?>[] parameterTypeArray;
         parameterTypeArray = targetMethod.getParameterTypes();
 
-        final boolean methodNameParameter = parameterTypeArray.length > 1 && parameterTypeArray[1] == String.class;
+
+        int sessionIndex = -1, methodIndex = -1, readOnlyIndex = -1;
+
+
+        Class<?> parameterType;
+        for (int i = 0; i < parameterTypeArray.length; i++) {
+            parameterType = parameterTypeArray[i];
+            if (DatabaseSession.class.isAssignableFrom(parameterType)) {
+                sessionIndex = i;
+            } else if (parameterType == boolean.class) {
+                readOnlyIndex = i;
+            } else if (parameterType == String.class) {
+                methodIndex = i;
+            }
+        }
+
+        final int currentInvocationCount = targetMethod.getCurrentInvocationCount() + 1;
+
+        final boolean readOnly = (currentInvocationCount & 1) == 0;
 
         final Object[][] result;
-        if (methodNameParameter) {
-            result = new Object[][]{{session, methodName}};
+        if (sessionIndex > -1 && methodIndex > -1 && readOnlyIndex > -1) {
+            result = new Object[1][3];
+            result[0][sessionIndex] = session;
+            result[0][methodIndex] = methodName;
+            result[0][readOnlyIndex] = readOnly;
+        } else if (sessionIndex > -1 && readOnlyIndex > -1) {
+            result = new Object[1][2];
+            result[0][sessionIndex] = session;
+            result[0][readOnlyIndex] = readOnly;
+        } else if (sessionIndex > -1 && methodIndex > -1) {
+            result = new Object[1][2];
+            result[0][sessionIndex] = session;
+            result[0][methodIndex] = methodName;
         } else {
             result = new Object[][]{{session}};
         }

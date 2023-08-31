@@ -419,7 +419,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
 
-    private void onSessionClose() {
+    final void onSessionClose() {
+        super.onSessionClose();
         CURRENT_TX_OPTION.set(this, null);  // clear cache , avoid reconnect occur bug
         LOG.debug("session close event,clear current xa transaction cache.");
 
@@ -446,18 +447,18 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
         assert hexString.startsWith("0x") : "mysql XA RECOVER convert xid response error";
 
-        final byte[] hexBytes;
-        hexBytes = hexString.substring(2).getBytes(StandardCharsets.UTF_8);
+        final byte[] idBytes;
+        idBytes = MySQLBuffers.decodeHex(hexString.substring(2).getBytes(StandardCharsets.UTF_8));
 
         final String gtrid, bqual;
         if (gtridLength == 0) {
             return Optional.empty(); // non-jdbd create xid
         }
-        gtrid = MySQLBuffers.decodeHexAsString(hexBytes, 0, gtridLength);
+        gtrid = new String(idBytes, 0, gtridLength);
         if (bqualLength == 0) {
             bqual = null;
         } else {
-            bqual = MySQLBuffers.decodeHexAsString(hexBytes, gtridLength, gtridLength + bqualLength);
+            bqual = new String(idBytes, gtridLength, bqualLength);
         }
         return Optional.of(Xid.from(gtrid, bqual, formatId));
     }
@@ -487,7 +488,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         builder.append(" 0x")
                 .append(MySQLBuffers.hexEscapesText(true, gtridBytes, gtridBytes.length));
 
-        builder.append(',');
+        builder.append(Constants.COMMA);
         if (bqual != null) {
             if ((bqualBytes = bqual.getBytes(StandardCharsets.UTF_8)).length > 64) {
                 return MySQLExceptions.xaBqualBeyond64Bytes();

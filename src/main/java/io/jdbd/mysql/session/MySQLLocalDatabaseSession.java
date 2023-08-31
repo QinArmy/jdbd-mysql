@@ -203,6 +203,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     /**
      * @see #commit(Function)
      * @see #rollback(Function)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">COMMIT</a>
      */
     private Mono<LocalDatabaseSession> commitOrRollback(final boolean commit,
                                                         final @Nullable Function<Option<?>, ?> optionFunc) {
@@ -244,6 +245,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                     if (states.inTransaction()) {
                         assert Boolean.TRUE.equals(chain) : "ResultStates bug";
                         CURRENT_TX_OPTION.set(this, currentTxOption); // record old value. NOTE : this occur after this.onTransactionEnd().
+                    } else {
+                        CURRENT_TX_OPTION.set(this, null);
                     }
                 })
                 .thenReturn(this);
@@ -294,9 +297,11 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
 
-    private void onSessionClose() {
+    final void onSessionClose() {
+        super.onSessionClose();
         CURRENT_TX_OPTION.set(this, null); // clear cache , avoid reconnect occur bug
         LOG.debug("session close event,clear current local transaction cache.");
+        ;
 
     }
 

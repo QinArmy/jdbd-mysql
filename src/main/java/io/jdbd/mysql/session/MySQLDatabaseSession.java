@@ -416,6 +416,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
      */
     abstract void printTransactionInfo(StringBuilder builder);
 
+    void onSessionClose() {
+        if (this.protocol.isClosed()) {
+            this.sessionClosed.set(true);
+        }
+    }
+
 
     /*################################## blow private method ##################################*/
 
