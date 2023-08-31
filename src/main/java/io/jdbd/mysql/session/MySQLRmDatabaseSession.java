@@ -7,6 +7,7 @@ import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.*;
 import io.jdbd.pool.PoolRmDatabaseSession;
+import io.jdbd.result.DataRow;
 import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
@@ -73,6 +74,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     /**
+     * <p>
+     * the conversion process of xid is same with MySQL Connector/J .
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
@@ -142,6 +147,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
     /**
+     * <p>
+     * the conversion process of xid is same with MySQL Connector/J .
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
@@ -179,6 +188,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
     /**
+     * <p>
+     * the conversion process of xid is same with MySQL Connector/J .
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
@@ -216,6 +229,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     }
 
     /**
+     * <p>
+     * the conversion process of xid is same with MySQL Connector/J .
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
@@ -266,6 +283,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     /**
+     * <p>
+     * the conversion process of xid is same with MySQL Connector/J .
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
@@ -304,6 +325,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     /**
+     * <p>
+     * the conversion process of xid is same with MySQL Connector/J .
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
@@ -316,8 +341,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else if ((flags & TM_START_RSCAN) != 0) {
             flux = Flux.empty();
         } else {
-            flux = this.protocol.query(Stmts.stmt("XA RECOVER CONVERT XID"), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES)
-                    .map(this::mapRecoverResult);
+            flux = this.protocol.query(Stmts.stmt("XA RECOVER CONVERT XID"), this::mapRecoverResult,
+                    DatabaseProtocol.IGNORE_RESULT_STATES);
         }
         return flux;
     }
@@ -435,7 +460,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * @see #recover(int, Function)
      */
-    private Optional<Xid> mapRecoverResult(final ResultRow row) {
+    private Optional<Xid> mapRecoverResult(final DataRow row) {
         final int formatId, gtridLength, bqualLength;
 
         formatId = row.getNonNull(0, Integer.class); // formatID

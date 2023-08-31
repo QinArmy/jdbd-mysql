@@ -31,11 +31,11 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
      * @see LocalDatabaseSession#startTransaction(TransactionOption, HandleMode)
      * @see LocalDatabaseSession#commit(Function)
      */
-    @Test
-    public void startTransactionAndCommit(final LocalDatabaseSession session) {
+    @Test(invocationCount = 2)
+    public void startTransactionAndCommit(final LocalDatabaseSession session, final boolean readOnly) {
         final TransactionOption txOption;
         txOption = TransactionOption.builder()
-                .option(Option.READ_ONLY, Boolean.FALSE)
+                .option(Option.READ_ONLY, readOnly)
                 .option(Option.ISOLATION, Isolation.REPEATABLE_READ)
                 .option(Option.WITH_CONSISTENT_SNAPSHOT, Boolean.TRUE)
                 .build();
@@ -49,6 +49,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
@@ -59,16 +60,25 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
                     Assert.assertNotNull(s.isolation());
+                    Assert.assertFalse(s.isReadOnly());
                     Assert.assertNull(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT));
                 })
 
                 .then(Mono.from(session.startTransaction(txOption)))
-                .flatMap(s -> Mono.from(session.commit(optionMap::get)))  // COMMIT AND CHAIN
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .doOnSuccess(s -> {
+                    Assert.assertTrue(s.inTransaction());
+                    Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
+                    Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
+                })
 
+                .flatMap(s -> Mono.from(session.commit(optionMap::get)))  // COMMIT AND CHAIN
                 .flatMap(s -> Mono.from(s.transactionStatus()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());  // due to COMMIT AND CHAIN, so session still in transaction block.
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
@@ -79,11 +89,11 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
      * @see LocalDatabaseSession#startTransaction(TransactionOption, HandleMode)
      * @see LocalDatabaseSession#rollback(Function)
      */
-    @Test
-    public void startTransactionAndRollback(final LocalDatabaseSession session) {
+    @Test(invocationCount = 2)
+    public void startTransactionAndRollback(final LocalDatabaseSession session, final boolean readOnly) {
         final TransactionOption txOption;
         txOption = TransactionOption.builder()
-                .option(Option.READ_ONLY, Boolean.FALSE)
+                .option(Option.READ_ONLY, readOnly)
                 .option(Option.ISOLATION, Isolation.REPEATABLE_READ)
                 .option(Option.WITH_CONSISTENT_SNAPSHOT, Boolean.TRUE)
                 .build();
@@ -97,6 +107,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
@@ -107,16 +118,25 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
                     Assert.assertNotNull(s.isolation());
+                    Assert.assertFalse(s.isReadOnly());
                     Assert.assertNull(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT));
                 })
 
                 .then(Mono.from(session.startTransaction(txOption)))
-                .flatMap(s -> Mono.from(session.rollback(optionMap::get)))  // ROLLBACK AND CHAIN
+                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .doOnSuccess(s -> {
+                    Assert.assertTrue(s.inTransaction());
+                    Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
+                    Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
+                })
 
+                .flatMap(s -> Mono.from(session.rollback(optionMap::get)))  // ROLLBACK AND CHAIN
                 .flatMap(s -> Mono.from(s.transactionStatus()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());  // due to ROLLBACK AND CHAIN, so session still in transaction block.
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
@@ -127,11 +147,11 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
      * @see LocalDatabaseSession#startTransaction(TransactionOption, HandleMode)
      * @see LocalDatabaseSession#commit(Function)
      */
-    @Test
-    public void startTransactionAndCommitRelease(final LocalDatabaseSession session) {
+    @Test(invocationCount = 2)
+    public void startTransactionAndCommitRelease(final LocalDatabaseSession session, final boolean readOnly) {
         final TransactionOption txOption;
         txOption = TransactionOption.builder()
-                .option(Option.READ_ONLY, Boolean.FALSE)
+                .option(Option.READ_ONLY, readOnly)
                 .option(Option.ISOLATION, Isolation.REPEATABLE_READ)
                 .option(Option.WITH_CONSISTENT_SNAPSHOT, Boolean.TRUE)
                 .build();
@@ -144,11 +164,12 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
                 .flatMap(s -> Mono.from(session.commit(optionMap::get))) // COMMIT RELEASE
-                .delayElement(Duration.ofSeconds(1)) // wait for close
+                .delayElement(Duration.ofMillis(5)) // wait for close
                 .block();
 
         Assert.assertTrue(session.isClosed());
@@ -159,11 +180,11 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
      * @see LocalDatabaseSession#startTransaction(TransactionOption, HandleMode)
      * @see LocalDatabaseSession#rollback(Function)
      */
-    @Test
-    public void startTransactionAndRollbackRelease(final LocalDatabaseSession session) {
+    @Test(invocationCount = 2)
+    public void startTransactionAndRollbackRelease(final LocalDatabaseSession session, final boolean readOnly) {
         final TransactionOption txOption;
         txOption = TransactionOption.builder()
-                .option(Option.READ_ONLY, Boolean.FALSE)
+                .option(Option.READ_ONLY, readOnly)
                 .option(Option.ISOLATION, Isolation.REPEATABLE_READ)
                 .option(Option.WITH_CONSISTENT_SNAPSHOT, Boolean.TRUE)
                 .build();
@@ -176,11 +197,12 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
+                    Assert.assertEquals(s.isReadOnly(), readOnly);
                     Assert.assertEquals(s.valueOf(Option.WITH_CONSISTENT_SNAPSHOT), Boolean.TRUE);
                 })
 
                 .flatMap(s -> Mono.from(session.rollback(optionMap::get)))  // ROLLBACK RELEASE
-                .delayElement(Duration.ofSeconds(1)) // wait for close
+                .delayElement(Duration.ofMillis(5)) // wait for close
                 .block();
 
         Assert.assertTrue(session.isClosed());
