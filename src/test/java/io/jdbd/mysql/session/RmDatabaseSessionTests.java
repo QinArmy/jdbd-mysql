@@ -222,6 +222,9 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
 
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
     @Test(invocationCount = 4, expectedExceptions = XaException.class)
     public void rollbackOnlyOnePhase(final RmDatabaseSession session, final boolean readOnly) {
 
@@ -268,6 +271,9 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
 
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
+     */
     @Test(invocationCount = 4, expectedExceptions = XaException.class)
     public void rollbackOnly(final RmDatabaseSession session, final boolean readOnly) {
 
@@ -328,11 +334,12 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
 
     /**
      * @see RmDatabaseSession#recover(int, Function)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Test(dependsOnMethods = {"rollbackOnlyOnePhase", "rollbackOnly"})
     public void recover(final RmDatabaseSession session) {
 
-        Flux.from(session.recover(RmDatabaseSession.TM_NO_FLAGS))
+        Flux.from(session.recover())
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .doOnNext(xid -> LOG.info("rollback {} ...", xid))

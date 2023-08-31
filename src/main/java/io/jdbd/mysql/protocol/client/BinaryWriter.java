@@ -91,12 +91,24 @@ abstract class BinaryWriter {
             case SMALLINT_UNSIGNED:
                 Packets.writeInt2(packet, MySQLBinds.bindToIntUnsigned(batchIndex, paramValue, 0xFFFF));
                 break;
-            case MEDIUMINT:
-                Packets.writeInt3(packet, MySQLBinds.bindToInt(batchIndex, paramValue, 0x8000_00, 0X7FFF_FF));
-                break;
-            case MEDIUMINT_UNSIGNED:
-                Packets.writeInt3(packet, MySQLBinds.bindToIntUnsigned(batchIndex, paramValue, 0xFFFF_FF));
-                break;
+            case MEDIUMINT: {
+                final int v = MySQLBinds.bindToInt(batchIndex, paramValue, -0x80_00_00, 0x7F_FF_FF);
+//                if (v >= 0) {
+//                    Packets.writeInt4(packet, v);
+//                } else if (v == -0x80_00_00) {
+//                    Packets.writeInt4(packet, 0x80_00_00);
+//                } else {
+//                    Packets.writeInt4(packet, 0x80_00_00 | ((-v ^ 0x7F_FF_FF) + 1));
+//                }
+                // see io.jdbd.mysql.protocol.client.BinaryWriter.decideActualType() , actually bind INT type
+                Packets.writeInt4(packet, v);
+            }
+            break;
+            case MEDIUMINT_UNSIGNED: {
+                // see io.jdbd.mysql.protocol.client.BinaryWriter.decideActualType() , actual bind INT_UNSIGNED type
+                Packets.writeInt4(packet, MySQLBinds.bindToIntUnsigned(batchIndex, paramValue, 0xFF_FF_FF));
+            }
+            break;
             case INT:
                 Packets.writeInt4(packet, MySQLBinds.bindToInt(batchIndex, paramValue, Integer.MIN_VALUE, Integer.MAX_VALUE));
                 break;
@@ -260,6 +272,18 @@ abstract class BinaryWriter {
                 // Server 8.0.27 and before ,can't bind BIT type.
                 //@see writeBit method.
                 bindType = MySQLType.BIGINT;
+            }
+            break;
+            case MEDIUMINT: {
+                // Server 8.0.33 and before don't support MEDIUMINT, response message : Incorrect arguments to mysqld_stmt_execute
+                // , sqlState : HY000 , vendorCode : 1210  ;  I 服了 MySQL
+                bindType = MySQLType.INT;
+            }
+            break;
+            case MEDIUMINT_UNSIGNED: {
+                // Server 8.0.33 and before don't support MEDIUMINT, response message : Incorrect arguments to mysqld_stmt_execute
+                // , sqlState : HY000 , vendorCode : 1210  ;  I 服了 MySQL
+                bindType = MySQLType.INT_UNSIGNED;
             }
             break;
             case YEAR: {

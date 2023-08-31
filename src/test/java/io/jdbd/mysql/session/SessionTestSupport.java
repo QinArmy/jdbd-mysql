@@ -152,22 +152,32 @@ public abstract class SessionTestSupport {
     private Object[][] createDatabaseSession(final boolean local, final ITestNGMethod targetMethod,
                                              final ITestContext context) {
 
+        final int currentInvocationCount = targetMethod.getCurrentInvocationCount() + 1;
+
+        final String methodName, keyOfSession;
+        methodName = targetMethod.getMethodName();
+        keyOfSession = targetMethod.getRealClass().getName() + '.' + methodName + "#session";
+
+        final Object cacheSession;
+        cacheSession = context.getAttribute(keyOfSession);
 
         final DatabaseSession session;
-        if (local) {
-            session = Mono.from(sessionFactory.localSession())
-                    .block();
+        if (cacheSession instanceof TestSessionHolder) {
+            session = ((TestSessionHolder) cacheSession).session;
         } else {
-            session = Mono.from(sessionFactory.rmSession())
-                    .block();
+            if (local) {
+                session = Mono.from(sessionFactory.localSession())
+                        .block();
+            } else {
+                session = Mono.from(sessionFactory.rmSession())
+                        .block();
+            }
+
+            Assert.assertNotNull(session);
+            final boolean closeSession;
+            closeSession = currentInvocationCount == targetMethod.getInvocationCount();
+            context.setAttribute(keyOfSession, new TestSessionHolder(session, closeSession));
         }
-
-
-        final String methodName, key;
-        methodName = targetMethod.getMethodName();
-        key = targetMethod.getRealClass().getName() + '.' + methodName + "#session";
-
-        context.setAttribute(key, session);
 
         final Class<?>[] parameterTypeArray;
         parameterTypeArray = targetMethod.getParameterTypes();
@@ -187,8 +197,6 @@ public abstract class SessionTestSupport {
                 methodIndex = i;
             }
         }
-
-        final int currentInvocationCount = targetMethod.getCurrentInvocationCount() + 1;
 
         final boolean readOnly = (currentInvocationCount & 1) == 0;
 

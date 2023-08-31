@@ -327,7 +327,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 break;
                 case MEDIUMINT: {
                     final int value;
-                    value = MySQLBinds.bindToInt(batchIndex, paramValue, 0x8000_00, 0xFFFF_FF);
+                    value = MySQLBinds.bindToInt(batchIndex, paramValue, -0x80_00_00, 0x7F_FF_FF);
                     packet.writeBytes(Integer.toString(value).getBytes(this.clientCharset));
                 }
                 break;

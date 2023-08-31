@@ -151,30 +151,8 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
                 }
             }
             break;
-            case MEDIUMINT: {
-                final int v;
-                if (readableBytes < 3) {
-                    value = MORE_CUMULATE_OBJECT;
-                } else if (((v = Packets.readInt4(payload)) & 0x80_00_00) == 0) {//positive
-                    value = v;
-                } else {//negative
-                    final int complement = (v & 0x7F_FF_FF);
-                    if (complement == 0) {
-                        value = (-(0x7F_FF_FF) - 1);
-                    } else {
-                        value = -((complement - 1) ^ 0x7F_FF_FF);
-                    }
-                }
-            }
-            break;
-            case MEDIUMINT_UNSIGNED: {
-                if (readableBytes > 2) {
-                    value = Packets.readInt4(payload);
-                } else {
-                    value = MORE_CUMULATE_OBJECT;
-                }
-            }
-            break;
+            case MEDIUMINT:
+            case MEDIUMINT_UNSIGNED:
             case INT: {
                 if (readableBytes > 3) {
                     value = Packets.readInt4(payload);
