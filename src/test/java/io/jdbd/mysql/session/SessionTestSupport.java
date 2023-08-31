@@ -158,26 +158,17 @@ public abstract class SessionTestSupport {
         methodName = targetMethod.getMethodName();
         keyOfSession = targetMethod.getRealClass().getName() + '.' + methodName + "#session";
 
-        final Object cacheSession;
-        cacheSession = context.getAttribute(keyOfSession);
-
         final DatabaseSession session;
-        if (cacheSession instanceof TestSessionHolder && !methodName.contains("Release")) {
-            session = ((TestSessionHolder) cacheSession).session;
+        if (local) {
+            session = Mono.from(sessionFactory.localSession())
+                    .block();
         } else {
-            if (local) {
-                session = Mono.from(sessionFactory.localSession())
-                        .block();
-            } else {
-                session = Mono.from(sessionFactory.rmSession())
-                        .block();
-            }
-
-            Assert.assertNotNull(session);
-            final boolean closeSession;
-            closeSession = currentInvocationCount == targetMethod.getInvocationCount();
-            context.setAttribute(keyOfSession, new TestSessionHolder(session, closeSession));
+            session = Mono.from(sessionFactory.rmSession())
+                    .block();
         }
+        Assert.assertNotNull(session);
+
+        context.setAttribute(keyOfSession, session);
 
         final Class<?>[] parameterTypeArray;
         parameterTypeArray = targetMethod.getParameterTypes();

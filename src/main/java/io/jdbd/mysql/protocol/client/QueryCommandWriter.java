@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.BitSet;
@@ -425,17 +426,14 @@ final class QueryCommandWriter extends BinaryWriter {
                 case TINYTEXT:
                 case MEDIUMTEXT:
                 case TEXT:
-                case LONGTEXT: {
-                    final byte[] byteArray;
-                    byteArray = MySQLBinds.bindToString(batchIndex, paramValue).getBytes(this.clientCharset);
-                    writeOneEscapesValue(packet, byteArray);
-                }
-                break;
+                case LONGTEXT:
+                    writeOneEscapesValue(packet, MySQLBinds.bindToString(batchIndex, paramValue));
+                    break;
                 case JSON: {
                     final Object value;
                     value = MySQLBinds.bindToJson(batchIndex, paramValue);
                     if (value instanceof String) {
-                        writeOneEscapesValue(packet, ((String) value).getBytes(this.clientCharset));
+                        writeOneEscapesValue(packet, ((String) value));
                     } else if (value instanceof BigDecimal) {
                         packet.writeBytes(((BigDecimal) value).toPlainString().getBytes(this.clientCharset));
                     } else if (value instanceof Number) {
@@ -461,12 +459,9 @@ final class QueryCommandWriter extends BinaryWriter {
                     writeHexEscape(packet, (byte[]) value);
                 }
                 break;
-                case SET: {
-                    final String value;
-                    value = MySQLBinds.bindToSetType(batchIndex, paramValue);
-                    writeOneEscapesValue(packet, value.getBytes(this.clientCharset));
-                }
-                break;
+                case SET:
+                    writeOneEscapesValue(packet, MySQLBinds.bindToSetType(batchIndex, paramValue));
+                    break;
                 case TIME:
                     writeTimeValue(batchIndex, paramValue, packet);
                     break;
@@ -484,7 +479,7 @@ final class QueryCommandWriter extends BinaryWriter {
                     } else if (nonNull instanceof byte[]) {
                         writeHexEscape(packet, (byte[]) nonNull);
                     } else if (nonNull instanceof String) {
-                        writeOneEscapesValue(packet, ((String) nonNull).getBytes(this.clientCharset));
+                        writeOneEscapesValue(packet, ((String) nonNull));
                     } else {
                         throw JdbdExceptions.nonSupportBindSqlTypeError(batchIndex, paramValue);
                     }
@@ -506,23 +501,24 @@ final class QueryCommandWriter extends BinaryWriter {
     }
 
 
-    private void writeOneEscapesValue(final ByteBuf packet, final byte[] value) {
+    private void writeOneEscapesValue(final ByteBuf packet, final String value) {
+        final byte[] valueBytes;
         if (this.hexEscape) {
-            packet.writeByte('X');
-            packet.writeByte(Constants.QUOTE);
-            packet.writeBytes(MySQLBuffers.hexEscapes(true, value, value.length));
+            valueBytes = value.getBytes(StandardCharsets.UTF_8); // here, use UTF-8
+            packet.writeBytes(" _utf8mb4 0x".getBytes(this.clientCharset));
+            packet.writeBytes(MySQLBuffers.hexEscapes(true, valueBytes, valueBytes.length));
         } else {
+            valueBytes = value.getBytes(this.clientCharset);
             packet.writeByte(Constants.QUOTE);
-            writeByteEscapes(packet, value, value.length);
+            writeByteEscapes(packet, valueBytes, valueBytes.length);
+            packet.writeByte(Constants.QUOTE);
         }
-        packet.writeByte(Constants.QUOTE);
     }
 
     private void writeHexEscape(final ByteBuf packet, final byte[] value) {
-        packet.writeByte('X');
-        packet.writeByte(Constants.QUOTE);
+        packet.writeByte('0');
+        packet.writeByte('x');
         packet.writeBytes(MySQLBuffers.hexEscapes(true, value, value.length));
-        packet.writeByte(Constants.QUOTE);
     }
 
 
@@ -671,7 +667,9 @@ final class QueryCommandWriter extends BinaryWriter {
         return value;
     }
 
-
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     */
     private void writeByteEscapes(final ByteBuf packet, final byte[] bytes, final int length) {
         if (length < 0 || length > bytes.length) {
             // no bug,never here
@@ -679,9 +677,15 @@ final class QueryCommandWriter extends BinaryWriter {
             throw new IllegalArgumentException(m);
         }
         int lastWritten = 0;
-        for (int i = 0; i < length; i++) {
-            byte b = bytes[i];
-            if (b == Constants.EMPTY_CHAR_BYTE) {
+        for (int i = 0, b; i < length; i++) {
+            b = bytes[i];
+            if (b == Constants.QUOTE) {
+                if (i > lastWritten) {
+                    packet.writeBytes(bytes, lastWritten, i - lastWritten);
+                }
+                packet.writeByte(Constants.QUOTE);
+                lastWritten = i; // not i+1 as b wasn't written.
+            } else if (b == Constants.EMPTY_CHAR_BYTE) {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
                 }
@@ -695,9 +699,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 packet.writeByte(Constants.BACK_SLASH_BYTE);
                 packet.writeByte('Z');
                 lastWritten = i + 1;
-            } else if (b == Constants.BACK_SLASH_BYTE
-                    || b == Constants.QUOTE
-                    || b == Constants.DOUBLE_QUOTE_BYTE) {
+            } else if (b == Constants.BACK_SLASH_BYTE) {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
                 }

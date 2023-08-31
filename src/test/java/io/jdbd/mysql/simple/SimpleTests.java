@@ -1,8 +1,11 @@
 package io.jdbd.mysql.simple;
 
+import io.jdbd.mysql.util.MySQLTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
+
+import java.time.OffsetDateTime;
 
 public class SimpleTests {
 
@@ -10,13 +13,7 @@ public class SimpleTests {
 
     @Test
     public void test() {
-        int max, min;
-        max = 0x7fff_ff;
-        min = -0x8000_00;
-        LOG.info(Integer.toBinaryString(min));
-        LOG.info("{}", Integer.toBinaryString(min).length());
-        LOG.info(Integer.toBinaryString(binary(min)));
-        LOG.info("{}", Integer.toBinaryString(binary(min)).length());
+        System.out.println(OffsetDateTime.now().format(MySQLTimes.OFFSET_DATETIME_FORMATTER_6));
     }
 
     private int binary(final int v) {
