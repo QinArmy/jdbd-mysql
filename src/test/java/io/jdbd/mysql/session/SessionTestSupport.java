@@ -60,9 +60,11 @@ public abstract class SessionTestSupport {
 
 
         if (sessionFactory != null && !sessionFactory.isClosed()) {
-            final String sql = "DROP TABLE IF EXISTS my_types";
+            final String sql = "TRUNCATE TABLE mysql_types";
             Mono.from(sessionFactory.localSession())
-                    .flatMap(session -> Mono.from(session.executeUpdate(sql)))
+                    .flatMap(session -> Mono.from(session.executeUpdate(sql))
+                            .then(Mono.from(session.close()))
+                    )
                     .doOnSuccess(s -> LOG.info("{} ; complete", sql))
                     .then(Mono.defer(() -> Mono.from(sessionFactory.close())))
                     .block();

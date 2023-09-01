@@ -10,7 +10,7 @@ public class SimpleTests {
 
     @Test
     public void test() {
-
+        LOG.info("{}", Long.toBinaryString((1L << 20) - 1L));
 
     }
 

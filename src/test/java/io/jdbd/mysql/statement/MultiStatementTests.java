@@ -39,7 +39,7 @@ public class MultiStatementTests extends SessionTestSupport {
      * @see MultiStatement#executeBatchUpdate()
      */
     @Test
-    public void executeBatchUpdate(final DatabaseSession session) {
+    public void executeBatchUpdateInsert(final DatabaseSession session) {
         final MultiStatement statement;
         statement = session.multiStatement();
 
@@ -75,7 +75,7 @@ public class MultiStatementTests extends SessionTestSupport {
     /**
      * @see MultiStatement#executeBatchQuery()
      */
-    @Test
+    @Test(dependsOnMethods = "executeBatchUpdateInsert")
     public void executeBatchQuery(final DatabaseSession session) {
         final MultiStatement statement;
         statement = session.multiStatement();
@@ -221,7 +221,7 @@ public class MultiStatementTests extends SessionTestSupport {
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/query-attributes.html">Query Attributes</a>
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY , static statement Query Attributes bind</a>
      */
-    @Test
+    @Test(dependsOnMethods = "executeBatchUpdateInsert")
     public void queryWithQueryAttributes(final DatabaseSession session) {
         if (!((MySQLServerVersion) session.serverVersion()).isSupportQueryAttr()) {
             LOG.info("MySQL server don't support query attributes ignore test.");

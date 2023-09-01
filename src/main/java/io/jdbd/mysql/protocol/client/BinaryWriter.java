@@ -293,6 +293,12 @@ abstract class BinaryWriter {
                 bindType = MySQLType.SMALLINT;
             }
             break;
+            case SET: {
+                // Server 8.1.0 , bind SET server response  Incorrect arguments to mysqld_stmt_execute
+                //  , sqlState : HY000 , vendorCode : 1210
+                bindType = MySQLType.TEXT;
+            }
+            break;
             case DATETIME: {
                 final Object source = paramValue.get();
                 if (this.supportZoneOffset && (source instanceof OffsetDateTime || source instanceof ZonedDateTime)) {

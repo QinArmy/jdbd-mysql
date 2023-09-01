@@ -14,7 +14,7 @@ a humane client library to delegate to.
 2. CREATE USER army_w@'localhost' IDENTIFIED BY 'army123' ;
 3. GRANT ALL ON army_test.* TO army_w@'localhost' ;
 4. GRANT XA_RECOVER_ADMIN ON &#42;.&#42; TO army_w@'localhost';
-5. If as of 8.0.26 , INSTALL COMPONENT "file://component_query_attributes" ;
+5. If meets MySQL 8.0.26 ,then INSTALL COMPONENT "file://component_query_attributes" ;
 6. mvn test
 
 

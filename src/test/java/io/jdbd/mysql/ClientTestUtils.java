@@ -20,7 +20,7 @@ import java.util.Map;
 @Test(enabled = false)
 public abstract class ClientTestUtils {
 
-    protected ClientTestUtils() {
+    private ClientTestUtils() {
         throw new UnsupportedOperationException();
     }
 
@@ -77,7 +77,7 @@ public abstract class ClientTestUtils {
     }
 
     public static Path getTestResourcesPath() {
-        return Paths.get(getModulePath().toString(), "src/test/resources");
+        return Paths.get(getModulePath().toString(), "src/test/resources").toAbsolutePath();
     }
 
     public static Charset getSystemFileCharset() {

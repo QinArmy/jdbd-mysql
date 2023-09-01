@@ -3,6 +3,8 @@ package io.jdbd.mysql.statement;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.session.SessionTestSupport;
+import io.jdbd.mysql.type.City;
+import io.jdbd.mysql.util.MySQLArrays;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
@@ -21,6 +23,9 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.Year;
 import java.time.ZoneOffset;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -253,7 +258,7 @@ public class DataTypeTests extends SessionTestSupport {
         final byte[] blob1, blob2, blob3;
 
         text1 = "QinArmy's \n \\ \t \" \032 \b \r  ";
-        text2 = "QinArmy(秦军) is a open source organization that create better framework,better language";
+        text2 = "QinArmy(秦军) is a open source organization that create better framework";
         text3 = "' update mysql_types AS t SET t.my_decimal = t.my_decimal + 8888.88 WHERE";
 
         blob1 = text1.getBytes(StandardCharsets.UTF_8);
@@ -291,6 +296,77 @@ public class DataTypeTests extends SessionTestSupport {
                 case 4:
                     Assert.assertEquals(row.get(1, String.class), text3);
                     Assert.assertEquals(row.get(2, byte[].class), blob3);
+                    break;
+                default:
+                    throw new RuntimeException("unknown row");
+
+            }
+            return row.asResultRow();
+        };
+
+
+        Mono.from(insertStmt.executeUpdate())
+                .flatMapMany(s -> {
+                    // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
+                    final int rowCount = (int) s.affectedRows();
+                    long lastId = s.lastInsertedId();
+                    for (int i = 0; i < rowCount; i++) {
+                        queryInsert.bind(i, JdbdType.BIGINT, lastId);
+                        lastId++;
+                    }
+                    return Flux.from(queryInsert.executeQuery(function));
+                })
+                .blockLast();
+    }
+
+    /**
+     * <p>
+     * Test :
+     *     <ul>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
+     *     </ul>
+     *     bind {@link MySQLType#SET}
+     * </p>
+     *
+     * @see MySQLType#SET
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     */
+    @Test(invocationCount = 3, dataProvider = "setStmtProvider")
+    public void setType(final BindSingleStatement insertStmt, final BindSingleStatement queryInsert) {
+        final Set<City> citySet;
+        citySet = MySQLArrays.asSet(City.BEIJING, City.SHANGHAI);
+
+        final Set<String> cityNameSet;
+        cityNameSet = MySQLArrays.asSet(City.TAIBEI.name(), City.XIANGGANG.name());
+
+        final String cityNameSetString;
+        cityNameSetString = City.AOMENG.name() + ',' + City.SHANGHAI.name();
+
+
+        insertStmt.bind(0, MySQLType.SET, null)
+                .bind(1, MySQLType.SET, citySet)
+
+                .bind(2, MySQLType.SET, cityNameSet)
+                .bind(3, MySQLType.SET, cityNameSetString);
+
+        final Function<CurrentRow, ResultRow> function;
+        function = row -> {
+            // LOG.info("row id : {}", row.get(0, Long.class));
+            switch ((int) row.rowNumber()) {
+                case 1:
+                    Assert.assertNull(row.get(1, String.class));
+                    Assert.assertSame(row.getSet(1, City.class), Collections.emptySet());
+                    break;
+                case 2:
+                    Assert.assertEquals(row.getSet(1, City.class), citySet);
+                    break;
+                case 3:
+                    Assert.assertEquals(row.getSet(1, String.class), cityNameSet);
+                    break;
+                case 4:
+                    Assert.assertEquals(row.getSet(1, City.class), MySQLArrays.asSet(City.AOMENG, City.SHANGHAI));
                     break;
                 default:
                     throw new RuntimeException("unknown row");
@@ -406,6 +482,87 @@ public class DataTypeTests extends SessionTestSupport {
 
     }
 
+    /**
+     * <p>
+     * Test :
+     *     <ul>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
+     *     </ul>
+     *     bind {@link MySQLType#BIT}
+     * </p>
+     *
+     * @see JdbdType#BIT
+     * @see JdbdType#VARBIT
+     * @see MySQLType#BIT
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/bit-type.html"> Bit-Value Type - BIT </a>
+     */
+    @Test(invocationCount = 3, dataProvider = "bitStmtProvider")
+    public void bitType(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
+        insertStmt.bind(0, JdbdType.BIT, null)
+                .bind(1, JdbdType.BIT, null)
+
+                .bind(2, JdbdType.BIT, (byte) 0)
+                .bind(3, JdbdType.BIT, 0)
+
+                .bind(4, JdbdType.BIT, (1 << 20) - 1)
+                .bind(5, JdbdType.BIT, -1L)
+
+                .bind(6, JdbdType.BIT, 0x7f_f)
+                .bind(7, JdbdType.BIT, BitSet.valueOf(new long[]{0xff_ff_ff}));
+
+
+        final Function<CurrentRow, ResultRow> function;
+        function = row -> {
+            //LOG.info("row id : {}", row.get(0, Long.class));
+            switch ((int) row.rowNumber()) {
+                case 1: {
+                    Assert.assertNull(row.get(1, Long.class));
+                    Assert.assertNull(row.get(2, Long.class));
+                }
+                break;
+                case 2: {
+                    Assert.assertEquals(row.get(1, Long.class), 0L);
+                    Assert.assertEquals(row.get(2, Long.class), 0L);
+                }
+                break;
+                case 3: {
+                    Assert.assertEquals(row.get(1, Long.class), (1L << 20) - 1L);
+                    Assert.assertEquals(row.get(2, Long.class), -1L);
+
+                    Assert.assertEquals(row.get(2, BitSet.class), BitSet.valueOf(new long[]{-1L}));
+                }
+                break;
+                case 4: {
+                    Assert.assertEquals(row.get(1, Long.class), 0x7f_f);
+                    Assert.assertEquals(row.get(2, Long.class), 0xff_ff_ff);
+                }
+                break;
+                default:
+                    throw new RuntimeException("unknown row");
+
+            }
+            return row.asResultRow();
+        };
+
+
+        Mono.from(insertStmt.executeUpdate())
+                .flatMapMany(s -> {
+                    // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
+                    final int rowCount = (int) s.affectedRows();
+                    long lastId = s.lastInsertedId();
+                    for (int i = 0; i < rowCount; i++) {
+                        queryStmt.bind(i, JdbdType.BIGINT, lastId);
+                        lastId++;
+                    }
+                    return Flux.from(queryStmt.executeQuery(function));
+                })
+                .blockLast();
+
+
+    }
+
 
     /**
      * @see JdbdType#MEDIUMINT
@@ -489,6 +646,34 @@ public class DataTypeTests extends SessionTestSupport {
 
         insertSql = "INSERT mysql_types(my_text,my_blob) VALUES (?,?),(?,?),(?,?),(?,?)";
         querySql = "SELECT t.id,t.my_text,t.my_blob FROM mysql_types AS t WHERE t.id IN (?,?,?,?) ORDER BY t.id";
+
+        final BindSingleStatement insertStmt, queryInsert;
+        insertStmt = createSingleStatement(targetMethod, context, insertSql);
+        queryInsert = createSingleStatement(targetMethod, context, querySql);
+
+        return new Object[][]{{insertStmt, queryInsert}};
+    }
+
+    @DataProvider(name = "setStmtProvider", parallel = true)
+    public final Object[][] setStmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String insertSql, querySql;
+
+        insertSql = "INSERT mysql_types(my_set) VALUES (?),(?),(?),(?)";
+        querySql = "SELECT t.id,t.my_set FROM mysql_types AS t WHERE t.id IN (?,?,?,?) ORDER BY t.id";
+
+        final BindSingleStatement insertStmt, queryInsert;
+        insertStmt = createSingleStatement(targetMethod, context, insertSql);
+        queryInsert = createSingleStatement(targetMethod, context, querySql);
+
+        return new Object[][]{{insertStmt, queryInsert}};
+    }
+
+    @DataProvider(name = "bitStmtProvider", parallel = true)
+    public final Object[][] bitStmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String insertSql, querySql;
+
+        insertSql = "INSERT mysql_types(my_bit20,my_bit64) VALUES (?,?),(?,?),(?,?),(?,?)";
+        querySql = "SELECT t.id,t.my_bit20,t.my_bit64 FROM mysql_types AS t WHERE t.id IN (?,?,?,?) ORDER BY t.id";
 
         final BindSingleStatement insertStmt, queryInsert;
         insertStmt = createSingleStatement(targetMethod, context, insertSql);

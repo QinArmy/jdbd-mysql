@@ -4,6 +4,7 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.MySQLType;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.vendor.stmt.Value;
 import io.jdbd.vendor.util.JdbdBinds;
 import io.jdbd.vendor.util.JdbdExceptions;
@@ -212,7 +213,7 @@ public abstract class MySQLBinds extends JdbdBinds {
         int index = 0;
         for (Object element : set) {
             if (index > 0) {
-                builder.append(',');
+                builder.append(Constants.COMMA);
             }
             if (element instanceof String) {
                 builder.append(element);

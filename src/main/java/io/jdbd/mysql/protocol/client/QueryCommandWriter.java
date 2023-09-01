@@ -417,9 +417,12 @@ final class QueryCommandWriter extends BinaryWriter {
                     packet.writeBytes(v.getBytes(this.clientCharset));
                 }
                 break;
-                case BIT:
-                    writeBitValue(batchIndex, paramValue, packet);
-                    break;
+                case BIT: {
+                    packet.writeByte('0');
+                    packet.writeByte('b');
+                    packet.writeBytes(bindToBit(batchIndex, paramValue).getBytes(this.clientCharset));
+                }
+                break;
                 case CHAR:
                 case VARCHAR:
                 case ENUM:
@@ -540,20 +543,6 @@ final class QueryCommandWriter extends BinaryWriter {
         packet.writeBytes(Integer.toString(value).getBytes(this.clientCharset));
     }
 
-    /**
-     * @see #writeParameter(int, ParamValue, ByteBuf)
-     */
-    private void writeBitValue(final int batchIndex, final ParamValue bindValue, final ByteBuf packet) {
-
-        final String value;
-        value = bindToBit(batchIndex, bindValue);
-
-        packet.writeByte('B');
-        packet.writeByte(Constants.QUOTE);
-        packet.writeBytes(value.getBytes(this.clientCharset));
-        packet.writeByte(Constants.QUOTE);
-    }
-
 
     /**
      * @see #writeParameter(int, ParamValue, ByteBuf)
@@ -634,9 +623,6 @@ final class QueryCommandWriter extends BinaryWriter {
     }
 
 
-    /**
-     * @see #writeBitValue(int, ParamValue, ByteBuf)
-     */
     private static String bindToBit(final int batchIndex, final Value paramValue) {
         final Object nonNull = paramValue.get();
         final String value;
