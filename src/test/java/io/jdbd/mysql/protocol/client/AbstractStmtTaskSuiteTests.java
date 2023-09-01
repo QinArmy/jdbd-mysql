@@ -5,9 +5,9 @@ import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.type.City;
 import io.jdbd.mysql.type.TrueOrFalse;
 import io.jdbd.mysql.util.*;
+import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -50,7 +50,7 @@ public abstract class AbstractStmtTaskSuiteTests extends AbstractTaskSuiteTests 
         final TaskAdjutant taskAdjutant = obtainTaskAdjutant();
 
         List<ResultRow> resultRowList;
-        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, taskAdjutant)
+        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, taskAdjutant)
                 .collectList()
                 .block();
 
@@ -63,7 +63,7 @@ public abstract class AbstractStmtTaskSuiteTests extends AbstractTaskSuiteTests 
 
         // string bigint
         bindValue = JdbdValues.paramValue(0, MySQLType.BIGINT, Long.toString(id));
-        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, taskAdjutant)
+        resultRowList = ComQueryTask.paramQuery(Stmts.single(sql, bindValue), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, taskAdjutant)
                 .collectList()
                 .block();
 

@@ -1,9 +1,9 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.Groups;
+import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.stmt.ParamStmt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +31,7 @@ public class QueryCommandWriterSuiteTests extends AbstractStmtTaskSuiteTests {
 
     @Override
     Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
-        return ComQueryTask.paramQuery(stmt, DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant);
+        return ComQueryTask.paramQuery(stmt, CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, adjutant);
     }
 
     @Override

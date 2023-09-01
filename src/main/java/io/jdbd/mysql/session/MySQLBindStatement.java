@@ -14,7 +14,6 @@ import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.Parameter;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.util.JdbdBinds;
@@ -187,13 +186,18 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     }
 
     @Override
+    public <R extends Publisher<ResultStates>> R executeUpdate(Function<Publisher<ResultStates>, R> monoFunc) {
+        return monoFunc.apply(executeUpdate());
+    }
+
+    @Override
     public Publisher<ResultRow> executeQuery() {
-        return this.executeQuery(CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES);
     }
 
     @Override
     public <R> Publisher<R> executeQuery(Function<CurrentRow, R> function) {
-        return this.executeQuery(function, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(function, ResultStates.IGNORE_STATES);
     }
 
     @Override
@@ -224,6 +228,13 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
     }
 
     @Override
+    public <R, F extends Publisher<R>> F executeQuery(Function<CurrentRow, R> rowFunc,
+                                                      Consumer<ResultStates> statesConsumer,
+                                                      Function<Publisher<R>, F> fluxFunc) {
+        return fluxFunc.apply(executeQuery(rowFunc, statesConsumer));
+    }
+
+    @Override
     public OrderedFlux executeAsFlux() {
         this.endStmtOption(false);
 
@@ -248,6 +259,11 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         }
         clearStatementToAvoidReuse();
         return flux;
+    }
+
+    @Override
+    public <F extends Publisher<ResultItem>> F executeAsFlux(Function<OrderedFlux, F> fluxFunc) {
+        return fluxFunc.apply(executeAsFlux());
     }
 
     @Override
@@ -277,6 +293,11 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         }
         clearStatementToAvoidReuse();
         return flux;
+    }
+
+    @Override
+    public <F extends Publisher<ResultStates>> F executeBatchUpdate(Function<Publisher<ResultStates>, F> fluxFunc) {
+        return fluxFunc.apply(executeBatchUpdate());
     }
 
     @Override
@@ -365,6 +386,12 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         clearStatementToAvoidReuse();
         return flux;
     }
+
+    @Override
+    public <F extends Publisher<ResultItem>> F executeBatchAsFlux(Function<OrderedFlux, F> fluxFunc) {
+        return fluxFunc.apply(executeBatchAsFlux());
+    }
+
 
     @Override
     public String toString() {

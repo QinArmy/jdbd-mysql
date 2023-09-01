@@ -10,12 +10,12 @@ import io.jdbd.mysql.type.City;
 import io.jdbd.mysql.type.TrueOrFalse;
 import io.jdbd.mysql.util.MySQLStreams;
 import io.jdbd.mysql.util.MySQLStrings;
+import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultRowMeta;
 import io.jdbd.result.ResultStates;
 import io.jdbd.vendor.JdbdCompositeException;
 import io.jdbd.vendor.env.Environment;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.stmt.Stmts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +89,7 @@ public class TaskTestAdvice extends AbstractTaskSuiteTests {
         LOG.info("mysqlTypeMatch test start");
         final TaskAdjutant adjutant = obtainTaskAdjutant();
 
-        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(createQuerySqlForMySQLTypeMatch()), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant)
+        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(createQuerySqlForMySQLTypeMatch()), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, adjutant)
                 .collectList()
                 .doOnError(this::printMultiError)
                 .block();

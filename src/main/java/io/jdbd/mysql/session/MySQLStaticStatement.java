@@ -5,7 +5,6 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
 import io.jdbd.statement.StaticStatement;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
@@ -53,13 +52,18 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     }
 
     @Override
+    public <M extends Publisher<ResultStates>> M executeUpdate(String sql, Function<Publisher<ResultStates>, M> monoFunc) {
+        return monoFunc.apply(executeUpdate(sql));
+    }
+
+    @Override
     public Publisher<ResultRow> executeQuery(String sql) {
-        return this.executeQuery(sql, CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES);
     }
 
     @Override
     public <R> Publisher<R> executeQuery(String sql, Function<CurrentRow, R> function) {
-        return this.executeQuery(sql, function, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, function, ResultStates.IGNORE_STATES);
     }
 
     @Override
@@ -78,6 +82,14 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
     }
 
     @Override
+    public <R, F extends Publisher<R>> F executeQuery(String sql, Function<CurrentRow, R> rowFunc,
+                                                      Consumer<ResultStates> statesConsumer,
+                                                      Function<Publisher<R>, F> fluxFunc) {
+        return fluxFunc.apply(executeQuery(sql, rowFunc, statesConsumer));
+    }
+
+
+    @Override
     public Publisher<ResultStates> executeBatchUpdate(final List<String> sqlGroup) {
         if (this.executed) {
             return Flux.error(MySQLExceptions.cannotReuseStatement(StaticStatement.class));
@@ -90,6 +102,13 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
         }
         return this.session.protocol.batchUpdate(Stmts.batch(sqlGroup, this));
     }
+
+    @Override
+    public <F extends Publisher<ResultStates>> F executeBatchUpdate(List<String> sqlGroup,
+                                                                    Function<Publisher<ResultStates>, F> fluxFunc) {
+        return fluxFunc.apply(executeBatchUpdate(sqlGroup));
+    }
+
 
     @Override
     public QueryResults executeBatchQuery(final List<String> sqlGroup) {
@@ -134,6 +153,12 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
         return this.session.protocol.batchAsFlux(Stmts.batch(sqlGroup, this));
     }
 
+    @Override
+    public <F extends Publisher<ResultItem>> F executeBatchAsFlux(List<String> sqlGroup,
+                                                                  Function<OrderedFlux, F> fluxFunc) {
+        return fluxFunc.apply(executeBatchAsFlux(sqlGroup));
+    }
+
 
     @Override
     public OrderedFlux executeMultiStmt(final String multiStmt) {
@@ -154,6 +179,10 @@ final class MySQLStaticStatement extends MySQLStatement<StaticStatement> impleme
         return flux;
     }
 
+    @Override
+    public <F extends Publisher<ResultItem>> F executeMultiStmt(String multiStmt, Function<OrderedFlux, F> fluxFunc) {
+        return fluxFunc.apply(executeMultiStmt(multiStmt));
+    }
 
     @Override
     public String toString() {

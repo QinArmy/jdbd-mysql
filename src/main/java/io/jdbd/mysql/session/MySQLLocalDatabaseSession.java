@@ -11,7 +11,6 @@ import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
@@ -126,9 +125,10 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
 
+
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
-        return this.commit(DatabaseProtocol.OPTION_FUNC);
+        return this.commit(Option.EMPTY_OPTION_FUNC);
     }
 
     /**
@@ -141,7 +141,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
     @Override
     public final Publisher<LocalDatabaseSession> rollback() {
-        return this.rollback(DatabaseProtocol.OPTION_FUNC);
+        return this.rollback(Option.EMPTY_OPTION_FUNC);
     }
 
     @Override

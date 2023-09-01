@@ -8,12 +8,12 @@ import io.jdbd.mysql.util.MySQLCodes;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStates;
+import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.vendor.JdbdCompositeException;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.stmt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +50,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
     @Override
     Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
-        return ComQueryTask.paramQuery(stmt, DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant);
+        return ComQueryTask.paramQuery(stmt, CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, adjutant);
     }
 
     @Override
@@ -97,7 +97,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
         sql = "SELECT t.id,t.name,t.create_time as createTime FROM mysql_types as t ORDER BY t.id LIMIT 50";
 
-        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, resultStatesHolder::set, adjutant)
+        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), CurrentRow.AS_RESULT_ROW, resultStatesHolder::set, adjutant)
                 .collectList()
                 .block();
 
@@ -143,7 +143,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
         sql = "SELECT u.id,u.name FROM mysql_types as u WHERE u.id = 1";
 
-        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant)
+        List<ResultRow> resultRowList = ComQueryTask.query(Stmts.stmt(sql), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, adjutant)
                 .collectList()
                 .block();
 
@@ -207,7 +207,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
         String sql = "UPDATE mysql_types as u SET u.name = 'simonyi4' WHERE u.id = 30";
 
         try {
-            ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant)
+            ComQueryTask.query(Stmts.stmt(sql), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, adjutant)
                     .map(row -> {
                         fail("queryIsUpdate test failure.");
                         return row;

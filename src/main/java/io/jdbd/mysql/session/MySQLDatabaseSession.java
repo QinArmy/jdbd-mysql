@@ -15,7 +15,6 @@ import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.statement.StaticStatement;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.result.NamedSavePoint;
 import io.jdbd.vendor.stmt.Stmts;
@@ -85,12 +84,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final Publisher<ResultRow> executeQuery(String sql) {
-        return this.executeQuery(sql, CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES);
     }
 
     @Override
     public final <R> Publisher<R> executeQuery(String sql, Function<CurrentRow, R> function) {
-        return this.executeQuery(sql, function, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(sql, function, ResultStates.IGNORE_STATES);
     }
 
     @Override
@@ -101,6 +100,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         }
         return this.protocol.query(Stmts.stmtWithSession(sql, this), function, consumer);
     }
+
 
     @Override
     public final QueryResults executeBatchQuery(final List<String> sqlGroup) {
@@ -134,6 +134,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return this.protocol.batchAsFlux(Stmts.batchWithSession(sqlGroup, this));
     }
 
+
     @Override
     public final OrderedFlux executeMultiStmt(final String multiStmt) {
         if (!MySQLStrings.hasText(multiStmt)) {
@@ -141,6 +142,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         }
         return this.protocol.staticMultiStmtAsFlux(Stmts.multiStmtWithSession(multiStmt, this));
     }
+
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/set-transaction.html">SET TRANSACTION Statement</a>
@@ -172,6 +174,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .thenReturn((S) this);
     }
 
+
     @Override
     public final Publisher<TransactionStatus> transactionStatus() {
         final ServerVersion version = this.protocol.serverVersion();
@@ -189,7 +192,6 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .collectList()
                 .flatMap(this::mapTransactionStatus);
     }
-
 
     @Override
     public final boolean inTransaction() throws JdbdException {
@@ -212,7 +214,6 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return this.protocol.prepare(sql)
                 .map(this::createPreparedStatement);
     }
-
 
     @Override
     public final BindStatement bindStatement(final String sql) {
@@ -255,16 +256,15 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .append(this.savePointIndex.getAndIncrement())
                 .append('_')
                 .append(ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE));
-        return this.setSavePoint(builder.toString(), DatabaseProtocol.OPTION_FUNC);
+        return this.setSavePoint(builder.toString(), Option.EMPTY_OPTION_FUNC);
     }
-
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
      */
     @Override
     public final Publisher<SavePoint> setSavePoint(final String name) {
-        return this.setSavePoint(name, DatabaseProtocol.OPTION_FUNC);
+        return this.setSavePoint(name, Option.EMPTY_OPTION_FUNC);
     }
 
     /**
@@ -291,7 +291,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
      */
     @Override
     public final Publisher<S> releaseSavePoint(final SavePoint savepoint) {
-        return this.releaseSavePoint(savepoint, DatabaseProtocol.OPTION_FUNC);
+        return this.releaseSavePoint(savepoint, Option.EMPTY_OPTION_FUNC);
     }
 
     /**
@@ -321,7 +321,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
      */
     @Override
     public final Publisher<S> rollbackToSavePoint(final SavePoint savepoint) {
-        return this.rollbackToSavePoint(savepoint, DatabaseProtocol.OPTION_FUNC);
+        return this.rollbackToSavePoint(savepoint, Option.EMPTY_OPTION_FUNC);
     }
 
     /**

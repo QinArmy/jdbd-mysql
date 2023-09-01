@@ -134,7 +134,7 @@ public class SessionInitializerSuiteTests extends AbstractTaskSuiteTests {
 //        String sql = "SELECT @@character_set_connection as  characterSetConnection" +
 //                ", @@character_set_results as characterSetResults," +
 //                "@@character_set_client as characterSetClient";
-//        ResultRow resultRow = ComQueryTask.query(Stmts.stmt(sql), DatabaseProtocol.ROW_FUNC, adjutant)
+//        ResultRow resultRow = ComQueryTask.query(Stmts.stmt(sql), CurrentRow.AS_RESULT_ROW, adjutant)
 //                .elementAt(0)
 //                .block();
 //        assertNotNull(resultRow);

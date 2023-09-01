@@ -15,9 +15,9 @@ import io.jdbd.mysql.util.*;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
+import io.jdbd.result.ResultStates;
 import io.jdbd.session.Option;
 import io.jdbd.vendor.env.Environment;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -346,7 +346,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             if (this.factory.env.isOff(MySQLKey.DETECT_CUSTOM_COLLATIONS) || this.factory.customCharsetMap.size() == 0) {
                 return Mono.empty();
             }
-            return ComQueryTask.query(Stmts.stmt("SHOW CHARACTER SET"), this::mapMyCharset, DatabaseProtocol.IGNORE_RESULT_STATES, this.adjutant)// SHOW CHARACTER SET result
+            return ComQueryTask.query(Stmts.stmt("SHOW CHARACTER SET"), this::mapMyCharset, ResultStates.IGNORE_STATES, this.adjutant)// SHOW CHARACTER SET result
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .collectMap(MyCharset::charsetName, MyCharset::self, MySQLCollections::hashMap)
@@ -383,7 +383,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             }
             final ParamStmt stmt;
             stmt = collationStmt(charsetMap);
-            return ComQueryTask.paramQuery(stmt, row -> mapCollation(row, charsetMap), DatabaseProtocol.IGNORE_RESULT_STATES, this.adjutant)
+            return ComQueryTask.paramQuery(stmt, row -> mapCollation(row, charsetMap), ResultStates.IGNORE_STATES, this.adjutant)
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .collectMap(Collation::index, Collation::self, MySQLCollections::hashMap)

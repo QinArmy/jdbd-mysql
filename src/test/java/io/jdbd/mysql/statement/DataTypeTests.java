@@ -257,8 +257,8 @@ public class DataTypeTests extends SessionTestSupport {
         final String text1, text2, text3;
         final byte[] blob1, blob2, blob3;
 
-        text1 = "QinArmy's \n \\ \t \" \032 \b \r  ";
-        text2 = "QinArmy(秦军) is a open source organization that create better framework";
+        text1 = "中国 QinArmy's jdbd \n \\ \t \" \032 \b \r '''  \\' ";
+        text2 = "中国 QinArmy(秦军) is a open source organization that create better framework";
         text3 = "' update mysql_types AS t SET t.my_decimal = t.my_decimal + 8888.88 WHERE";
 
         blob1 = text1.getBytes(StandardCharsets.UTF_8);

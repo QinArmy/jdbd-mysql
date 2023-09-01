@@ -220,7 +220,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
         resultRowList = Mono.from(multiResult.nextUpdate())                 // result 1
                 .then(Mono.from(multiResult.nextUpdate()))                  // result 2
                 .thenMany(multiResult.nextQuery())                          // result 3
-                .thenMany(multiResult.nextQuery(CurrentRow::asResultRow))                          // result 4
+                .thenMany(multiResult.nextQuery(CurrentRow.AS_RESULT_ROW))                          // result 4
                 .concatWith(Flux.from(multiResult.nextQueryFlux())         // result 5
                         .filter(ResultItem::isRowItem)
                         .map(ResultRow.class::cast)

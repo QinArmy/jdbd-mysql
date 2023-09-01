@@ -14,7 +14,6 @@ import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -203,13 +202,18 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
+    public <R extends Publisher<ResultStates>> R executeUpdate(Function<Publisher<ResultStates>, R> monoFunc) {
+        return monoFunc.apply(executeUpdate());
+    }
+
+    @Override
     public Publisher<ResultRow> executeQuery() {
-        return this.executeQuery(CurrentRow::asResultRow, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES);
     }
 
     @Override
     public <R> Publisher<R> executeQuery(Function<CurrentRow, R> function) {
-        return this.executeQuery(function, DatabaseProtocol.IGNORE_RESULT_STATES);
+        return this.executeQuery(function, ResultStates.IGNORE_STATES);
     }
 
     @Override
@@ -252,6 +256,19 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
+    public <R, F extends Publisher<R>> F executeQuery(Function<CurrentRow, R> rowFunc,
+                                                      Consumer<ResultStates> statesConsumer,
+                                                      @Nullable Function<Publisher<R>, F> fluxFunc) {
+        if (fluxFunc == null) {
+            final NullPointerException error;
+            error = MySQLExceptions.fluxFuncIsNull();
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            throw error;
+        }
+        return fluxFunc.apply(executeQuery(rowFunc, statesConsumer));
+    }
+
+    @Override
     public OrderedFlux executeAsFlux() {
         this.endStmtOption(false);
 
@@ -284,6 +301,17 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
+    public <F extends Publisher<ResultItem>> F executeAsFlux(@Nullable Function<OrderedFlux, F> fluxFunc) {
+        if (fluxFunc == null) {
+            final NullPointerException error;
+            error = MySQLExceptions.fluxFuncIsNull();
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            throw error;
+        }
+        return fluxFunc.apply(executeAsFlux());
+    }
+
+    @Override
     public Publisher<ResultStates> executeBatchUpdate() {
         this.endStmtOption(true);
 
@@ -312,6 +340,17 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
         }
         clearStatementToAvoidReuse();
         return flux;
+    }
+
+    @Override
+    public <F extends Publisher<ResultStates>> F executeBatchUpdate(@Nullable Function<Publisher<ResultStates>, F> fluxFunc) {
+        if (fluxFunc == null) {
+            final NullPointerException error;
+            error = MySQLExceptions.fluxFuncIsNull();
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            throw error;
+        }
+        return fluxFunc.apply(executeBatchUpdate());
     }
 
     @Override
@@ -403,6 +442,17 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
         }
         clearStatementToAvoidReuse();
         return flux;
+    }
+
+    @Override
+    public <F extends Publisher<ResultItem>> F executeBatchAsFlux(@Nullable Function<OrderedFlux, F> fluxFunc) {
+        if (fluxFunc == null) {
+            final NullPointerException error;
+            error = MySQLExceptions.fluxFuncIsNull();
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            throw error;
+        }
+        return fluxFunc.apply(executeBatchAsFlux());
     }
 
     @Override

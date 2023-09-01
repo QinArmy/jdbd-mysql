@@ -4,9 +4,9 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.JdbdException;
 import io.jdbd.mysql.Groups;
 import io.jdbd.mysql.MySQLType;
+import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
@@ -47,7 +47,7 @@ public class ComPreparedTaskSuiteTests extends AbstractStmtTaskSuiteTests {
 
     @Override
     Flux<ResultRow> executeQuery(ParamStmt stmt, TaskAdjutant adjutant) {
-        return ComPreparedTask.query(stmt, DatabaseProtocol.ROW_FUNC, DatabaseProtocol.IGNORE_RESULT_STATES, adjutant);
+        return ComPreparedTask.query(stmt, CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES, adjutant);
     }
 
     @Override

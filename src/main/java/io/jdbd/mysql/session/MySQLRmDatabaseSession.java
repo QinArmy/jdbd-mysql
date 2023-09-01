@@ -12,7 +12,6 @@ import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
-import io.jdbd.vendor.protocol.DatabaseProtocol;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
@@ -147,12 +146,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     public final Publisher<RmDatabaseSession> end(Xid xid) {
-        return this.end(xid, TM_SUCCESS, DatabaseProtocol.OPTION_FUNC);
+        return this.end(xid, TM_SUCCESS, Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
     public final Publisher<RmDatabaseSession> end(final Xid xid, final int flags) {
-        return this.end(xid, flags, DatabaseProtocol.OPTION_FUNC);
+        return this.end(xid, flags, Option.EMPTY_OPTION_FUNC);
     }
 
     /**
@@ -193,7 +192,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     public final Publisher<Integer> prepare(final Xid xid) {
-        return this.prepare(xid, DatabaseProtocol.OPTION_FUNC);
+        return this.prepare(xid, Option.EMPTY_OPTION_FUNC);
     }
 
     /**
@@ -234,12 +233,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     public final Publisher<RmDatabaseSession> commit(Xid xid) {
-        return this.commit(xid, TM_NO_FLAGS, DatabaseProtocol.OPTION_FUNC);
+        return this.commit(xid, TM_NO_FLAGS, Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
     public final Publisher<RmDatabaseSession> commit(final Xid xid, final int flags) {
-        return this.commit(xid, flags, DatabaseProtocol.OPTION_FUNC);
+        return this.commit(xid, flags, Option.EMPTY_OPTION_FUNC);
     }
 
     /**
@@ -292,7 +291,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     public final Publisher<RmDatabaseSession> rollback(final Xid xid) {
-        return this.rollback(xid, DatabaseProtocol.OPTION_FUNC);
+        return this.rollback(xid, Option.EMPTY_OPTION_FUNC);
     }
 
 
@@ -323,7 +322,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     public final Publisher<RmDatabaseSession> forget(final Xid xid) {
-        return this.forget(xid, DatabaseProtocol.OPTION_FUNC);
+        return this.forget(xid, Option.EMPTY_OPTION_FUNC);
     }
 
 
@@ -334,12 +333,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     public final Publisher<Optional<Xid>> recover() {
-        return this.recover(TM_NO_FLAGS, DatabaseProtocol.OPTION_FUNC);
+        return this.recover(TM_NO_FLAGS, Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
     public final Publisher<Optional<Xid>> recover(final int flags) {
-        return this.recover(flags, DatabaseProtocol.OPTION_FUNC);
+        return this.recover(flags, Option.EMPTY_OPTION_FUNC);
     }
 
 
@@ -361,7 +360,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             flux = Flux.empty();
         } else {
             flux = this.protocol.query(Stmts.stmt("XA RECOVER CONVERT XID"), this::mapRecoverResult,
-                    DatabaseProtocol.IGNORE_RESULT_STATES);
+                    ResultStates.IGNORE_STATES);
         }
         return flux;
     }
