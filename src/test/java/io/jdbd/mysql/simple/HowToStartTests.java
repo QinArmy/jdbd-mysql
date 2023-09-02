@@ -2,6 +2,8 @@ package io.jdbd.mysql.simple;
 
 import io.jdbd.Driver;
 import io.jdbd.meta.JdbdType;
+import io.jdbd.mysql.session.SessionTestSupport;
+import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.DatabaseSessionFactory;
 import org.slf4j.Logger;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
@@ -24,22 +27,6 @@ public class HowToStartTests {
 
     private static DatabaseSessionFactory sessionFactory;
 
-    @Test
-    public void unixDomainSocket() throws Exception {
-        //  select @@Global.socket;  // default is  /tmp/mysql.sock
-        final String mysqlSocketPath = "/tmp/mysql.sock";
-        final String hostAddress = URLEncoder.encode(mysqlSocketPath, "utf-8");
-        // hostAddress result is  /%2Ftmp%2Fmysql.sock
-        final String url = "jdbd:mysql://%2Ftmp%2Fmysql.sock/army_test";
-
-        final Map<String, Object> map = new HashMap<>();
-        map.put(Driver.USER, "army_w");
-        map.put(Driver.PASSWORD, "army123");
-
-        DatabaseSessionFactory sessionFactory;
-        sessionFactory = Driver.findDriver(url).forDeveloper(url, map);
-
-    }
 
     @BeforeClass
     public void createSessionFactory() {
@@ -51,8 +38,11 @@ public class HowToStartTests {
         map.put(Driver.USER, "army_w");
         map.put(Driver.PASSWORD, "army123");
 
-        sessionFactory = Driver.findDriver(url).forDeveloper(url, map);
+        final DatabaseSessionFactory factory;
+        sessionFactory = factory = Driver.findDriver(url).forDeveloper(url, map);
+        SessionTestSupport.createMysqlTypeTableIfNeed(factory);
     }
+
 
     @Test
     public void howToStart() {
@@ -104,6 +94,32 @@ public class HowToStartTests {
             LOG.info("number {} row id: {}", i + 1, lastInsertId);
             lastInsertId++;
         }
+
+    }
+
+
+    @Test
+    public void unixDomainSocket() throws Exception {
+        //  select @@Global.socket;  // default is  /tmp/mysql.sock
+        final String mysqlSocketPath = "/tmp/mysql.sock";
+        final String hostAddress = URLEncoder.encode(mysqlSocketPath, "utf-8");
+        // hostAddress result is  /%2Ftmp%2Fmysql.sock
+        final String url = "jdbd:mysql://%2Ftmp%2Fmysql.sock/army_test";
+
+        final Map<String, Object> map = new HashMap<>();
+        map.put(Driver.USER, "army_w");
+        map.put(Driver.PASSWORD, "army123");
+        // properties will override the properties of url.
+        final DatabaseSessionFactory domainSocketSessionFactory;
+        domainSocketSessionFactory = Driver.findDriver(url).forDeveloper(url, map);
+
+        final ResultRow row;
+        row = Mono.from(domainSocketSessionFactory.localSession())
+                .flatMapMany(session -> Flux.from(session.executeQuery("SELECT current_timestamp AS now")))
+                .blockLast();
+
+        Assert.assertNotNull(row);
+        Assert.assertNotNull(row.get(0, LocalDateTime.class));
 
     }
 

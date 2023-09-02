@@ -1,31 +1,49 @@
 package io.jdbd.mysql.statement;
 
 import io.jdbd.meta.JdbdType;
+import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.MySQLType;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.mysql.type.City;
 import io.jdbd.mysql.util.MySQLArrays;
+import io.jdbd.mysql.util.MySQLSpatials;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultRow;
 import io.jdbd.statement.BindSingleStatement;
+import io.jdbd.type.BlobPath;
+import io.jdbd.type.Point;
+import io.jdbd.type.TextPath;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.Year;
 import java.time.ZoneOffset;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 
 /**
@@ -37,6 +55,89 @@ import java.util.function.Function;
  * </p>
  */
 public class DataTypeTests extends SessionTestSupport {
+
+
+    protected static Path bigColumnWkbPath, bigColumnWktPath;
+
+
+    @BeforeClass
+    public void createBigColumnTempFile() throws IOException {
+
+        final Path dir;
+        dir = Paths.get(ClientTestUtils.getModulePath().toString(), "target/big_column");
+
+        if (Files.notExists(dir)) {
+            Files.createDirectories(dir);
+        }
+
+        final int wkbPointNumber = 64 * 1024 * 800;
+        final Path wkbPath, textPath;
+        wkbPath = Files.createTempFile(dir, "Geometry", ".wkb");
+        textPath = Files.createTempFile(dir, "Geometry", ".wkt");
+        bigColumnWkbPath = wkbPath;
+        bigColumnWktPath = textPath;
+
+        // writ LineString
+        final ByteBuf buffer = ByteBufAllocator.DEFAULT.buffer(4096 + 9);
+        final Random random = ThreadLocalRandom.current();
+        try (FileChannel channel = FileChannel.open(wkbPath, StandardOpenOption.APPEND)) {
+
+            buffer.writeByte(1); // Little Endian;
+            buffer.writeIntLE(2); // wkbType
+            buffer.writeIntLE(wkbPointNumber);  // numPoints
+
+            for (int i = 0; i < wkbPointNumber; ) {
+                buffer.writeLongLE(random.nextLong());
+                buffer.writeLongLE(random.nextLong());
+                i++;
+
+                if ((i & 255) == 0) {
+                    buffer.readBytes(channel, channel.position(), buffer.readableBytes());
+                    buffer.clear();
+                }
+
+            }
+            buffer.clear();
+            LOG.info("{} size {} mb", wkbPath, channel.size() >> 20);
+        } catch (Throwable e) {
+            buffer.release();
+            throw e;
+        }
+
+        final int wktPointNumber = 64 * 1024 * 300;
+        try (FileChannel channel = FileChannel.open(textPath, StandardOpenOption.APPEND)) {
+            buffer.writeBytes("LINESTRING(".getBytes(StandardCharsets.UTF_8));
+            for (int i = 0; i < wktPointNumber; ) {
+
+                buffer.writeBytes(Double.toString(Double.longBitsToDouble(random.nextLong())).getBytes(StandardCharsets.UTF_8));
+                buffer.writeByte(Constants.SPACE);
+                buffer.writeBytes(Double.toString(Double.longBitsToDouble(random.nextLong())).getBytes(StandardCharsets.UTF_8));
+                if (i > 0) {
+                    buffer.writeByte(Constants.COMMA);
+                }
+                i++;
+                if ((i & 127) == 0) {
+                    buffer.readBytes(channel, channel.position(), buffer.readableBytes());
+                    buffer.clear();
+                }
+
+            }// for
+
+            buffer.writeByte(')');
+
+            LOG.info("{} size {} mb", textPath, channel.size() >> 20);
+        } finally {
+            buffer.release();
+        }
+
+
+    }
+
+    @AfterClass
+    public void deleteBigColumnFile() throws IOException {
+        Files.deleteIfExists(bigColumnWkbPath);
+        Files.deleteIfExists(bigColumnWktPath);
+    }
 
 
     /**
@@ -563,6 +664,153 @@ public class DataTypeTests extends SessionTestSupport {
 
     }
 
+    /**
+     * <p>
+     * Test :
+     *     <ul>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
+     *     </ul>
+     *     bind {@link MySQLType#GEOMETRY}
+     * </p>
+     *
+     * @see JdbdType#GEOMETRY
+     * @see MySQLType#GEOMETRY
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
+     */
+    @Test(invocationCount = 3, dataProvider = "pointSmtProvider")
+    public void pointType(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
+        insertStmt.bind(0, JdbdType.GEOMETRY, null)
+                .bind(1, JdbdType.GEOMETRY, null)
+
+                .bind(2, JdbdType.GEOMETRY, Point.from(0, 0))
+                .bind(3, JdbdType.GEOMETRY, Point.from(Double.MIN_VALUE, Double.MIN_VALUE))
+
+                .bind(4, JdbdType.GEOMETRY, Point.from(Double.MAX_VALUE, Double.MAX_VALUE))
+                .bind(5, JdbdType.GEOMETRY, Point.from(Double.MIN_VALUE, Double.MAX_VALUE))
+
+                .bind(6, JdbdType.GEOMETRY, MySQLSpatials.writePointToWkb(false, Point.from(0, 0)))
+                .bind(7, JdbdType.GEOMETRY, MySQLSpatials.writePointToWkb(false, Point.from(Double.MIN_VALUE, Double.MAX_VALUE)))
+
+                .bind(8, JdbdType.GEOMETRY, MySQLSpatials.writePointToWkt(Point.from(0, 0)))
+                .bind(9, JdbdType.GEOMETRY, MySQLSpatials.writePointToWkt(Point.from(Double.MIN_VALUE, Double.MAX_VALUE)));
+
+
+        final Function<CurrentRow, ResultRow> function;
+        function = row -> {
+            //LOG.info("row id : {}", row.get(0, Long.class));
+            switch ((int) row.rowNumber()) {
+                case 1: {
+                    Assert.assertNull(row.get(1, Point.class));
+                    Assert.assertNull(row.get(2, Point.class));
+                }
+                break;
+                case 2: {
+                    Assert.assertEquals(row.get(1, Point.class), Point.from(0, 0));
+                    Assert.assertEquals(row.get(2, Point.class), Point.from(Double.MIN_VALUE, Double.MIN_VALUE));
+                }
+                break;
+                case 3: {
+                    Assert.assertEquals(row.get(1, Point.class), Point.from(Double.MAX_VALUE, Double.MAX_VALUE));
+                    Assert.assertEquals(row.get(2, Point.class), Point.from(Double.MIN_VALUE, Double.MAX_VALUE));
+                }
+                break;
+                case 4: {
+                    Assert.assertEquals(row.get(1, byte[].class), MySQLSpatials.writePointToWkb(false, Point.from(0, 0)));
+                    Assert.assertEquals(row.get(2, byte[].class), MySQLSpatials.writePointToWkb(false, Point.from(Double.MIN_VALUE, Double.MAX_VALUE)));
+                }
+                break;
+                case 5: {
+                    Assert.assertEquals(row.get(1, Point.class), Point.from(0, 0));
+                    Assert.assertEquals(row.get(2, Point.class), Point.from(Double.MIN_VALUE, Double.MAX_VALUE));
+                }
+                break;
+                default:
+                    throw new RuntimeException("unknown row");
+
+            }
+            return row.asResultRow();
+        };
+
+
+        Mono.from(insertStmt.executeUpdate())
+                .flatMapMany(s -> {
+                    // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
+                    final int rowCount = (int) s.affectedRows();
+                    long lastId = s.lastInsertedId();
+                    for (int i = 0; i < rowCount; i++) {
+                        queryStmt.bind(i, JdbdType.BIGINT, lastId);
+                        lastId++;
+                    }
+                    return Flux.from(queryStmt.executeQuery(function));
+                })
+                .blockLast();
+
+
+    }
+
+    /**
+     * <p>
+     * Test :
+     *     <ul>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
+     *     </ul>
+     *     bind {@link MySQLType#GEOMETRY}
+     * </p>
+     *
+     * @see JdbdType#GEOMETRY
+     * @see MySQLType#GEOMETRY
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
+     */
+    @Test(invocationCount = 3, dataProvider = "bigColumnStmtProvider")
+    public void bitColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
+
+        insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, bigColumnWkbPath))
+                .bind(1, JdbdType.GEOMETRY, wrapToBlob(bigColumnWkbPath))
+
+                .bind(2, JdbdType.GEOMETRY, TextPath.from(false, StandardCharsets.UTF_8, bigColumnWktPath))
+                .bind(3, JdbdType.GEOMETRY, wrapToText(bigColumnWktPath, StandardCharsets.UTF_8))
+
+                .bind(4, JdbdType.GEOMETRY, wrapToClob(bigColumnWktPath, StandardCharsets.UTF_8))
+                .bind(5, JdbdType.GEOMETRY, wrapToBlob(bigColumnWkbPath));
+
+        final Function<CurrentRow, ResultRow> function;
+        function = row -> {
+            //LOG.info("row id : {}", row.get(0, Long.class));
+            try {
+                BlobPath path;
+                path = row.getNonNull(1, BlobPath.class);
+                LOG.info("{} size {} mb", path, Files.size(path.value()));
+                path = row.getNonNull(2, BlobPath.class);
+                LOG.info("{} size {} mb", path, Files.size(path.value()));
+            } catch (Throwable e) {
+                LOG.error("asResultRow function error.", e);
+                throw new RuntimeException(e);
+            }
+
+            return row.asResultRow();
+        };
+
+
+        Mono.from(insertStmt.executeUpdate())
+                .flatMapMany(s -> {
+                    // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
+                    final int rowCount = (int) s.affectedRows();
+                    long lastId = s.lastInsertedId();
+                    for (int i = 0; i < rowCount; i++) {
+                        queryStmt.bind(i, JdbdType.BIGINT, lastId);
+                        lastId++;
+                    }
+                    return Flux.from(queryStmt.executeQuery(function));
+                })
+                .blockLast();
+
+
+    }
+
 
     /**
      * @see JdbdType#MEDIUMINT
@@ -674,6 +922,40 @@ public class DataTypeTests extends SessionTestSupport {
 
         insertSql = "INSERT mysql_types(my_bit20,my_bit64) VALUES (?,?),(?,?),(?,?),(?,?)";
         querySql = "SELECT t.id,t.my_bit20,t.my_bit64 FROM mysql_types AS t WHERE t.id IN (?,?,?,?) ORDER BY t.id";
+
+        final BindSingleStatement insertStmt, queryInsert;
+        insertStmt = createSingleStatement(targetMethod, context, insertSql);
+        queryInsert = createSingleStatement(targetMethod, context, querySql);
+
+        return new Object[][]{{insertStmt, queryInsert}};
+    }
+
+    /**
+     * @see #pointType(BindSingleStatement, BindSingleStatement)
+     */
+    @DataProvider(name = "pointSmtProvider", parallel = true)
+    public final Object[][] pointSmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String insertSql, querySql;
+
+        insertSql = "INSERT mysql_types(my_point,my_geometry) VALUES (?,?),(st_geometryfromwkb(?),st_geometryfromwkb(?)),(st_geometryfromwkb(?),st_geometryfromwkb(?)),(st_geometryfromwkb(?),st_geometryfromwkb(?)),(st_geometryfromtext(?),st_geometryfromtext(?))";
+        querySql = "SELECT t.id,t.my_point,t.my_geometry FROM mysql_types AS t WHERE t.id IN (?,?,?,?,?) ORDER BY t.id";
+
+        final BindSingleStatement insertStmt, queryInsert;
+        insertStmt = createSingleStatement(targetMethod, context, insertSql);
+        queryInsert = createSingleStatement(targetMethod, context, querySql);
+
+        return new Object[][]{{insertStmt, queryInsert}};
+    }
+
+    /**
+     * @see #bitColumn(BindSingleStatement, BindSingleStatement)
+     */
+    @DataProvider(name = "bigColumnStmtProvider", parallel = true)
+    public final Object[] bigColumnStmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String insertSql, querySql;
+
+        insertSql = "INSERT mysql_types(my_point,my_geometry) VALUES (st_geometryfromwkb(?),st_geometryfromwkb(?)),(st_geometryfromtext(?),st_geometryfromtext(?)),(st_geometryfromtext(?),st_geometryfromtext(?))";
+        querySql = "SELECT t.id,t.my_point,t.my_geometry FROM mysql_types AS t WHERE t.id IN (?,?,?) ORDER BY t.id";
 
         final BindSingleStatement insertStmt, queryInsert;
         insertStmt = createSingleStatement(targetMethod, context, insertSql);

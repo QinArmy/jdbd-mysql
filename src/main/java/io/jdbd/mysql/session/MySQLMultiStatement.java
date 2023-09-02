@@ -143,11 +143,6 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
 
 
     @Override
-    public <F extends Publisher<ResultStates>> F executeBatchUpdate(Function<Publisher<ResultStates>, F> fluxFunc) {
-        return fluxFunc.apply(executeBatchUpdate());
-    }
-
-    @Override
     public QueryResults executeBatchQuery() {
         if (this.paramGroup == EMPTY_PARAM_GROUP) {
             return MultiResults.batchQueryError(MySQLExceptions.cannotReuseStatement(MultiStatement.class));

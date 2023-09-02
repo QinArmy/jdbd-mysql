@@ -117,7 +117,8 @@ final class LongParameterWriter {
 
             }
 
-
+            sink.complete();
+            LOG.debug("{} big blob file send complete", blobPath.value());
         } catch (Throwable e) {
             if (MySQLExceptions.isByteBufOutflow(e)) {
                 sink.error(MySQLExceptions.netPacketTooLargeError(e));
@@ -168,7 +169,8 @@ final class LongParameterWriter {
 
             }
 
-
+            sink.complete();
+            LOG.debug("{} send complete", textPath.value());
         } catch (Throwable e) {
             if (MySQLExceptions.isByteBufOutflow(e)) {
                 sink.error(MySQLExceptions.netPacketTooLargeError(e));

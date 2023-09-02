@@ -343,17 +343,6 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
-    public <F extends Publisher<ResultStates>> F executeBatchUpdate(@Nullable Function<Publisher<ResultStates>, F> fluxFunc) {
-        if (fluxFunc == null) {
-            final NullPointerException error;
-            error = MySQLExceptions.fluxFuncIsNull();
-            this.stmtTask.closeOnBindError(error); // close prepare statement.
-            throw error;
-        }
-        return fluxFunc.apply(executeBatchUpdate());
-    }
-
-    @Override
     public QueryResults executeBatchQuery() {
         this.endStmtOption(true);
 

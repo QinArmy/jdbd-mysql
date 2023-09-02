@@ -29,7 +29,7 @@ public abstract class ClientTestUtils {
     private static final Environment ENV = loadTestConfig();
 
     public static Path getModulePath() {
-        return Paths.get(System.getProperty("user.dir"));
+        return Paths.get(System.getProperty("user.dir")).toAbsolutePath();
     }
 
     public static Path getTestMyLocalPath() {

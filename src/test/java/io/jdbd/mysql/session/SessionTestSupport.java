@@ -9,6 +9,9 @@ import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
 import io.jdbd.statement.BindSingleStatement;
 import io.jdbd.statement.Statement;
+import io.jdbd.type.Blob;
+import io.jdbd.type.Clob;
+import io.jdbd.type.Text;
 import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,21 +22,30 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.DataProvider;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public abstract class SessionTestSupport {
 
     protected final Logger LOG = LoggerFactory.getLogger(getClass());
 
-
+    protected static final Executor EXECUTOR = Executors.newFixedThreadPool(3);
     protected static DatabaseSessionFactory sessionFactory;
 
 
@@ -42,16 +54,9 @@ public abstract class SessionTestSupport {
         if (sessionFactory != null) {
             return;
         }
-        sessionFactory = createSessionFactory();
-
-        // create table
-        final Path path;
-        path = Paths.get(ClientTestUtils.getTestResourcesPath().toString(), "ddl/mysqlTypes.sql");
-        final String sql;
-        sql = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-        Mono.from(sessionFactory.localSession())
-                .flatMap(session -> Mono.from(session.executeUpdate(sql)))
-                .block();
+        final DatabaseSessionFactory factory;
+        sessionFactory = factory = createSessionFactory();
+        createMysqlTypeTableIfNeed(factory);
     }
 
     @AfterSuite
@@ -71,6 +76,7 @@ public abstract class SessionTestSupport {
         }
 
     }
+
 
     @AfterMethod
     public final void closeSessionAfterTest(final Method method, final ITestContext context) {
@@ -233,6 +239,42 @@ public abstract class SessionTestSupport {
 
     /*-------------------below static method -------------------*/
 
+    public static void createMysqlTypeTableIfNeed(final DatabaseSessionFactory sessionFactory) {
+        try {
+            // create table
+            final Path path;
+            path = Paths.get(ClientTestUtils.getTestResourcesPath().toString(), "ddl/mysqlTypes.sql");
+            final String sql;
+            sql = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+
+            Mono.from(sessionFactory.localSession())
+                    .flatMap(session -> Mono.from(session.executeUpdate(sql)))
+                    .block();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    public static Blob wrapToBlob(final Path path) {
+        final Flux<byte[]> flux;
+        flux = Flux.create(sink -> EXECUTOR.execute(() -> publishBinaryFile(sink, path)));
+        return Blob.from(flux);
+    }
+
+    public static Text wrapToText(final Path path, final Charset charset) {
+        final Flux<byte[]> flux;
+        flux = Flux.create(sink -> EXECUTOR.execute(() -> publishBinaryFile(sink, path)));
+        return Text.from(charset, flux);
+    }
+
+    public static Clob wrapToClob(final Path path, final Charset charset) {
+        final Flux<CharSequence> flux;
+        flux = Flux.create(sink -> EXECUTOR.execute(() -> publishTextFile(sink, path, charset)));
+        return Clob.from(flux);
+    }
+
+
     protected static String keyNameOfSession(final ITestNGMethod targetMethod) {
         return targetMethod.getRealClass().getName() + '.' + targetMethod.getMethodName() + "#session";
     }
@@ -247,6 +289,40 @@ public abstract class SessionTestSupport {
         driver = Driver.findDriver(url);
         //LOG.debug("driver {} ", driver);
         return driver.forPoolVendor(url, testEnv.sourceMap());
+    }
+
+
+    private static void publishBinaryFile(final FluxSink<byte[]> sink, final Path path) {
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+            final byte[] bufferBytes = new byte[4096];
+            final ByteBuffer buffer = ByteBuffer.wrap(bufferBytes);
+            byte[] outBytes;
+            for (int length; (length = channel.read(buffer)) > 0; ) {
+                buffer.flip();
+                outBytes = new byte[length];
+                System.arraycopy(bufferBytes, 0, outBytes, 0, length);
+                sink.next(outBytes);
+                buffer.clear();
+            }// for
+            sink.complete();
+        } catch (Throwable e) {
+            sink.error(e);
+        }
+    }
+
+    private static void publishTextFile(final FluxSink<CharSequence> sink, final Path path, final Charset charset) {
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+            final byte[] bufferBytes = new byte[4096];
+            final ByteBuffer buffer = ByteBuffer.wrap(bufferBytes);
+            for (int length; (length = channel.read(buffer)) > 0; ) {
+                buffer.flip();
+                sink.next(new String(bufferBytes, 0, length, charset));
+                buffer.clear();
+            }// for
+            sink.complete();
+        } catch (Throwable e) {
+            sink.error(e);
+        }
     }
 
 

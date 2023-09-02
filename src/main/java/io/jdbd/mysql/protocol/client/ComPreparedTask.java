@@ -589,7 +589,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                 break;
             case END: {
                 throw new IllegalStateException("CLOSE_STMT command send error.", e);
-            }
+            }// TODO fix me
             default: {
                 addError(MySQLExceptions.wrap(e));
                 this.packetPublisher = Mono.just(createCloseStatementPacket());
@@ -603,6 +603,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     @Override
     protected void onChannelClose() {
         if (this.taskPhase != TaskPhase.END) {
+            this.taskPhase = TaskPhase.END;
             this.sink.error(new SessionCloseException("Database session unexpected close."));
         }
     }
@@ -1133,7 +1134,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         }
         return taskEnd;
     }
-
 
 
     /**

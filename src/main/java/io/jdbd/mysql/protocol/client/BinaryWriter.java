@@ -6,7 +6,10 @@ import io.jdbd.mysql.protocol.MySQLServerVersion;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
+import io.jdbd.type.Clob;
 import io.jdbd.type.Point;
+import io.jdbd.type.Text;
+import io.jdbd.type.TextPath;
 import io.jdbd.vendor.stmt.NamedValue;
 import io.jdbd.vendor.stmt.Value;
 import io.jdbd.vendor.util.JdbdExceptions;
@@ -264,6 +267,7 @@ abstract class BinaryWriter {
     final MySQLType decideActualType(final Value paramValue) {
         final MySQLType type = (MySQLType) paramValue.getType();
         final MySQLType bindType;
+        final Object source;
         switch (type) {
             case BIT: {
                 // Server 8.0.27 and before ,can't bind BIT type.
@@ -300,13 +304,25 @@ abstract class BinaryWriter {
             }
             break;
             case DATETIME: {
-                final Object source = paramValue.get();
+                source = paramValue.get();
                 if (this.supportZoneOffset && (source instanceof OffsetDateTime || source instanceof ZonedDateTime)) {
                     //As of MySQL 8.0.19 can append zone
                     //Datetime literals that include time zone offsets are accepted as parameter values by prepared statements.
                     bindType = MySQLType.VARCHAR;
                 } else {
                     bindType = type;
+                }
+            }
+            break;
+            case GEOMETRY: {
+                source = paramValue.get();
+                if (source instanceof String
+                        || source instanceof TextPath
+                        || source instanceof Clob
+                        || source instanceof Text) {
+                    bindType = MySQLType.TEXT;
+                } else {
+                    bindType = MySQLType.BLOB;
                 }
             }
             break;
