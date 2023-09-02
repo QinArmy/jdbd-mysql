@@ -173,6 +173,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .option(ChannelOption.SO_KEEPALIVE, tcp ? env.isOn(MySQLKey.TCP_KEEP_ALIVE) : null)
                 .option(ChannelOption.TCP_NODELAY, tcp ? env.isOn(MySQLKey.TCP_NO_DELAY) : null)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, tcp ? env.getOrDefault(MySQLKey.CONNECT_TIMEOUT) : null)
+                .option(ChannelOption.AUTO_CLOSE, tcp ? false : null)
                 .runOn(this.loopResources, true)
                 .remoteAddress(() -> socketAddress)
                 .connect()

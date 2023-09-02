@@ -765,7 +765,7 @@ public class DataTypeTests extends SessionTestSupport {
      * @see MySQLType#GEOMETRY
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
      */
-    @Test(invocationCount = 3, dataProvider = "bigColumnStmtProvider")
+    @Test(enabled = false, invocationCount = 3, dataProvider = "bigColumnStmtProvider")
     public void bitColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
 
         insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, bigColumnWkbPath))

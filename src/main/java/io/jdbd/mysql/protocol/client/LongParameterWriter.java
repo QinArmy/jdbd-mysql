@@ -237,7 +237,6 @@ final class LongParameterWriter {
             this.sink = sink;
 
             this.restPayloadBytes = 0;
-            this.packet = null;
             this.packet = createPacket();
         }
 
@@ -252,6 +251,9 @@ final class LongParameterWriter {
 
         @Override
         public final void cancel() {
+            if (this.terminate) {
+                return;
+            }
             final Subscription s = this.upstream;
             if (s != null) {
                 s.cancel();
@@ -284,6 +286,9 @@ final class LongParameterWriter {
 
         @Override
         public final void onError(final Throwable error) {
+            if (this.terminate) {
+                return;
+            }
             if (this.adjutant.inEventLoop()) {
                 onErrorInEventLoop(error);
             } else {
@@ -293,6 +298,9 @@ final class LongParameterWriter {
 
         @Override
         public final void onComplete() {
+            if (this.terminate) {
+                return;
+            }
             if (this.adjutant.inEventLoop()) {
                 onCompleteInEventLoop();
             } else {
@@ -334,18 +342,24 @@ final class LongParameterWriter {
 
 
         private void onCompleteInEventLoop() {
+            if (this.terminate) {
+                return;
+            }
+            this.terminate = true;
+
             final ByteBuf packet = this.packet;
             boolean error = false;
             if (packet != null) {
                 if (packet.readableBytes() > Packets.HEADER_SIZE) {
                     error = sendPackets(packet);
-                } else {
+                } else if (packet.refCnt() > 0) {
                     packet.release();
                 }
                 this.packet = null;
             }
             if (!error) {
                 this.sink.complete();
+                LOG.debug("{} complete", getClass().getSimpleName());
             }
 
 
@@ -369,6 +383,7 @@ final class LongParameterWriter {
             } else {
                 this.sink.error(MySQLExceptions.longDataReadException(this.batchIndex, this.paramValue, e));
             }
+            LOG.debug("{} error", getClass().getSimpleName(), e);
 
         }
 
@@ -396,6 +411,7 @@ final class LongParameterWriter {
                 packet.release();
                 this.packet = null;
             }
+            LOG.debug("{} downdown cancel", getClass().getSimpleName());
 
         }
 
@@ -435,7 +451,7 @@ final class LongParameterWriter {
 
                 this.restPayloadBytes = 0;
                 this.packet = null;
-                packet = createPacket();
+                this.packet = packet = createPacket();
                 restPayloadLength = this.restPayloadBytes;
 
             }
