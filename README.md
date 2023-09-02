@@ -30,7 +30,7 @@ a humane client library to delegate to.
 </dependency>
 ```
 
-#### DataBaseSessionFactory
+#### Java code
 
 ```java
 package io.jdbd.mysql.simple;
@@ -52,9 +52,9 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
-public class SimpleTests {
+public class HowToStartTests {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SimpleTests.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HowToStartTests.class);
 
     private static DatabaseSessionFactory sessionFactory;
 
@@ -115,7 +115,7 @@ public class SimpleTests {
         final long affectedRows = resultStates.affectedRows();
         Assert.assertEquals(affectedRows, 2);
 
-        long lastInsertId = resultStates.lastInsertedId(); // NOTE : lastInsertId is first row id ,not last row id
+        long lastInsertId = resultStates.lastInsertedId(); // NOTE : lastInsertId is first row id ,not last row id in multi-row insert syntax
         for (int i = 0; i < affectedRows; i++) {
             LOG.info("number {} row id: {}", i + 1, lastInsertId);
             lastInsertId++;
