@@ -11,6 +11,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Mono;
 
+import java.net.URLEncoder;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -22,6 +23,23 @@ public class HowToStartTests {
     private static final Logger LOG = LoggerFactory.getLogger(HowToStartTests.class);
 
     private static DatabaseSessionFactory sessionFactory;
+
+    @Test
+    public void unixDomainSocket() throws Exception {
+        //  select @@Global.socket;  // default is  /tmp/mysql.sock
+        final String mysqlSocketPath = "/tmp/mysql.sock";
+        final String hostAddress = URLEncoder.encode(mysqlSocketPath, "utf-8");
+        // hostAddress result is  /%2Ftmp%2Fmysql.sock
+        final String url = "jdbd:mysql://%2Ftmp%2Fmysql.sock/army_test";
+
+        final Map<String, Object> map = new HashMap<>();
+        map.put(Driver.USER, "army_w");
+        map.put(Driver.PASSWORD, "army123");
+
+        DatabaseSessionFactory sessionFactory;
+        sessionFactory = Driver.findDriver(url).forDeveloper(url, map);
+
+    }
 
     @BeforeClass
     public void createSessionFactory() {
@@ -80,7 +98,8 @@ public class HowToStartTests {
         final long affectedRows = resultStates.affectedRows();
         Assert.assertEquals(affectedRows, 2);
 
-        long lastInsertId = resultStates.lastInsertedId(); // NOTE : lastInsertId is first row id ,not last row id in multi-row insert syntax
+        // NOTE : lastInsertId is first row id ,not last row id in multi-row insert syntax
+        long lastInsertId = resultStates.lastInsertedId();
         for (int i = 0; i < affectedRows; i++) {
             LOG.info("number {} row id: {}", i + 1, lastInsertId);
             lastInsertId++;

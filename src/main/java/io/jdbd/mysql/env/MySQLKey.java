@@ -1284,11 +1284,11 @@ public final class MySQLKey<T> extends Key<T> {
     public static final MySQLKey<String> DB_NAME = new MySQLKey<>("dbname", String.class, null);
 
     // blow Connection Group
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html">Server SQL Modes</a>
-     */
-    public static final MySQLKey<String> APPEND_SQL_MODE = new MySQLKey<>("appendSqlMode", String.class, null);
+//
+//    /**
+//     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html">Server SQL Modes</a>
+//     */
+//    public static final MySQLKey<String> APPEND_SQL_MODE = new MySQLKey<>("appendSqlMode", String.class, null);
 
     /**
      * <p>
