@@ -21,4 +21,9 @@ public interface SessionEnv {
 
     boolean isSupportLocalInfile();
 
+
+    int globalMaxAllowedPacket();
+
+    int sessionMaxAllowedPacket();
+
 }

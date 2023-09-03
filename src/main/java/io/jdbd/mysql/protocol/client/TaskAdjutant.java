@@ -21,6 +21,11 @@ interface TaskAdjutant extends ITaskAdjutant, ClientProtocolAdjutant, MySQLParse
 
     Map<String, Collation> nameCollationMap();
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_max_allowed_packet">max_allowed_packet</a>
+     */
+    int sessionMaxAllowedPacket();
+
     ClientProtocolFactory getFactory();
 
     void addSessionCloseListener(Runnable listener);

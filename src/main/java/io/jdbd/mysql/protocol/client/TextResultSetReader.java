@@ -121,18 +121,15 @@ final class TextResultSetReader extends MySQLResultSetReader {
         switch (meta.sqlType) {
             case NULL:
                 throw MySQLExceptions.createFatalIoException("server text protocol return null type", null);
-            case LONGTEXT:
-            case JSON:
-                bigColumnValue = readLongText(payload, meta, currentRow);
-                bigColumn = true;
-                break;
             case GEOMETRY:
                 bigColumnValue = readGeometry(payload, meta, currentRow);
                 bigColumn = true;
                 break;
+            case LONGTEXT:
+            case JSON:
             case LONGBLOB:
             case UNKNOWN:
-                bigColumnValue = readLongBlob(payload, meta, currentRow);
+                bigColumnValue = readLongTextOrBlob(payload, meta, currentRow);
                 bigColumn = true;
                 break;
             default:
@@ -147,11 +144,12 @@ final class TextResultSetReader extends MySQLResultSetReader {
 
         final Object value;
         final byte[] bytes;
-        final int lenEnc;
-        if (readableBytes == 0 || (lenEnc = Packets.readLenEncAsInt(payload)) > readableBytes) {
+        final long lenEnc;
+        if (readableBytes == 0 || (lenEnc = Packets.getLenEnc(payload, payload.readerIndex())) > readableBytes) {
             return MORE_CUMULATE_OBJECT;
         }
-        bytes = new byte[lenEnc];
+        Packets.readLenEnc(payload); // skip
+        bytes = new byte[(int) lenEnc];
         payload.readBytes(bytes);
 
         final Charset columnCharset;

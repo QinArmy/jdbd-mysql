@@ -188,9 +188,10 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
             case DECIMAL:
             case DECIMAL_UNSIGNED: {
                 final int lenEnc;
-                if (readableBytes == 0 || (lenEnc = Packets.readLenEncAsInt(payload)) > readableBytes) {
+                if (readableBytes == 0 || (lenEnc = Packets.getLenEncAsInt(payload, payload.readerIndex())) > readableBytes) {
                     value = MORE_CUMULATE_OBJECT;
                 } else {
+                    assert Packets.readLenEnc(payload) == lenEnc;
                     bytes = new byte[lenEnc];
                     payload.readBytes(bytes);
                     value = new BigDecimal(new String(bytes, this.adjutant.columnCharset(meta.columnCharset)));
@@ -252,33 +253,25 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
             case CHAR:
             case VARCHAR:
             case ENUM:
-            case SET:
-            case TINYTEXT:
-            case TEXT:
-            case MEDIUMTEXT: {
+            case SET: {
                 final int lenEnc;
-                if (readableBytes == 0 || (lenEnc = Packets.readLenEncAsInt(payload)) > readableBytes) {
+                if (readableBytes == 0 || (lenEnc = Packets.getLenEncAsInt(payload, payload.readerIndex())) > readableBytes) {
                     value = MORE_CUMULATE_OBJECT;
                 } else {
+                    assert Packets.readLenEnc(payload) == lenEnc;
                     bytes = new byte[lenEnc];
                     payload.readBytes(bytes);
                     value = new String(bytes, this.adjutant.columnCharset(meta.columnCharset));
                 }
             }
             break;
-            case LONGTEXT:
-            case JSON: // handle JSON as long text
-                value = readLongText(payload, meta, currentRow);
-                break;
             case BINARY:
-            case VARBINARY:
-            case TINYBLOB:
-            case BLOB:
-            case MEDIUMBLOB: {
+            case VARBINARY: {
                 final int lenEnc;
-                if (readableBytes == 0 || (lenEnc = Packets.readLenEncAsInt(payload)) > readableBytes) {
+                if (readableBytes == 0 || (lenEnc = Packets.getLenEncAsInt(payload, payload.readerIndex())) > readableBytes) {
                     value = MORE_CUMULATE_OBJECT;
                 } else {
+                    assert Packets.readLenEnc(payload) == lenEnc;
                     bytes = new byte[lenEnc];
                     payload.readBytes(bytes);
                     value = bytes;
@@ -290,10 +283,19 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
                 break;
             case NULL:
                 throw MySQLExceptions.createFatalIoException("server return null type", null);
+            case TINYTEXT:
+            case TEXT:
+            case MEDIUMTEXT:
+            case LONGTEXT:
+            case JSON: // handle JSON as long text
+
+            case TINYBLOB:
+            case BLOB:
+            case MEDIUMBLOB:
             case LONGBLOB:
             case UNKNOWN:// handle unknown as long blob.
             default:
-                value = readLongBlob(payload, meta, currentRow);
+                value = readLongTextOrBlob(payload, meta, currentRow);
 
         } //switch
         return value;

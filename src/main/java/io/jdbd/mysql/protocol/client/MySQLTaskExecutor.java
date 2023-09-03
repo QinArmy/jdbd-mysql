@@ -334,6 +334,14 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
             return map;
         }
 
+        @Override
+        public int sessionMaxAllowedPacket() {
+            final SessionEnv server = this.sessionEnv;
+            if (server == null) {
+                throw new IllegalStateException("Cannot access server now.");
+            }
+            return server.sessionMaxAllowedPacket();
+        }
 
         @Override
         public SessionEnv sessionEnv() {

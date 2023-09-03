@@ -173,7 +173,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .option(ChannelOption.SO_KEEPALIVE, tcp ? env.isOn(MySQLKey.TCP_KEEP_ALIVE) : null)
                 .option(ChannelOption.TCP_NODELAY, tcp ? env.isOn(MySQLKey.TCP_NO_DELAY) : null)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, tcp ? env.getOrDefault(MySQLKey.CONNECT_TIMEOUT) : null)
-                .option(ChannelOption.AUTO_CLOSE, tcp ? false : null)
+                //.option(ChannelOption.AUTO_CLOSE, tcp ? false : null)
                 .runOn(this.loopResources, true)
                 .remoteAddress(() -> socketAddress)
                 .connect()
@@ -327,7 +327,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             }
             builder.append("SELECT DATE_FORMAT(FROM_UNIXTIME(")
                     .append(utcEpochSecond)
-                    .append("),'%Y-%m-%d %T') AS databaseNow , @@SESSION.sql_mode AS sqlMode , @@GLOBAL.local_infile localInfile");
+                    .append("),'%Y-%m-%d %T') AS databaseNow,@@SESSION.sql_mode AS sqlMode,@@GLOBAL.local_infile AS localInfile")
+                    .append(",@@GLOBAL.max_allowed_packet AS globalMaxPacket,@@SESSION.max_allowed_packet AS sessionMaxPacket");
 
             return Flux.from(ComQueryTask.staticMultiStmt(Stmts.multiStmt(builder.toString()), this.adjutant))
                     .filter(ResultItem::isRowItem)
@@ -715,6 +716,10 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         private final boolean localInfile;
 
+        private final int globalMaxPacket;
+
+        private final int sessionMaxPacket;
+
 
         private DefaultSessionEnv(Charset clientCharset, @Nullable Charset resultsCharset, @Nullable ZoneOffset connZone,
                                   ResultRow row, long utcEpochSecond, Environment env) {
@@ -732,6 +737,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             this.sqlModeSet = MySQLStrings.spitAsSet(row.get("sqlMode", String.class), ",", true);
 
             this.localInfile = row.getNonNull("localInfile", Boolean.class);
+            this.globalMaxPacket = row.getNonNull("globalMaxPacket", Integer.class);
+            this.sessionMaxPacket = row.getNonNull("sessionMaxPacket", Integer.class);
         }
 
 
@@ -766,6 +773,16 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         }
 
         @Override
+        public int globalMaxAllowedPacket() {
+            return this.globalMaxPacket;
+        }
+
+        @Override
+        public int sessionMaxAllowedPacket() {
+            return this.sessionMaxPacket;
+        }
+
+        @Override
         public String toString() {
             return MySQLStrings.builder()
                     .append(getClass().getSimpleName())
@@ -781,6 +798,10 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                     .append(this.serverZone)
                     .append(" , localInfile : ")
                     .append(this.localInfile)
+                    .append(" , globalMaxAllowedPacket : ")
+                    .append(this.globalMaxPacket)
+                    .append(" , sessionMaxAllowedPacket : ")
+                    .append(this.sessionMaxPacket)
                     .append(" ]")
                     .toString();
         }

@@ -34,7 +34,7 @@ public class SessionFactoryTests extends SessionTestSupport {
     }
 
 
-    @Test//(invocationCount = 20_000, threadPoolSize = 20)
+    @Test//(invocationCount = 20_000, threadPoolSize = 99)
     public void localSession() {
 
         Flux.from(sessionFactory.localSession())

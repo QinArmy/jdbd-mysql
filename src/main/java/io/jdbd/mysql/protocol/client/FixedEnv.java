@@ -54,7 +54,7 @@ abstract class FixedEnv {
     final Environment env;
 
     FixedEnv(Environment env) {
-       // this.transformedBitIsBoolean = env.getOrDefault(MySQLKey.TRANS_FORMED_BIT_IS_BOOLEAN);
+        // this.transformedBitIsBoolean = env.getOrDefault(MySQLKey.TRANS_FORMED_BIT_IS_BOOLEAN);
         this.functionsNeverReturnBlobs = env.getOrDefault(MySQLKey.FUNCTIONS_NEVER_RETURN_BLOBS);
         this.blobsAreStrings = env.getOrDefault(MySQLKey.BLOBS_ARE_STRINGS);
         this.maxAllowedPacket = parseMaxAllowedPacket(env);
@@ -62,7 +62,7 @@ abstract class FixedEnv {
         this.bigColumnBoundaryBytes = env.getInRange(MySQLKey.BIG_COLUMN_BOUNDARY_BYTES, Packets.MAX_PAYLOAD, 1 << 27);
         this.sendFractionalSeconds = env.getOrDefault(MySQLKey.SEND_FRACTIONAL_SECONDS);
         this.sendFractionalSecondsForTime = env.getOrDefault(MySQLKey.SEND_FRACTIONAL_SECONDS_FOR_TIME);
-        this.blobSendChunkSize = env.getInRange(MySQLKey.BLOB_SEND_CHUNK_SIZE, 1024, this.maxAllowedPacket - Packets.HEADER_SIZE);
+        this.blobSendChunkSize = env.getInRange(MySQLKey.BLOB_SEND_CHUNK_SIZE, 1024, Packets.MAX_PAYLOAD - 1);
 
         this.pluginFuncMap = createPluginFuncMap(env);
         this.customCharsetMap = createCustomCharsetMap(env);

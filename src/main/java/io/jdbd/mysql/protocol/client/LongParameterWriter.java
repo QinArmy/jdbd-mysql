@@ -36,21 +36,21 @@ final class LongParameterWriter {
 
     private final MySQLColumnMeta[] columnMetas;
 
+    private final int maxAllowedPacket;
+
     private LongParameterWriter(ExecuteCommandWriter writer) {
         this.writer = writer;
         this.statementId = writer.stmtTask.getStatementId();
         this.columnMetas = writer.stmtTask.getParameterMetas();
+        this.maxAllowedPacket = writer.adjutant.sessionMaxAllowedPacket();
 
     }
 
 
     Flux<ByteBuf> write(final int batchIndex, final ParamValue paramValue) {
         return Flux.create(sink -> {
-            if (this.writer.adjutant.inEventLoop()) {
-                sendPathParameterInEventLoop(batchIndex, paramValue, sink);
-            } else {
-                this.writer.adjutant.execute(() -> sendPathParameterInEventLoop(batchIndex, paramValue, sink));
-            }
+            // here must async
+            this.writer.adjutant.execute(() -> sendPathParameterInEventLoop(batchIndex, paramValue, sink));
 
         });
     }
@@ -101,7 +101,7 @@ final class LongParameterWriter {
             totalSize = channel.size();
 
             final int chunkSize = this.writer.fixedEnv.blobSendChunkSize, paramIndex = paramValue.getIndex();
-            final IntSupplier sequenceId = this.writer.stmtTask::nextSequenceId;
+            final IntSupplier sequenceId = this.writer.sequenceId;
 
 
             long restBytes = totalSize;
@@ -112,13 +112,13 @@ final class LongParameterWriter {
                 packet = createLongDataPacket(paramIndex, length);
 
                 packet.writeBytes(channel, length);
-
+                this.writer.stmtTask.resetSequenceId(); // reset before send
                 Packets.sendPackets(packet, sequenceId, sink);
 
             }
 
             sink.complete();
-            LOG.debug("{} big blob file send complete", blobPath.value());
+            LOG.debug("{} big blob file send complete,size {} mb", blobPath.value(), totalSize >> 20);
         } catch (Throwable e) {
             if (MySQLExceptions.isByteBufOutflow(e)) {
                 sink.error(MySQLExceptions.netPacketTooLargeError(e));
@@ -164,7 +164,7 @@ final class LongParameterWriter {
                 } else {
                     MySQLBinds.readFileAndWrite(channel, buffer, packet, length, textCharset, clientCharset);
                 }
-
+                this.writer.stmtTask.resetSequenceId();
                 Packets.sendPackets(packet, sequenceId, sink);
 
             }
@@ -183,10 +183,12 @@ final class LongParameterWriter {
 
     }
 
-
+    /**
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_send_long_data.html">Protocol::COM_STMT_SEND_LONG_DATA</a>
+     */
     private ByteBuf createLongDataPacket(final int parameterIndex, final int capacity) {
         final ByteBuf packet = this.writer.adjutant.allocator()
-                .buffer(Packets.HEADER_SIZE + capacity, this.writer.fixedEnv.maxAllowedPacket);
+                .buffer(Packets.HEADER_SIZE + capacity, Integer.MAX_VALUE - 128);
         packet.writeZero(Packets.HEADER_SIZE); // placeholder of header
 
         packet.writeByte(Packets.COM_STMT_SEND_LONG_DATA); //status
@@ -332,6 +334,7 @@ final class LongParameterWriter {
                     packet.release();
                 }
             } else {
+                this.parameterWriter.writer.stmtTask.resetSequenceId();
                 Packets.sendPackets(packet, this.parameterWriter.writer.sequenceId, this.sink);
             }
             return error;

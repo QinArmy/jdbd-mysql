@@ -3,7 +3,6 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLBinds;
-import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.statement.OutParameter;
 import io.jdbd.statement.Parameter;
@@ -12,13 +11,11 @@ import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.IntSupplier;
 
 
@@ -79,26 +76,33 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
         final List<ParamValue> bindGroup;
         bindGroup = getBindGroup(batchIndex);
 
-        final MySQLColumnMeta[] paramMetaArray = Objects.requireNonNull(this.stmtTask.getParameterMetas());
+        final MySQLColumnMeta[] paramMetaArray = this.stmtTask.getParameterMetas();
         MySQLBinds.assertParamCountMatch(batchIndex, paramMetaArray.length, bindGroup.size());
 
-        List<ParamValue> longParamList = null;
         ParamValue paramValue;
-        Object value;
+
+        Flux<ByteBuf> longParamFlux = null;
+        LongParameterWriter longParamWriter = this.longParamWriter;
+
         for (int i = 0; i < paramMetaArray.length; i++) {
             paramValue = bindGroup.get(i);
             if (paramValue.getIndex() != i) {
                 // hear invoker has bug
                 throw MySQLExceptions.bindValueParamIndexNotMatchError(batchIndex, paramValue, i);
             }
-            value = paramValue.get();
-            if (value instanceof LongParameter) {
-                if (longParamList == null) {
-                    longParamList = MySQLCollections.arrayList();
-                }
-                longParamList.add(paramValue);
+            if (!(paramValue.get() instanceof LongParameter)) {
+                continue;
+            }
+            if (longParamWriter == null) {
+                this.longParamWriter = longParamWriter = LongParameterWriter.create(this);
+            }
+            if (longParamFlux == null) {
+                longParamFlux = longParamWriter.write(batchIndex, paramValue);
+            } else {
+                longParamFlux = longParamFlux.concatWith(longParamWriter.write(batchIndex, paramValue));
             }
         }
+
         final Publisher<ByteBuf> publisher;
         if (paramMetaArray.length == 0 && (!this.supportQueryAttr || this.stmt.getStmtVarList().size() == 0)) {
             // this 'if' block handle no bind parameter.
@@ -107,18 +111,12 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             Packets.writeIntLenEnc(packet, 0); // parameter_count
             this.stmtTask.resetSequenceId(); // reset sequenceId before write header
             publisher = Packets.createPacketPublisher(packet, this.sequenceId, this.adjutant);
-        } else if (longParamList == null || longParamList.size() == 0) {
+        } else if (longParamFlux == null) {
             // this 'if' block handle no long parameter.
             publisher = bindParameters(batchIndex, bindGroup);
         } else {
-            LongParameterWriter longParamWriter = this.longParamWriter;
-            if (longParamWriter == null) {
-                this.longParamWriter = longParamWriter = LongParameterWriter.create(this);
-            }
             this.stmtTask.nextGroupReset(); // next group need to reset
-            final LongParameterWriter longWriter = longParamWriter;
-            publisher = Flux.fromIterable(longParamList)
-                    .flatMap(param -> longWriter.write(batchIndex, param))
+            publisher = longParamFlux
                     .concatWith(defferBindParameters(batchIndex, bindGroup))
                     .onErrorResume(this::handleSendError);
         }
@@ -145,10 +143,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
 
     private List<ParamValue> getBindGroup(final int batchIndex) {
-        ParamSingleStmt stmt = this.stmt;
-        if (stmt instanceof PrepareStmt) {
-            stmt = ((PrepareStmt) stmt).getStmt();
-        }
+        final ParamSingleStmt stmt = this.stmt;
         final List<ParamValue> bindGroup;
         if (stmt instanceof ParamStmt) {
             if (batchIndex > -1) {
@@ -175,36 +170,22 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
 
     private Publisher<ByteBuf> defferBindParameters(final int batchIndex, final List<ParamValue> bindGroup) {
-        return Flux.create(sink -> {
-            if (this.adjutant.inEventLoop()) {
-                defferBIndParamInEventLoop(batchIndex, bindGroup, sink);
-            } else {
-                this.adjutant.execute(() -> defferBIndParamInEventLoop(batchIndex, bindGroup, sink));
+        // must async
+        return Flux.defer(() -> {
+            Publisher<ByteBuf> publisher;
+            try {
+                publisher = bindParameters(batchIndex, bindGroup);
+            } catch (Throwable e) {
+                publisher = Mono.error(MySQLExceptions.wrap(e));
             }
+            return publisher;
         });
-    }
-
-    private void defferBIndParamInEventLoop(final int batchIndex, final List<ParamValue> bindGroup,
-                                            final FluxSink<ByteBuf> sink) {
-
-        Publisher<ByteBuf> publisher;
-        try {
-            publisher = bindParameters(batchIndex, bindGroup);
-
-        } catch (Throwable e) {
-            publisher = null;
-            sink.error(MySQLExceptions.wrap(e));
-        }
-        if (publisher != null) {
-            Flux.from(publisher)
-                    .subscribe(sink::next, sink::error, sink::complete);
-        }
-
     }
 
 
     /**
      * @return {@link Flux} that is created by {@link Flux#fromIterable(Iterable)} method.
+     * @throws JdbdException throw(not emit) when occur error
      * @see #writeCommand(int)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html">Protocol::COM_STMT_EXECUTE</a>
      */
@@ -216,7 +197,6 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
         final ByteBuf packet;
         packet = createExecutePacket(1024);
-
         try {
 
             final List<NamedValue> queryAttrList = this.stmt.getStmtVarList();

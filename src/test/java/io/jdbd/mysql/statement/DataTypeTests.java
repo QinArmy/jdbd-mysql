@@ -3,7 +3,6 @@ package io.jdbd.mysql.statement;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.MySQLType;
-import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.mysql.type.City;
 import io.jdbd.mysql.util.MySQLArrays;
@@ -20,8 +19,8 @@ import io.netty.buffer.ByteBufAllocator;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterSuite;
+import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
@@ -60,7 +59,7 @@ public class DataTypeTests extends SessionTestSupport {
     protected static Path bigColumnWkbPath, bigColumnWktPath;
 
 
-    @BeforeClass
+    @BeforeSuite
     public void createBigColumnTempFile() throws IOException {
 
         final Path dir;
@@ -104,36 +103,37 @@ public class DataTypeTests extends SessionTestSupport {
             throw e;
         }
 
-        final int wktPointNumber = 64 * 1024 * 300;
-        try (FileChannel channel = FileChannel.open(textPath, StandardOpenOption.APPEND)) {
-            buffer.writeBytes("LINESTRING(".getBytes(StandardCharsets.UTF_8));
-            for (int i = 0; i < wktPointNumber; ) {
-
-                buffer.writeBytes(Double.toString(Double.longBitsToDouble(random.nextLong())).getBytes(StandardCharsets.UTF_8));
-                buffer.writeByte(Constants.SPACE);
-                buffer.writeBytes(Double.toString(Double.longBitsToDouble(random.nextLong())).getBytes(StandardCharsets.UTF_8));
-                if (i > 0) {
-                    buffer.writeByte(Constants.COMMA);
-                }
-                i++;
-                if ((i & 127) == 0) {
-                    buffer.readBytes(channel, channel.position(), buffer.readableBytes());
-                    buffer.clear();
-                }
-
-            }// for
-
-            buffer.writeByte(')');
-
-            LOG.info("{} size {} mb", textPath, channel.size() >> 20);
-        } finally {
-            buffer.release();
-        }
+//
+//        final int wktPointNumber = 64 * 1024 * 10;
+//        try (FileChannel channel = FileChannel.open(textPath, StandardOpenOption.APPEND)) {
+//            buffer.writeBytes("LINESTRING(".getBytes(StandardCharsets.UTF_8));
+//            for (int i = 0; i < wktPointNumber; ) {
+//
+//                buffer.writeBytes(Double.toString(Double.longBitsToDouble(random.nextLong())).getBytes(StandardCharsets.UTF_8));
+//                buffer.writeByte(Constants.SPACE);
+//                buffer.writeBytes(Double.toString(Double.longBitsToDouble(random.nextLong())).getBytes(StandardCharsets.UTF_8));
+//                if (i > 0) {
+//                    buffer.writeByte(Constants.COMMA);
+//                }
+//                i++;
+//                if ((i & 127) == 0) {
+//                    buffer.readBytes(channel, channel.position(), buffer.readableBytes());
+//                    buffer.clear();
+//                }
+//
+//            }// for
+//
+//            buffer.writeByte(')');
+//
+//            LOG.info("{} size {} mb", textPath, channel.size() >> 20);
+//        } finally {
+//            buffer.release();
+//        }
 
 
     }
 
-    @AfterClass
+    @AfterSuite
     public void deleteBigColumnFile() throws IOException {
         Files.deleteIfExists(bigColumnWkbPath);
         Files.deleteIfExists(bigColumnWktPath);
@@ -766,7 +766,7 @@ public class DataTypeTests extends SessionTestSupport {
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
      */
     @Test(enabled = false, invocationCount = 3, dataProvider = "bigColumnStmtProvider")
-    public void bitColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
+    public void bigColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
 
         insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, bigColumnWkbPath))
                 .bind(1, JdbdType.GEOMETRY, wrapToBlob(bigColumnWkbPath))
@@ -786,6 +786,58 @@ public class DataTypeTests extends SessionTestSupport {
                 LOG.info("{} size {} mb", path, Files.size(path.value()));
                 path = row.getNonNull(2, BlobPath.class);
                 LOG.info("{} size {} mb", path, Files.size(path.value()));
+            } catch (Throwable e) {
+                LOG.error("asResultRow function error.", e);
+                throw new RuntimeException(e);
+            }
+
+            return row.asResultRow();
+        };
+
+
+        Mono.from(insertStmt.executeUpdate())
+                .flatMapMany(s -> {
+                    // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
+                    final int rowCount = (int) s.affectedRows();
+                    long lastId = s.lastInsertedId();
+                    for (int i = 0; i < rowCount; i++) {
+                        queryStmt.bind(i, JdbdType.BIGINT, lastId);
+                        lastId++;
+                    }
+                    return Flux.from(queryStmt.executeQuery(function));
+                })
+                .blockLast();
+
+
+    }
+
+    /**
+     * <p>
+     * Test :
+     *     <ul>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
+     *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
+     *     </ul>
+     *     bind {@link MySQLType#GEOMETRY}
+     * </p>
+     *
+     * @see JdbdType#GEOMETRY
+     * @see MySQLType#GEOMETRY
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
+     */
+    @Test(enabled = false, invocationCount = 9, dataProvider = "singleBigColumnStmtProvider")
+    public void singleBigColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
+        final Path wkbPath = bigColumnWkbPath;
+        insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, wkbPath));
+
+        final Function<CurrentRow, ResultRow> function;
+        function = row -> {
+            //LOG.info("row id : {}", row.get(0, Long.class));
+            try {
+                BlobPath blobPath;
+                blobPath = row.getNonNull(1, BlobPath.class);
+                LOG.debug("{} and {} size match : {}", blobPath.value(), wkbPath, Files.size(blobPath.value()) == Files.size(wkbPath));
             } catch (Throwable e) {
                 LOG.error("asResultRow function error.", e);
                 throw new RuntimeException(e);
@@ -948,7 +1000,7 @@ public class DataTypeTests extends SessionTestSupport {
     }
 
     /**
-     * @see #bitColumn(BindSingleStatement, BindSingleStatement)
+     * @see #bigColumn(BindSingleStatement, BindSingleStatement)
      */
     @DataProvider(name = "bigColumnStmtProvider", parallel = true)
     public final Object[] bigColumnStmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
@@ -964,5 +1016,21 @@ public class DataTypeTests extends SessionTestSupport {
         return new Object[][]{{insertStmt, queryInsert}};
     }
 
+    /**
+     * @see #singleBigColumn(BindSingleStatement, BindSingleStatement)
+     */
+    @DataProvider(name = "singleBigColumnStmtProvider", parallel = true)
+    public final Object[] singleBigColumnStmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String insertSql, querySql;
+
+        insertSql = "INSERT mysql_types(my_geometry) VALUES (st_geometryfromwkb(?))";
+        querySql = "SELECT t.id,t.my_geometry FROM mysql_types AS t WHERE t.id IN (?) ORDER BY t.id";
+
+        final BindSingleStatement insertStmt, queryInsert;
+        insertStmt = createSingleStatement(targetMethod, context, insertSql);
+        queryInsert = createSingleStatement(targetMethod, context, querySql);
+
+        return new Object[][]{{insertStmt, queryInsert}};
+    }
 
 }

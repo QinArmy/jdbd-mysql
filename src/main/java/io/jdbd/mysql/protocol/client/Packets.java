@@ -188,6 +188,15 @@ public abstract class Packets {
         return int8;
     }
 
+    public static int getLenEncAsInt(ByteBuf byteBuf, int index) {
+        final long len;
+        len = getLenEnc(byteBuf, index);
+        if (len > Integer.MAX_VALUE) {
+            throw new JdbdException("length encode integer cant' convert to int.");
+        }
+        return (int) len;
+    }
+
     public static int getHeaderFlag(final ByteBuf cumulateBuffer) {
         return cumulateBuffer.getByte(cumulateBuffer.readerIndex() + HEADER_SIZE) & BIT_8;
     }
@@ -413,29 +422,6 @@ public abstract class Packets {
 
         cumulateBuffer.readerIndex(originalIndex);
         return totalPayloadBytes;
-    }
-
-    /**
-     * @return sequenceId
-     */
-    public static int readBigPayload(final ByteBuf cumulateBuffer, final ByteBuf payload) {
-        int sequenceId = -1;
-        for (int payloadLength; hasOnePacket(cumulateBuffer); ) {
-            payloadLength = readInt3(cumulateBuffer);
-            sequenceId = Packets.readInt1AsInt(cumulateBuffer);
-
-            if (payloadLength > 0) {
-                cumulateBuffer.readBytes(payload, payloadLength);
-            }
-            if (payloadLength < MAX_PAYLOAD) {
-                break;
-            }
-        }
-        if (sequenceId < 0) {
-            //no bug,never here
-            throw new IllegalArgumentException("non big packet");
-        }
-        return sequenceId;
     }
 
     /**
