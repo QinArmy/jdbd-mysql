@@ -37,6 +37,12 @@ public abstract class ClientTestUtils {
         return Paths.get(modelPath.toString(), "target/test-classes/my-local");
     }
 
+    public static boolean isNotDriverDeveloperComputer() {
+        final Path path;
+        path = Paths.get(getTestResourcesPath().toString(), "my-local/myLocal.txt");
+        return Files.notExists(path);
+    }
+
     public static Path getBigColumnTestPath() {
         return Paths.get(getTestMyLocalPath().toString(), "bigColumn");
     }

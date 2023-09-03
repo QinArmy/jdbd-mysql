@@ -50,7 +50,7 @@ public abstract class SessionTestSupport {
 
 
     @BeforeSuite
-    public final void beforeSuiteCreateSessionFactory() throws Exception {
+    public final void beforeSuiteCreateSessionFactory() {
         if (sessionFactory != null) {
             return;
         }

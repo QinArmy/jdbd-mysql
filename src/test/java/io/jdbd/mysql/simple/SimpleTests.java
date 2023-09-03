@@ -10,7 +10,7 @@ public class SimpleTests {
 
     @Test
     public void simple() {
-        System.out.println(1073741824 - 67108860);
+        System.out.println(0xff_ff_ff - 1);
     }
 
 

@@ -65,6 +65,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
         this.supportQueryAttr = Capabilities.supportQueryAttr(adjutant.capability());
         this.supportZoneOffset = adjutant.handshake10().serverVersion.isSupportZoneOffset();
         this.fixedEnv = adjutant.getFactory();
+
         this.serverZone = adjutant.serverZone();
         this.clientCharset = adjutant.charsetClient();
 
@@ -143,7 +144,10 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
 
     private List<ParamValue> getBindGroup(final int batchIndex) {
-        final ParamSingleStmt stmt = this.stmt;
+        ParamSingleStmt stmt = this.stmt;
+        if (stmt instanceof PrepareStmt) {
+            stmt = ((PrepareStmt) stmt).getStmt();
+        }
         final List<ParamValue> bindGroup;
         if (stmt instanceof ParamStmt) {
             if (batchIndex > -1) {

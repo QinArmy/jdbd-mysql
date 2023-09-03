@@ -123,6 +123,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         shutdownTimeout = Duration.ofMillis(env.getOrDefault(MySQLKey.SHUTDOWN_TIMEOUT));
 
         return this.loopResources.disposeLater(shutdownQuietPeriod, shutdownTimeout)
+                .doOnTerminate(MySQLResultSetReader::deleteBigColumnTempDirectoryOnFactoryClose)
                 .then(Mono.empty());
     }
 

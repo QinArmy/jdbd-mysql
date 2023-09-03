@@ -52,6 +52,8 @@ abstract class BinaryWriter {
 
     final int capability;
 
+    final int maxAllowedPacket;
+
     BinaryWriter(final TaskAdjutant adjutant) {
         this.adjutant = adjutant;
         this.clientCharset = adjutant.charsetClient();
@@ -61,6 +63,7 @@ abstract class BinaryWriter {
         serverVersion = adjutant.handshake10().serverVersion;
         this.supportZoneOffset = serverVersion.isSupportZoneOffset();
         this.capability = adjutant.capability();
+        this.maxAllowedPacket = adjutant.sessionMaxAllowedPacket();
     }
 
 
@@ -282,13 +285,13 @@ abstract class BinaryWriter {
             break;
             case MEDIUMINT: {
                 // Server 8.0.33 and before don't support MEDIUMINT, response message : Incorrect arguments to mysqld_stmt_execute
-                // , sqlState : HY000 , vendorCode : 1210  ;  I 服了 MySQL
+                // , sqlState : HY000 , vendorCode : 1210  ;
                 bindType = MySQLType.INT;
             }
             break;
             case MEDIUMINT_UNSIGNED: {
                 // Server 8.0.33 and before don't support MEDIUMINT, response message : Incorrect arguments to mysqld_stmt_execute
-                // , sqlState : HY000 , vendorCode : 1210  ;  I 服了 MySQL
+                // , sqlState : HY000 , vendorCode : 1210  ;
                 bindType = MySQLType.INT_UNSIGNED;
             }
             break;
@@ -316,7 +319,9 @@ abstract class BinaryWriter {
             break;
             case GEOMETRY: {
                 source = paramValue.get();
-                if (source instanceof String
+                if (source == null) {
+                    bindType = MySQLType.NULL;
+                } else if (source instanceof String
                         || source instanceof TextPath
                         || source instanceof Clob
                         || source instanceof Text) {

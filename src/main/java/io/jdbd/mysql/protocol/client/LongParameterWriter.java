@@ -16,6 +16,7 @@ import reactor.core.publisher.FluxSink;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.util.function.IntSupplier;
 
 /**
@@ -36,13 +37,11 @@ final class LongParameterWriter {
 
     private final MySQLColumnMeta[] columnMetas;
 
-    private final int maxAllowedPacket;
 
     private LongParameterWriter(ExecuteCommandWriter writer) {
         this.writer = writer;
         this.statementId = writer.stmtTask.getStatementId();
         this.columnMetas = writer.stmtTask.getParameterMetas();
-        this.maxAllowedPacket = writer.adjutant.sessionMaxAllowedPacket();
 
     }
 
@@ -62,8 +61,14 @@ final class LongParameterWriter {
 
     private void sendPathParameterInEventLoop(final int batchIndex, final ParamValue paramValue,
                                               final FluxSink<ByteBuf> sink) {
-        final Object value = paramValue.getNonNull();
-        sendParameterValue(batchIndex, paramValue, sink, value);
+
+        try {
+            final Object value = paramValue.getNonNull();
+            sendParameterValue(batchIndex, paramValue, sink, value);
+        } catch (Throwable e) {
+            sink.error(e);
+        }
+
     }
 
 
@@ -96,13 +101,14 @@ final class LongParameterWriter {
     private void sendBinaryFie(final int batchIndex, final ParamValue paramValue, final BlobPath blobPath,
                                final FluxSink<ByteBuf> sink) {
 
-        try (FileChannel channel = FileChannel.open(blobPath.value(), MySQLBinds.openOptionSet(blobPath))) {
+        final int paramIndex = paramValue.getIndex();
+        final Path path = blobPath.value();
+        try (FileChannel channel = FileChannel.open(path, MySQLBinds.openOptionSet(blobPath))) {
             final long totalSize;
             totalSize = channel.size();
 
-            final int chunkSize = this.writer.fixedEnv.blobSendChunkSize, paramIndex = paramValue.getIndex();
+            final int chunkSize = this.writer.fixedEnv.blobSendChunkSize;
             final IntSupplier sequenceId = this.writer.sequenceId;
-
 
             long restBytes = totalSize;
             ByteBuf packet;
@@ -115,32 +121,35 @@ final class LongParameterWriter {
                 this.writer.stmtTask.resetSequenceId(); // reset before send
                 Packets.sendPackets(packet, sequenceId, sink);
 
+                LOG.debug("{} BlobPath send chunk complete {} bytes {} MB", path, length, length >> 20);
+
             }
 
+            LOG.debug("{} BlobPath send complete,size {} mb", path, totalSize >> 20);
             sink.complete();
-            LOG.debug("{} big blob file send complete,size {} mb", blobPath.value(), totalSize >> 20);
         } catch (Throwable e) {
             if (MySQLExceptions.isByteBufOutflow(e)) {
                 sink.error(MySQLExceptions.netPacketTooLargeError(e));
             } else {
-                final ColumnMeta meta = this.columnMetas[paramValue.getIndex()];
-                sink.error(MySQLExceptions.readLocalFileError(batchIndex, meta, blobPath, e));
+                sink.error(MySQLExceptions.readLocalFileError(batchIndex, this.columnMetas[paramIndex], blobPath, e));
             }
 
         }
     }
 
 
-    private void sendTextFile(final int batchIndex, final ParamValue paramValue, TextPath textPath,
+    private void sendTextFile(final int batchIndex, final ParamValue paramValue, final TextPath textPath,
                               final FluxSink<ByteBuf> sink) {
 
-
-        try (FileChannel channel = FileChannel.open(textPath.value(), MySQLBinds.openOptionSet(textPath))) {
+        final int paramIndex = paramValue.getIndex();
+        final Path path = textPath.value();
+        ByteBuf packet = null;
+        try (FileChannel channel = FileChannel.open(path, MySQLBinds.openOptionSet(textPath))) {
             final long totalSize;
             totalSize = channel.size();
 
-            final int chunkSize = this.writer.fixedEnv.blobSendChunkSize, paramIndex = paramValue.getIndex();
-            final IntSupplier sequenceId = this.writer.stmtTask::nextSequenceId;
+            final long chunkSize = this.writer.fixedEnv.blobSendChunkSize;
+            final IntSupplier sequenceId = this.writer.sequenceId;
             final Charset textCharset = textPath.charset(), clientCharset = this.writer.clientCharset;
             final boolean sameCharset = textCharset.equals(clientCharset);
 
@@ -149,11 +158,11 @@ final class LongParameterWriter {
             if (sameCharset) {
                 buffer = null;
             } else {
-                buffer = ByteBuffer.allocate(1024);
+                buffer = ByteBuffer.allocate(2048);
             }
 
             long restBytes = totalSize;
-            ByteBuf packet;
+
             for (int length; restBytes > 0; restBytes -= length) {
 
                 length = (int) Math.min(chunkSize, restBytes);
@@ -164,19 +173,22 @@ final class LongParameterWriter {
                 } else {
                     MySQLBinds.readFileAndWrite(channel, buffer, packet, length, textCharset, clientCharset);
                 }
-                this.writer.stmtTask.resetSequenceId();
+                this.writer.stmtTask.resetSequenceId();// reset before send
                 Packets.sendPackets(packet, sequenceId, sink);
 
+                LOG.debug("{} TextPath send chunk complete {} bytes {} MB", path, length, length >> 20);
             }
 
+            LOG.debug("{} TextPath send complete,size {} mb", textPath.value(), totalSize >> 20);
             sink.complete();
-            LOG.debug("{} send complete", textPath.value());
         } catch (Throwable e) {
+            if (packet != null && packet.refCnt() > 0) {
+                packet.release();
+            }
             if (MySQLExceptions.isByteBufOutflow(e)) {
                 sink.error(MySQLExceptions.netPacketTooLargeError(e));
             } else {
-                final ColumnMeta meta = this.columnMetas[paramValue.getIndex()];
-                sink.error(MySQLExceptions.readLocalFileError(batchIndex, meta, textPath, e));
+                sink.error(MySQLExceptions.readLocalFileError(batchIndex, this.columnMetas[paramIndex], textPath, e));
             }
 
         }
@@ -239,6 +251,7 @@ final class LongParameterWriter {
             this.sink = sink;
 
             this.restPayloadBytes = 0;
+            this.packet = null;
             this.packet = createPacket();
         }
 
@@ -510,7 +523,7 @@ final class LongParameterWriter {
 
                 this.restPayloadBytes = 0;
                 this.packet = null;
-                packet = createPacket();
+                this.packet = packet = createPacket();
                 restPayloadLength = this.restPayloadBytes;
 
             }

@@ -32,11 +32,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import java.util.stream.Stream;
 
 /**
  * <p>
@@ -58,6 +60,11 @@ abstract class MySQLResultSetReader implements ResultSetReader {
     private static final Path TEMP_DIRECTORY = Paths.get(System.getProperty("java.io.tmpdir"), "jdbd/mysql/big_row")
             .toAbsolutePath();
 
+
+    private static final String BIG_COLUMN_FILE_PREFIX = "big_column";
+
+    private static final String BIG_COLUMN_FILE_SUFFIX = ".jdbd";
+
     private static final Logger LOG = LoggerFactory.getLogger(MySQLResultSetReader.class);
 
 
@@ -75,7 +82,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
     Charset resultSetCharset;
 
-    private Throwable error;
+    private Throwable columnHandleError;
 
     private ByteBuf bigPayload;
 
@@ -156,25 +163,29 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         final long lenEnc;
         final byte[] bytes;
         if (bigColumn != null) {
+            assert bigColumn.columnIndex == meta.columnIndex : "big column index not match";
             if (!readBigColumn(payload, bigColumn)) {
                 value = MORE_CUMULATE_OBJECT;
-            } else switch (meta.sqlType) {
-                case TINYTEXT:
-                case TEXT:
-                case MEDIUMTEXT:
-                case LONGTEXT:
-                case JSON:
-                    value = TextPath.from(true, columnCharset(meta), bigColumn.path);
-                    break;
-                case TINYBLOB:
-                case BLOB:
-                case MEDIUMBLOB:
-                case LONGBLOB:
-                case UNKNOWN:
-                default:
-                    value = BlobPath.from(true, bigColumn.path);
+            } else {
+                currentRow.bigColumn = null; // clear big column
+                switch (meta.sqlType) {
+                    case TINYTEXT:
+                    case TEXT:
+                    case MEDIUMTEXT:
+                    case LONGTEXT:
+                    case JSON:
+                        value = TextPath.from(true, columnCharset(meta), bigColumn.path);
+                        break;
+                    case TINYBLOB:
+                    case BLOB:
+                    case MEDIUMBLOB:
+                    case LONGBLOB:
+                    case UNKNOWN:
+                    default:
+                        value = BlobPath.from(true, bigColumn.path);
 
-            } // switch
+                } // switch
+            }
         } else if (readableBytes == 0) {
             value = MORE_CUMULATE_OBJECT;
         } else if ((lenEnc = Packets.getLenEnc(payload, payload.readerIndex())) <= readableBytes) {
@@ -229,7 +240,9 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         final long lenEnc;
         final byte[] bytes;
         if (bigColumn != null) {
+            assert bigColumn.columnIndex == meta.columnIndex : "big column index not match";
             if (readBigColumn(payload, bigColumn)) {
+                currentRow.bigColumn = null; // clear big column
                 value = BlobPath.from(true, bigColumn.path);
             } else {
                 value = MORE_CUMULATE_OBJECT;
@@ -289,7 +302,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                         type, MySQLKey.ZERO_DATE_TIME_BEHAVIOR);
                 final Throwable error;
                 error = MySQLExceptions.createTruncatedWrongValue(message, null);
-                this.error = error;
+                this.columnHandleError = error;
                 this.task.addErrorToTask(error);
                 date = null;
             }
@@ -313,12 +326,13 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             if (Files.notExists(TEMP_DIRECTORY)) {
                 Files.createDirectories(TEMP_DIRECTORY);
             }
-            path = Files.createTempFile(TEMP_DIRECTORY, "big_column", ".jdbd");
+            path = Files.createTempFile(TEMP_DIRECTORY, BIG_COLUMN_FILE_PREFIX, BIG_COLUMN_FILE_SUFFIX);
             this.task.addBigColumnPath(path);
-            LOG.debug("create big column temp file complete,{}", path);
+            LOG.debug("create big column temp file complete,expected total size : {} {} MB , {}",
+                    totalBytes, totalBytes >> 20, path);
         } catch (Throwable e) {
             path = null;
-            this.error = e;
+            this.columnHandleError = e;
             this.task.addErrorToTask(e);
         }
         if (path == null) {
@@ -360,7 +374,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             payload.readBytes(channel, channel.position(), readLength);
 
         } catch (Throwable e) {
-            this.error = error = e;
+            this.columnHandleError = error = e;
             payload.readerIndex(startIndex + readLength);
             this.task.addErrorToTask(e);
         }
@@ -379,6 +393,38 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
 
     /*################################## blow private method ##################################*/
+
+    private States readError(final ByteBuf cumulateBuffer, int payloadLength) {
+        final MySQLServerException error;
+        error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability,
+                this.adjutant.errorCharset());
+        this.task.addErrorToTask(error);
+        return States.END_ON_ERROR;
+    }
+
+
+    private States readTerminator(final ByteBuf cumulateBuffer, final int payloadLength,
+                                  final MySQLMutableCurrentRow currentRow,
+                                  final Consumer<Object> serverStatesConsumer) {
+        final Terminator terminator;
+        terminator = Terminator.fromCumulate(cumulateBuffer, payloadLength, this.capability);
+        serverStatesConsumer.accept(terminator);
+
+        final StmtTask task = this.task;
+        if (!task.isCancelled()) {
+            task.next(MySQLResultStates.fromQuery(currentRow.getResultNo(), terminator, currentRow.rowCount));
+        }
+
+        final States states;
+        if (terminator.hasMoreFetch()) {
+            states = States.MORE_FETCH;
+        } else if (terminator.hasMoreResult()) {
+            states = States.MORE_RESULT;
+        } else {
+            states = States.NO_MORE_RESULT;
+        }
+        return states;
+    }
 
 
     /**
@@ -405,76 +451,58 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             payloadIndex = cumulateBuffer.readerIndex();
             limitIndex = payloadIndex + payloadLength;
 
-            if (bigPayload == null) {
-                switch (Packets.getInt1AsInt(cumulateBuffer, payloadIndex)) {
-                    case MySQLServerException.ERROR_HEADER: {
-
-                        final MySQLServerException error;
-                        error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability,
-                                this.adjutant.errorCharset());
-                        task.addErrorToTask(error);
-                        states = States.END_ON_ERROR;
-                    }
-                    break outerLoop;
-                    case EofPacket.EOF_HEADER: {
-
-                        final Terminator terminator;
-                        terminator = Terminator.fromCumulate(cumulateBuffer, payloadLength, this.capability);
-                        serverStatesConsumer.accept(terminator);
-
-                        if (!cancelled) {
-                            task.next(MySQLResultStates.fromQuery(currentRow.getResultNo(), terminator, currentRow.rowCount));
-                        }
-                        if (terminator.hasMoreFetch()) {
-                            states = States.MORE_FETCH;
-                        } else if (terminator.hasMoreResult()) {
-                            states = States.MORE_RESULT;
-                        } else {
-                            states = States.NO_MORE_RESULT;
-                        }
-                    }
-                    break outerLoop;
-                    default: //no-op
-
-                }
-            } //   if (bigPayload == null)
-
-
-            if (cancelled) {
-                cumulateBuffer.skipBytes(payloadLength);
-                continue;
-            }
-
-            if (bigPayload == null && payloadLength < Packets.MAX_PAYLOAD) {
-                writerIndex = cumulateBuffer.writerIndex();
-                if (limitIndex != writerIndex) {
-                    cumulateBuffer.writerIndex(limitIndex);
-                }
-                payload = cumulateBuffer;
-            } else {
-                if (bigPayload == null) {
-                    this.bigPayload = bigPayload = this.adjutant.allocator()
-                            .buffer(payloadLength << 2, Integer.MAX_VALUE - 128);
-                }
+            if (bigPayload != null) {
                 payload = bigPayload;
-                payload.writeBytes(cumulateBuffer, payloadLength); // read current payload
-                if (Packets.hasOnePacket(cumulateBuffer)) {
-                    sequenceId = readRestBigPayload(cumulateBuffer, payload); //  read rest packet payload
+                if (cancelled) {
+                    cumulateBuffer.skipBytes(payloadLength);
+                } else {
+                    payload.writeBytes(cumulateBuffer, payloadLength); // read current payload
                 }
-            }
+                if (payloadLength < Packets.MAX_PAYLOAD) {
+                    this.bigPayload = bigPayload = null; // big row end
+                }
+            } else switch (Packets.getInt1AsInt(cumulateBuffer, payloadIndex)) {
+                case MySQLServerException.ERROR_HEADER:
+                    states = readError(cumulateBuffer, payloadLength);
+                    break outerLoop;
+                case EofPacket.EOF_HEADER:
+                    states = readTerminator(cumulateBuffer, payloadLength, currentRow, serverStatesConsumer);
+                    break outerLoop;
+                default: {
+                    if (payloadLength < Packets.MAX_PAYLOAD) {
+                        if (cancelled) {
+                            cumulateBuffer.skipBytes(payloadLength);
+                            continue;
+                        }
+                        writerIndex = cumulateBuffer.writerIndex();
+                        if (limitIndex != writerIndex) {
+                            cumulateBuffer.writerIndex(limitIndex);
+                        }
+                        payload = cumulateBuffer;
+                    } else {
+                        this.bigPayload = bigPayload = this.adjutant.allocator()
+                                .directBuffer(payloadLength << 2, Integer.MAX_VALUE - 128);
+                        payload = bigPayload;
+                        payload.writeBytes(cumulateBuffer, payloadLength); // read current payload
+
+                    } // else
+
+                }// default
+
+            }// switch
 
             oneRowEnd = readOneRow(payload, payload != cumulateBuffer, currentRow);  // read one row
 
             if (payload == cumulateBuffer) {
-                assert oneRowEnd; // fail ,driver bug or server bug
+                assert oneRowEnd; // fail ,driver row end bug or server bug
                 if (limitIndex != writerIndex) {
                     assert writerIndex > limitIndex; // fail , driver bug.
                     cumulateBuffer.writerIndex(writerIndex);
                 }
                 cumulateBuffer.readerIndex(limitIndex); //avoid tailor filler
             } else if (oneRowEnd) {
+                assert bigPayload == null;
                 payload.release();
-                this.bigPayload = bigPayload = null;
             } else if (payload.readableBytes() == 0) {
                 payload.clear();
             } else if (payload.readerIndex() > 0) {
@@ -482,11 +510,12 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             }
 
             if (!oneRowEnd) {
+                assert bigPayload != null;
                 // MORE_CUMULATE
                 break;
             }
 
-            if (!(cancelled = this.error != null)) {
+            if (!(cancelled = this.columnHandleError != null)) {
                 currentRow.rowCount++;
                 task.next(currentRow);
                 currentRow.resetCurrentRow();
@@ -513,7 +542,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 this.currentRow = null;
                 this.resultSetCharset = null;
                 this.bigPayload = null;
-                this.error = null;
+                this.columnHandleError = null;
             }
             break;
             case MORE_CUMULATE:
@@ -527,31 +556,55 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
     /**
      * <p>
-     * This method is used only this class
+     * Delete all big column temp file in temp directory.
+     * </p>
+     * <p>
+     * This method don't throw any error.
      * </p>
      *
-     * @return sequenceId
-     * @see #readRowSet(ByteBuf, Consumer)
+     * @see ClientProtocolFactory#close()
      */
-    private static int readRestBigPayload(final ByteBuf cumulateBuffer, final ByteBuf payload) {
-        int sequenceId = -1;
-        for (int payloadLength; Packets.hasOnePacket(cumulateBuffer); ) {
-            payloadLength = Packets.readInt3(cumulateBuffer);
-            sequenceId = Packets.readInt1AsInt(cumulateBuffer);
+    static void deleteBigColumnTempDirectoryOnFactoryClose() {
+        try {
+            if (Files.notExists(TEMP_DIRECTORY)) {
+                return;
+            }
+            try (Stream<Path> fileStream = Files.find(TEMP_DIRECTORY, 1, MySQLResultSetReader::isBigColumnTempFile)) {
+                fileStream.forEach(MySQLResultSetReader::deleteBigColumnTempFileIfExists);
+            }
+        } catch (Throwable e) {
+            // here ,just clear, don't throw error
+            LOG.debug("delete temp directory occur error,{}", TEMP_DIRECTORY, e);
+        }
 
-            if (payloadLength > 0) {
-                payload.writeBytes(cumulateBuffer, payloadLength);
-            }
-            if (payloadLength < Packets.MAX_PAYLOAD) {
-                break;
-            }
-        }
-        if (sequenceId < 0) {
-            //no bug,never here
-            throw new IllegalArgumentException("non big packet");
-        }
-        return sequenceId;
     }
+
+
+    /**
+     * @see #deleteBigColumnTempDirectoryOnFactoryClose()
+     */
+    private static boolean isBigColumnTempFile(final Path path, BasicFileAttributes attributes) {
+        if (Files.isDirectory(path)) {
+            return false;
+        }
+        final String name = path.getFileName().toString();
+        return (name.startsWith(BIG_COLUMN_FILE_PREFIX) && name.endsWith(BIG_COLUMN_FILE_SUFFIX));
+    }
+
+    /**
+     * @see #deleteBigColumnTempDirectoryOnFactoryClose()
+     */
+    private static void deleteBigColumnTempFileIfExists(final Path path) {
+        try {
+            if (Files.deleteIfExists(path)) {
+                LOG.debug("delete big column temp file complete,{}", path);
+            }
+        } catch (Throwable e) {
+            // here ,just clear, don't throw error
+            LOG.debug("delete big column temp file occur error,{}", path, e);
+        }
+    }
+
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_transaction_isolation">transaction_isolation</a>

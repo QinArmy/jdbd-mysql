@@ -12,6 +12,8 @@ import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.PreparedStatement;
+import io.jdbd.type.Blob;
+import io.jdbd.type.Clob;
 import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
 import io.jdbd.vendor.result.MultiResults;
@@ -115,7 +117,15 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
             if (paramGroup == null) {
                 this.paramGroup = paramGroup = MySQLCollections.arrayList(paramCount);
             }
-            paramGroup.add(JdbdValues.paramValue(indexBasedZero, type, value));
+            final Object actualValue;
+            if (value instanceof String && ((String) value).length() > 0xff_ff_ff) {
+                actualValue = Clob.from(Mono.just((String) value));
+            } else if (value instanceof byte[] && ((byte[]) value).length > 0xff_ff_ff) {
+                actualValue = Blob.from(Mono.just(((byte[]) value)));
+            } else {
+                actualValue = value;
+            }
+            paramGroup.add(JdbdValues.paramValue(indexBasedZero, type, actualValue));
         }
 
         if (error != null) {

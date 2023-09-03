@@ -125,8 +125,14 @@ final class TextResultSetReader extends MySQLResultSetReader {
                 bigColumnValue = readGeometry(payload, meta, currentRow);
                 bigColumn = true;
                 break;
+            case TINYTEXT:
+            case TEXT:
+            case MEDIUMTEXT:
             case LONGTEXT:
             case JSON:
+            case TINYBLOB:
+            case BLOB:
+            case MEDIUMBLOB:
             case LONGBLOB:
             case UNKNOWN:
                 bigColumnValue = readLongTextOrBlob(payload, meta, currentRow);
@@ -148,7 +154,7 @@ final class TextResultSetReader extends MySQLResultSetReader {
         if (readableBytes == 0 || (lenEnc = Packets.getLenEnc(payload, payload.readerIndex())) > readableBytes) {
             return MORE_CUMULATE_OBJECT;
         }
-        Packets.readLenEnc(payload); // skip
+        assert Packets.readLenEnc(payload) == lenEnc : "getLenEnc bug";
         bytes = new byte[(int) lenEnc];
         payload.readBytes(bytes);
 
@@ -195,9 +201,6 @@ final class TextResultSetReader extends MySQLResultSetReader {
             case VARCHAR:
             case ENUM:
             case SET:
-            case TINYTEXT:
-            case TEXT:
-            case MEDIUMTEXT:
                 value = new String(bytes, columnCharset);
                 break;
             case BIT:
@@ -234,9 +237,6 @@ final class TextResultSetReader extends MySQLResultSetReader {
             break;
             case BINARY:
             case VARBINARY:
-            case TINYBLOB:
-            case BLOB:
-            case MEDIUMBLOB:
                 value = bytes;
                 break;
             default:

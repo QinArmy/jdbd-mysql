@@ -701,16 +701,23 @@ public final class MySQLKey<T> extends Key<T> {
 
     /**
      * <p>
+     * jdbd-mysql redefine this property ,this property representing following parameter send chunk size,
+     *    <ul>
+     *        <li> {@link io.jdbd.type.LongParameter}</li>
+     *        <li>big {@link String} (greater than 16 MB)</li>
+     *        <li>big byte[] (greater than 16 MB)</li>
+     *    </ul>
+     * </p>
+     * <p>
      *     <ul>
      *         <li>default: 1 << 20</li>
      *         <li>min : 1024</li>
-     *         <li>max : {@link #MAX_ALLOWED_PACKET} - 4</li>
+     *         <li>max : 0xff_ff_ff -1 (16 MB)</li>
      *     </ul>
      * </p>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-blob-clob-processing.html">blobSendChunkSize</a>
-     * @see #MAX_ALLOWED_PACKET
-     * @since MySQL Driver  3.1.9
+     * @since jdbd-mysql 1.0
      */
     @Redefine
     public static final MySQLKey<Integer> BLOB_SEND_CHUNK_SIZE = new MySQLKey<>("blobSendChunkSize", Integer.class, 1 << 20); //1048576

@@ -29,12 +29,21 @@
         <Logger name="io.jdbd.vendor.task.CommunicationTaskExecutor" level="TRACE" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-        <Logger name="reactor.netty.tcp.ssl" level="INFO" additivity="false">
+        <Logger name="io.jdbd.mysql.protocol.client.LongParameterWriter" level="TRACE" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-        <Logger name="io.jdbd.mysql" level="DEBUG" additivity="false">
+        <Logger name="io.jdbd.mysql.protocol.client.MySQLResultSetReader" level="TRACE" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
+        <Logger name="io.jdbd.mysql.session.MySQLDatabaseSessionFactory" level="TRACE" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <!--        <Logger name="reactor.netty.tcp.ssl" level="INFO" additivity="false">-->
+        <!--            <AppenderRef ref="Console"/>-->
+        <!--        </Logger>-->
+        <!--        <Logger name="io.jdbd.mysql" level="DEBUG" additivity="false">-->
+        <!--            <AppenderRef ref="Console"/>-->
+        <!--        </Logger>-->
         <Logger name="io.jdbd.vendor.result.MultiResultSubscriber" level="DEBUG" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
