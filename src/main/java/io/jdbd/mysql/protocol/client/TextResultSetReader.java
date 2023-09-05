@@ -99,12 +99,6 @@ final class TextResultSetReader extends MySQLResultSetReader {
     }
 
 
-    @Override
-    Logger getLogger() {
-        return LOG;
-    }
-
-
     @SuppressWarnings("deprecation")
     @Nullable
     private Object readOneColumn(final ByteBuf payload, final boolean bigPayload, final MySQLColumnMeta meta,

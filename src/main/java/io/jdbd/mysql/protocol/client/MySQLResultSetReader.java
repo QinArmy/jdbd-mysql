@@ -132,7 +132,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
     abstract boolean readOneRow(ByteBuf cumulateBuffer, final boolean bigPayload, MySQLMutableCurrentRow currentRow);
 
 
-    abstract Logger getLogger();
+
 
 
     /*################################## blow final packet method ##################################*/
@@ -328,7 +328,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             }
             path = Files.createTempFile(TEMP_DIRECTORY, BIG_COLUMN_FILE_PREFIX, BIG_COLUMN_FILE_SUFFIX);
             this.task.addBigColumnPath(path);
-            LOG.debug("create big column temp file complete,expected total size : {} {} MB , {}",
+            LOG.debug("create big column temp file complete,expected total size : {} about {} MB , {}",
                     totalBytes, totalBytes >> 20, path);
         } catch (Throwable e) {
             path = null;
@@ -394,38 +394,6 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
     /*################################## blow private method ##################################*/
 
-    private States readError(final ByteBuf cumulateBuffer, int payloadLength) {
-        final MySQLServerException error;
-        error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability,
-                this.adjutant.errorCharset());
-        this.task.addErrorToTask(error);
-        return States.END_ON_ERROR;
-    }
-
-
-    private States readTerminator(final ByteBuf cumulateBuffer, final int payloadLength,
-                                  final MySQLMutableCurrentRow currentRow,
-                                  final Consumer<Object> serverStatesConsumer) {
-        final Terminator terminator;
-        terminator = Terminator.fromCumulate(cumulateBuffer, payloadLength, this.capability);
-        serverStatesConsumer.accept(terminator);
-
-        final StmtTask task = this.task;
-        if (!task.isCancelled()) {
-            task.next(MySQLResultStates.fromQuery(currentRow.getResultNo(), terminator, currentRow.rowCount));
-        }
-
-        final States states;
-        if (terminator.hasMoreFetch()) {
-            states = States.MORE_FETCH;
-        } else if (terminator.hasMoreResult()) {
-            states = States.MORE_RESULT;
-        } else {
-            states = States.NO_MORE_RESULT;
-        }
-        return states;
-    }
-
 
     /**
      * @see #read(ByteBuf, Consumer)
@@ -462,12 +430,31 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                     this.bigPayload = bigPayload = null; // big row end
                 }
             } else switch (Packets.getInt1AsInt(cumulateBuffer, payloadIndex)) {
-                case MySQLServerException.ERROR_HEADER:
-                    states = readError(cumulateBuffer, payloadLength);
-                    break outerLoop;
-                case EofPacket.EOF_HEADER:
-                    states = readTerminator(cumulateBuffer, payloadLength, currentRow, serverStatesConsumer);
-                    break outerLoop;
+                case MySQLServerException.ERROR_HEADER: {
+                    final MySQLServerException error;
+                    error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability,
+                            this.adjutant.errorCharset());
+                    this.task.addErrorToTask(error);
+                    states = States.END_ON_ERROR;
+                }
+                break outerLoop;
+                case EofPacket.EOF_HEADER: {
+                    final Terminator terminator;
+                    terminator = Terminator.fromCumulate(cumulateBuffer, payloadLength, this.capability);
+                    serverStatesConsumer.accept(terminator);
+
+                    if (!task.isCancelled()) {
+                        task.next(MySQLResultStates.fromQuery(currentRow.getResultNo(), terminator, currentRow.rowCount));
+                    }
+                    if (terminator.hasMoreFetch()) {
+                        states = States.MORE_FETCH;
+                    } else if (terminator.hasMoreResult()) {
+                        states = States.MORE_RESULT;
+                    } else {
+                        states = States.NO_MORE_RESULT;
+                    }
+                }
+                break outerLoop;
                 default: {
                     if (payloadLength < Packets.MAX_PAYLOAD) {
                         if (cancelled) {

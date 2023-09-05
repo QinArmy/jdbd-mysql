@@ -296,7 +296,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     @Override
     public void handleExecuteMessageError() {
-        //TODO
+
     }
 
     @Override
@@ -647,7 +647,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * @see #handleReadPrepareComplete()
      */
     boolean executeNextGroup() {
-        assertPhase(TaskPhase.EXECUTE);
 
         if (this.nextGroupNeedReset) {
             this.packetPublisher = Mono.just(createResetPacket());

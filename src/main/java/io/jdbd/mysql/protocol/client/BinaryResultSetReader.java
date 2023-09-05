@@ -92,12 +92,6 @@ final class BinaryResultSetReader extends MySQLResultSetReader {
     }
 
 
-    @Override
-    Logger getLogger() {
-        return LOG;
-    }
-
-
     /**
      * @return one of <ul>
      * <li>null : {@code DATETIME} is zero.</li>

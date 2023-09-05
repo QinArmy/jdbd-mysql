@@ -8,7 +8,6 @@ import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.type.Clob;
 import io.jdbd.type.Point;
-import io.jdbd.type.Text;
 import io.jdbd.type.TextPath;
 import io.jdbd.vendor.stmt.NamedValue;
 import io.jdbd.vendor.stmt.Value;
@@ -323,8 +322,7 @@ abstract class BinaryWriter {
                     bindType = MySQLType.NULL;
                 } else if (source instanceof String
                         || source instanceof TextPath
-                        || source instanceof Clob
-                        || source instanceof Text) {
+                        || source instanceof Clob) {
                     bindType = MySQLType.TEXT;
                 } else {
                     bindType = MySQLType.BLOB;

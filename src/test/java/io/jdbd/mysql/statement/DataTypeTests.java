@@ -31,6 +31,7 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,6 +57,9 @@ import java.util.function.Function;
  * </p>
  */
 public class DataTypeTests extends SessionTestSupport {
+
+
+    private static final Charset WKT_CHARSET = StandardCharsets.US_ASCII;
 
 
     protected static Path bigColumnWkbPath, bigColumnWktPath;
@@ -111,7 +115,7 @@ public class DataTypeTests extends SessionTestSupport {
 
         final int wktPointNumber = 64 * 1024 * 300;
         try (FileChannel channel = FileChannel.open(textPath, StandardOpenOption.APPEND)) {
-            buffer.writeBytes("LINESTRING(".getBytes(StandardCharsets.UTF_8));
+            buffer.writeBytes("LINESTRING(".getBytes(WKT_CHARSET));
             double d;
             for (int i = 0; i < wktPointNumber; i++) {
                 if (i > 0) {
@@ -121,7 +125,7 @@ public class DataTypeTests extends SessionTestSupport {
                 if (Double.isNaN(d)) {
                     d = 0.0d;
                 }
-                buffer.writeBytes(Double.toString(d).getBytes(StandardCharsets.UTF_8));
+                buffer.writeBytes(Double.toString(d).getBytes(WKT_CHARSET));
 
                 buffer.writeByte(Constants.SPACE);
 
@@ -129,7 +133,7 @@ public class DataTypeTests extends SessionTestSupport {
                 if (Double.isNaN(d)) {
                     d = 0.0d;
                 }
-                buffer.writeBytes(Double.toString(d).getBytes(StandardCharsets.UTF_8));
+                buffer.writeBytes(Double.toString(d).getBytes(WKT_CHARSET));
 
                 if ((i & 127) == 0) {
                     buffer.readBytes(channel, channel.position(), buffer.readableBytes());
@@ -781,7 +785,7 @@ public class DataTypeTests extends SessionTestSupport {
      * @see MySQLType#GEOMETRY
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
      */
-    @Test(enabled = false, invocationCount = 3, dataProvider = "bigColumnStmtProvider")
+    @Test(invocationCount = 3, dataProvider = "bigColumnStmtProvider")
     public void bigColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
 
         if (ClientTestUtils.isNotDriverDeveloperComputer()) {
@@ -793,24 +797,29 @@ public class DataTypeTests extends SessionTestSupport {
             }
             return;
         }
-        insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, bigColumnWkbPath))
-                .bind(1, JdbdType.GEOMETRY, wrapToBlob(bigColumnWkbPath))
+        final Path wkbPath = bigColumnWkbPath, wktPath = bigColumnWktPath;
 
-                .bind(2, JdbdType.GEOMETRY, TextPath.from(false, StandardCharsets.UTF_8, bigColumnWktPath))
-                .bind(3, JdbdType.GEOMETRY, wrapToText(bigColumnWktPath, StandardCharsets.UTF_8))
+        insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, wkbPath))
+                .bind(1, JdbdType.GEOMETRY, wrapToBlob(wkbPath))
 
-                .bind(4, JdbdType.GEOMETRY, wrapToClob(bigColumnWktPath, StandardCharsets.UTF_8))
-                .bind(5, JdbdType.GEOMETRY, wrapToBlob(bigColumnWkbPath));
+                .bind(2, JdbdType.GEOMETRY, TextPath.from(false, WKT_CHARSET, wktPath))
+                .bind(3, JdbdType.GEOMETRY, wrapToClob(wktPath, WKT_CHARSET));
 
         final Function<CurrentRow, ResultRow> function;
         function = row -> {
             //LOG.info("row id : {}", row.get(0, Long.class));
             try {
                 BlobPath path;
-                path = row.getNonNull(1, BlobPath.class);
-                LOG.info("{} size {} mb", path, Files.size(path.value()));
-                path = row.getNonNull(2, BlobPath.class);
-                LOG.info("{} size {} mb", path, Files.size(path.value()));
+                if (row.isBigColumn(1)) {
+                    path = row.getNonNull(1, BlobPath.class);
+
+                    LOG.info("{} size {} mb", path, Files.size(path.value()));
+                }
+                if (row.isBigColumn(2)) {
+                    path = row.getNonNull(2, BlobPath.class);
+                    LOG.info("{} size {} mb", path, Files.size(path.value()));
+                }
+
             } catch (Throwable e) {
                 LOG.error("asResultRow function error.", e);
                 throw new RuntimeException(e);
@@ -824,6 +833,8 @@ public class DataTypeTests extends SessionTestSupport {
                 .flatMapMany(s -> {
                     // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
                     final int rowCount = (int) s.affectedRows();
+                    LOG.info("big column test affectedRows {}", rowCount);
+                    assert rowCount == 2;
                     long lastId = s.lastInsertedId();
                     for (int i = 0; i < rowCount; i++) {
                         queryStmt.bind(i, JdbdType.BIGINT, lastId);
@@ -929,8 +940,8 @@ public class DataTypeTests extends SessionTestSupport {
             return;
         }
         final Path wktPath = bigColumnWktPath;
-        insertStmt.bind(0, JdbdType.GEOMETRY, TextPath.from(false, StandardCharsets.UTF_8, wktPath))
-                .bind(1, JdbdType.GEOMETRY, TextPath.from(false, StandardCharsets.UTF_8, wktPath));
+        insertStmt.bind(0, JdbdType.GEOMETRY, TextPath.from(false, WKT_CHARSET, wktPath))
+                .bind(1, JdbdType.GEOMETRY, wrapToClob(wktPath, WKT_CHARSET));
         // .bind(1, JdbdType.GEOMETRY, wrapToText(wktPath,StandardCharsets.UTF_8));
 
         final Function<CurrentRow, ResultRow> function;
@@ -1109,8 +1120,8 @@ public class DataTypeTests extends SessionTestSupport {
     public final Object[] bigColumnStmtProvider(final ITestNGMethod targetMethod, final ITestContext context) {
         final String insertSql, querySql;
 
-        insertSql = "INSERT mysql_types(my_point,my_geometry) VALUES (st_geometryfromwkb(?),st_geometryfromwkb(?)),(st_geometryfromtext(?),st_geometryfromtext(?)),(st_geometryfromtext(?),st_geometryfromtext(?))";
-        querySql = "SELECT t.id,t.my_point,t.my_geometry FROM mysql_types AS t WHERE t.id IN (?,?,?) ORDER BY t.id";
+        insertSql = "INSERT mysql_types(my_linestring,my_geometry) VALUES (st_geometryfromwkb(?),st_geometryfromwkb(?)),(st_geometryfromtext(?),st_geometryfromtext(?))";
+        querySql = "SELECT t.id,t.my_linestring,t.my_geometry,t.my_datetime6 FROM mysql_types AS t WHERE t.id IN (?,?) ORDER BY t.id";
 
         final BindSingleStatement insertStmt, queryInsert;
         insertStmt = createSingleStatement(targetMethod, context, insertSql);

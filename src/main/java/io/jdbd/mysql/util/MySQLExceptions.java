@@ -2,7 +2,6 @@ package io.jdbd.mysql.util;
 
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
-import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.UnrecognizedCollationException;
@@ -162,21 +161,6 @@ public abstract class MySQLExceptions extends JdbdExceptions {
     public static JdbdException createNetPacketTooLargeException(int maxAllowedPayload) {
         String m = String.format("sql length larger than %s[%s]", MySQLKey.MAX_ALLOWED_PACKET, maxAllowedPayload);
         return new JdbdException(m, netPacketTooLargeError(null));
-    }
-
-
-    public static JdbdException createNumberRangErrorException(int stmtIndex, MySQLType mySQLType,
-                                                               ParamValue bindValue, @Nullable Throwable cause,
-                                                               Number lower, Number upper) {
-        final String message;
-        if (stmtIndex < 0) {
-            message = String.format("Bind parameter[%s] MySQLType[%s] beyond rang[%s,%s].",
-                    bindValue.getIndex(), mySQLType, lower, upper);
-        } else {
-            message = String.format("Parameter Group[%s] Bind parameter[%s] MySQLType[%s] out range[%s,%s].",
-                    stmtIndex, bindValue.getIndex(), mySQLType, lower, upper);
-        }
-        return new JdbdException(message, cause);
     }
 
 

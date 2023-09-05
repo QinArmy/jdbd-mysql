@@ -10,6 +10,8 @@ import io.jdbd.type.LongParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -117,8 +119,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             publisher = bindParameters(batchIndex, bindGroup);
         } else {
             this.stmtTask.nextGroupReset(); // next group need to reset
-            publisher = longParamFlux
-                    .concatWith(defferBindParameters(batchIndex, bindGroup))
+            publisher = longParamFlux.concatWith(defferBindParameters(batchIndex, bindGroup))
                     .onErrorResume(this::handleSendError);
         }
         return publisher;
@@ -126,8 +127,12 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
 
     /*################################## blow private method ##################################*/
 
+    private static final Logger LOG = LoggerFactory.getLogger(ExecuteCommandWriter.class);
+
+
     private <T> Publisher<T> handleSendError(final Throwable e) {
         final Mono<T> empty;
+        LOG.error("", e);
         if (this.adjutant.inEventLoop()) {
             this.stmtTask.addErrorToTask(MySQLExceptions.wrap(e));
             this.stmtTask.handleExecuteMessageError();

@@ -2,9 +2,13 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
-import io.jdbd.type.*;
+import io.jdbd.type.Blob;
+import io.jdbd.type.BlobPath;
+import io.jdbd.type.Clob;
+import io.jdbd.type.TextPath;
 import io.jdbd.vendor.result.ColumnMeta;
 import io.jdbd.vendor.stmt.ParamValue;
+import io.jdbd.vendor.util.JdbdBinds;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -13,13 +17,18 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
+import java.io.BufferedReader;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.IntSupplier;
 
 /**
+ * @see ExecuteCommandWriter
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_send_long_data.html">Protocol::COM_STMT_SEND_LONG_DATA</a>
  */
 final class LongParameterWriter {
@@ -78,16 +87,15 @@ final class LongParameterWriter {
         if (source instanceof Blob) {
             Flux.from(((Blob) source).value())
                     .subscribe(new ByteArraySubscription(this, batchIndex, paramValue, sink));
+
+            LOG.debug("subscribe Blob");
         } else if (source instanceof BlobPath) {
             sendBinaryFie(batchIndex, paramValue, (BlobPath) source, sink);
         } else if (source instanceof Clob) {
             Flux.from(((Clob) source).value())
                     .map(s -> s.toString().getBytes(this.writer.clientCharset))
                     .subscribe(new ByteArraySubscription(this, batchIndex, paramValue, sink));
-        } else if (source instanceof Text) {
-            final Text text = (Text) source;
-            Flux.from(text.value())
-                    .subscribe(new TextSubscription(this, batchIndex, paramValue, text.charset(), sink));
+            LOG.debug("subscribe Clob");
         } else if (source instanceof TextPath) {
             sendTextFile(batchIndex, paramValue, (TextPath) source, sink);
         } else {
@@ -121,11 +129,11 @@ final class LongParameterWriter {
                 this.writer.stmtTask.resetSequenceId(); // reset before send
                 Packets.sendPackets(packet, sequenceId, sink);
 
-                LOG.debug("{} BlobPath send chunk complete {} bytes {} MB", path, length, length >> 20);
+                LOG.debug("{} BlobPath send chunk complete {} bytes about {} MB", path, length, length >> 20);
 
             }
 
-            LOG.debug("{} BlobPath send complete,size {} mb", path, totalSize >> 20);
+            LOG.debug("{} BlobPath send complete,size about {} MB", path, totalSize >> 20);
             sink.complete();
         } catch (Throwable e) {
             if (MySQLExceptions.isByteBufOutflow(e)) {
@@ -141,45 +149,91 @@ final class LongParameterWriter {
     private void sendTextFile(final int batchIndex, final ParamValue paramValue, final TextPath textPath,
                               final FluxSink<ByteBuf> sink) {
 
-        final int paramIndex = paramValue.getIndex();
         final Path path = textPath.value();
+
+        final long totalSize;
+
+        try {
+            totalSize = Files.size(path);
+        } catch (Throwable e) {
+            sink.error(e);
+            return;
+        }
+
+        final int paramIndex = paramValue.getIndex();
+
         ByteBuf packet = null;
-        try (FileChannel channel = FileChannel.open(path, MySQLBinds.openOptionSet(textPath))) {
-            final long totalSize;
-            totalSize = channel.size();
 
-            final long chunkSize = this.writer.fixedEnv.blobSendChunkSize;
+        try (BufferedReader reader = JdbdBinds.newReader(textPath, 8192)) {
+
+            final Charset clientCharset = this.writer.clientCharset;
+
+            final CharBuffer charBuffer = CharBuffer.allocate(2048);
+
+            final int chunkSize = this.writer.fixedEnv.blobSendChunkSize;
             final IntSupplier sequenceId = this.writer.sequenceId;
-            final Charset textCharset = textPath.charset(), clientCharset = this.writer.clientCharset;
-            final boolean sameCharset = textCharset.equals(clientCharset);
+            final CharsetEncoder encoder = clientCharset.newEncoder();
 
+            long aboutRestBytes = totalSize; // about
+            packet = createLongDataPacket(paramIndex, (int) Math.min(chunkSize, aboutRestBytes));
 
-            final ByteBuffer buffer;
-            if (sameCharset) {
-                buffer = null;
-            } else {
-                buffer = ByteBuffer.allocate(2048);
-            }
+            ByteBuffer byteBuffer;
+            for (int restChunkBytes = chunkSize, encodedBytes; reader.read(charBuffer) > 0; ) {
 
-            long restBytes = totalSize;
+                charBuffer.flip();
+                byteBuffer = encoder.encode(charBuffer);
+                charBuffer.clear();
 
-            for (int length; restBytes > 0; restBytes -= length) {
+                encodedBytes = byteBuffer.remaining();
 
-                length = (int) Math.min(chunkSize, restBytes);
-                packet = createLongDataPacket(paramIndex, length);
-
-                if (sameCharset) {
-                    packet.writeBytes(channel, length);
-                } else {
-                    MySQLBinds.readFileAndWrite(channel, buffer, packet, length, textCharset, clientCharset);
+                if (encodedBytes < restChunkBytes) {
+                    packet.writeBytes(byteBuffer);
+                    restChunkBytes -= encodedBytes;
+                    aboutRestBytes -= encodedBytes;
+                    continue;
                 }
+
+
+                for (int limit; encodedBytes >= restChunkBytes; ) {
+
+                    if (encodedBytes == restChunkBytes) {
+                        packet.writeBytes(byteBuffer);
+                    } else {
+                        limit = byteBuffer.limit();
+                        byteBuffer.limit(byteBuffer.position() + restChunkBytes);
+
+                        packet.writeBytes(byteBuffer);
+
+                        byteBuffer.limit(limit);
+                    }
+                    this.writer.stmtTask.resetSequenceId();// reset before send
+                    Packets.sendPackets(packet, sequenceId, sink);
+                    LOG.debug("{} TextPath send chunk complete {} bytes {} about MB", path, chunkSize, chunkSize >> 20);
+
+                    aboutRestBytes -= restChunkBytes;
+
+                    if (aboutRestBytes < 1024) {
+                        packet = createLongDataPacket(paramIndex, 1024);
+                    } else {
+                        packet = createLongDataPacket(paramIndex, (int) Math.min(chunkSize, aboutRestBytes));
+                    }
+                    restChunkBytes = chunkSize;
+                    encodedBytes = byteBuffer.remaining();
+                }
+
+                if (byteBuffer.hasRemaining()) {
+                    packet.writeBytes(byteBuffer);
+                }
+
+            } // out loop
+
+            if (packet.readableBytes() > Packets.HEADER_SIZE) {
                 this.writer.stmtTask.resetSequenceId();// reset before send
                 Packets.sendPackets(packet, sequenceId, sink);
-
-                LOG.debug("{} TextPath send chunk complete {} bytes {} MB", path, length, length >> 20);
+                packet = null;
             }
+            LOG.debug("{} TextPath send complete,size about {} MB", textPath.value(), totalSize >> 20);
 
-            LOG.debug("{} TextPath send complete,size {} mb", textPath.value(), totalSize >> 20);
             sink.complete();
         } catch (Throwable e) {
             if (packet != null && packet.refCnt() > 0) {
@@ -190,7 +244,6 @@ final class LongParameterWriter {
             } else {
                 sink.error(MySQLExceptions.readLocalFileError(batchIndex, this.columnMetas[paramIndex], textPath, e));
             }
-
         }
 
     }
@@ -334,24 +387,6 @@ final class LongParameterWriter {
             return packet;
         }
 
-        final boolean sendPackets(final ByteBuf packet) {
-            int totalBytes = this.totalBytes;
-            totalBytes += (packet.readableBytes() - Packets.HEADER_SIZE);
-
-            this.totalBytes = totalBytes;
-            final boolean error = totalBytes > this.parameterWriter.writer.fixedEnv.maxAllowedPacket;
-
-            if (error) {
-                this.onErrorInEventLoop(MySQLExceptions.netPacketTooLargeError(null));
-                if (packet.refCnt() > 0) {
-                    packet.release();
-                }
-            } else {
-                this.parameterWriter.writer.stmtTask.resetSequenceId();
-                Packets.sendPackets(packet, this.parameterWriter.writer.sequenceId, this.sink);
-            }
-            return error;
-        }
 
 
         abstract void onNextInEventLoop(final T item);
@@ -367,18 +402,16 @@ final class LongParameterWriter {
             boolean error = false;
             if (packet != null) {
                 if (packet.readableBytes() > Packets.HEADER_SIZE) {
-                    error = sendPackets(packet);
+                    this.parameterWriter.writer.stmtTask.resetSequenceId();
+                    Packets.sendPackets(packet, this.parameterWriter.writer.sequenceId, this.sink);
                 } else if (packet.refCnt() > 0) {
                     packet.release();
                 }
                 this.packet = null;
             }
-            if (!error) {
-                this.sink.complete();
-                LOG.debug("{} complete", getClass().getSimpleName());
-            }
 
-
+            this.sink.complete();
+            LOG.debug("{} complete", getClass().getSimpleName());
         }
 
 
@@ -461,9 +494,8 @@ final class LongParameterWriter {
                 if (restPayloadLength > 0) {
                     continue;
                 }
-                if (sendPackets(packet)) {
-                    break;
-                }
+                this.parameterWriter.writer.stmtTask.resetSequenceId();
+                Packets.sendPackets(packet, this.parameterWriter.writer.sequenceId, this.sink);
 
                 this.restPayloadBytes = 0;
                 this.packet = null;
@@ -477,62 +509,6 @@ final class LongParameterWriter {
 
 
     }//ByteArraySubscription
-
-
-    private static final class TextSubscription extends PacketSubscription<byte[]> {
-
-        private final Charset textCharset;
-
-        private TextSubscription(LongParameterWriter parameterWriter, int batchIndex, ParamValue paramValue,
-                                 Charset textCharset, FluxSink<ByteBuf> sink) {
-            super(parameterWriter, batchIndex, paramValue, sink);
-            this.textCharset = textCharset;
-        }
-
-        @Override
-        void onNextInEventLoop(final byte[] item) {
-            if (this.terminate) {
-                return;
-            }
-            final Charset textCharset = this.textCharset, clientCharset = this.parameterWriter.writer.clientCharset;
-
-            final ByteBuffer buffer;
-            buffer = clientCharset.encode(textCharset.decode(ByteBuffer.wrap(item)));
-
-            ByteBuf packet = this.packet;
-
-            int restPayloadLength = this.restPayloadBytes;
-            for (int pos = buffer.position(), length, restLength = buffer.remaining(); restLength > 0; restLength -= length) {
-
-                length = Math.min(restPayloadLength, restLength);
-
-                buffer.position(pos);
-                buffer.limit(pos + length);
-
-                packet.writeBytes(buffer);
-
-                pos += length;
-                restPayloadLength -= length;
-
-                if (restPayloadLength > 0) {
-                    continue;
-                }
-                if (sendPackets(packet)) {
-                    break;
-                }
-
-                this.restPayloadBytes = 0;
-                this.packet = null;
-                this.packet = packet = createPacket();
-                restPayloadLength = this.restPayloadBytes;
-
-            }
-
-            this.restPayloadBytes = restPayloadLength;
-        }
-
-
-    }//TextSubscription
 
 
 }

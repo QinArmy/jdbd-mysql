@@ -11,8 +11,9 @@ import io.jdbd.statement.BindSingleStatement;
 import io.jdbd.statement.Statement;
 import io.jdbd.type.Blob;
 import io.jdbd.type.Clob;
-import io.jdbd.type.Text;
+import io.jdbd.type.TextPath;
 import io.jdbd.vendor.env.Environment;
+import io.jdbd.vendor.util.JdbdBinds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -26,9 +27,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -262,11 +265,6 @@ public abstract class SessionTestSupport {
         return Blob.from(flux);
     }
 
-    public static Text wrapToText(final Path path, final Charset charset) {
-        final Flux<byte[]> flux;
-        flux = Flux.create(sink -> EXECUTOR.execute(() -> publishBinaryFile(sink, path)));
-        return Text.from(charset, flux);
-    }
 
     public static Clob wrapToClob(final Path path, final Charset charset) {
         final Flux<CharSequence> flux;
@@ -311,14 +309,14 @@ public abstract class SessionTestSupport {
     }
 
     private static void publishTextFile(final FluxSink<CharSequence> sink, final Path path, final Charset charset) {
-        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-            final byte[] bufferBytes = new byte[4096];
-            final ByteBuffer buffer = ByteBuffer.wrap(bufferBytes);
-            for (int length; (length = channel.read(buffer)) > 0; ) {
-                buffer.flip();
-                sink.next(new String(bufferBytes, 0, length, charset));
-                buffer.clear();
-            }// for
+        try (BufferedReader reader = JdbdBinds.newReader(TextPath.from(false, charset, path), 8192)) {
+            final CharBuffer charBuffer = CharBuffer.allocate(4096);
+
+            while (reader.read(charBuffer) > 0) {
+                charBuffer.flip();
+                sink.next(charBuffer.toString());
+                charBuffer.clear();
+            }
             sink.complete();
         } catch (Throwable e) {
             sink.error(e);
