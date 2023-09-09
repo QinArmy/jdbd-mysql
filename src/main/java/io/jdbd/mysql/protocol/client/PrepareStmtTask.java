@@ -1,6 +1,8 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.vendor.stmt.ParamSingleStmt;
+import io.netty.buffer.ByteBuf;
+import reactor.core.publisher.Mono;
 
 interface PrepareStmtTask {
 
@@ -28,7 +30,7 @@ interface PrepareStmtTask {
 
     void nextGroupReset();
 
-    void handleExecuteMessageError();
+    Mono<ByteBuf> handleExecuteMessageError(Throwable error);
 
 
 }

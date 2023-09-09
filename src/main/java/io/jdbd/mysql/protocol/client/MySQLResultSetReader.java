@@ -20,6 +20,7 @@ import io.jdbd.vendor.result.ColumnMeta;
 import io.jdbd.vendor.result.VendorDataRow;
 import io.jdbd.vendor.util.JdbdExceptions;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +33,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
-import java.util.stream.Stream;
 
 /**
  * <p>
@@ -112,11 +111,27 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 this.task.next(currentRow.rowMeta); // emit ResultRowMeta as the header of query result.
             }
         }
-        final States states;
         if (currentRow == null) {
-            states = States.MORE_CUMULATE;
-        } else {
+            return States.MORE_CUMULATE;
+        }
+        final ByteBuf oldBigPayload = this.bigPayload;
+        final int oldReaderIndex = cumulateBuffer.readerIndex();
+        States states;
+        try {
             states = readRowSet(cumulateBuffer, serverStatesConsumer);
+        } catch (Throwable e) {
+            this.task.addErrorToTask(e); // add error , will skip all row packets
+            LOG.debug("occur error,will skip all row packets", e);
+            final ByteBuf newBigPayload = this.bigPayload;
+            if (newBigPayload != null && newBigPayload != oldBigPayload) {
+                if (newBigPayload.refCnt() > 0) {
+                    newBigPayload.release();
+                    LOG.debug("occur error,release new big payload");
+                }
+            }
+            this.bigPayload = oldBigPayload;
+            cumulateBuffer.readerIndex(oldReaderIndex);
+            states = readRowSet(cumulateBuffer, serverStatesConsumer); // skip all row packets
         }
         return states;
     }
@@ -428,6 +443,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 }
                 if (payloadLength < Packets.MAX_PAYLOAD) {
                     this.bigPayload = bigPayload = null; // big row end
+                    LOG.debug("big column payload end"); // bigColumn reset bytes 74 about 0 MB
                 }
             } else switch (Packets.getInt1AsInt(cumulateBuffer, payloadIndex)) {
                 case MySQLServerException.ERROR_HEADER: {
@@ -466,6 +482,10 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                             cumulateBuffer.writerIndex(limitIndex);
                         }
                         payload = cumulateBuffer;
+                    } else if (cancelled) {
+                        cumulateBuffer.skipBytes(payloadLength);
+                        this.bigPayload = bigPayload = Unpooled.EMPTY_BUFFER;
+                        payload = bigPayload;
                     } else {
                         this.bigPayload = bigPayload = this.adjutant.allocator()
                                 .directBuffer(payloadLength << 2, Integer.MAX_VALUE - 128);
@@ -540,57 +560,6 @@ abstract class MySQLResultSetReader implements ResultSetReader {
     }
 
     /*-------------------below static method -------------------*/
-
-    /**
-     * <p>
-     * Delete all big column temp file in temp directory.
-     * </p>
-     * <p>
-     * This method don't throw any error.
-     * </p>
-     *
-     * @see ClientProtocolFactory#close()
-     */
-    static void deleteBigColumnTempDirectoryOnFactoryClose() {
-        try {
-            if (Files.notExists(TEMP_DIRECTORY)) {
-                return;
-            }
-            try (Stream<Path> fileStream = Files.find(TEMP_DIRECTORY, 1, MySQLResultSetReader::isBigColumnTempFile)) {
-                fileStream.forEach(MySQLResultSetReader::deleteBigColumnTempFileIfExists);
-            }
-        } catch (Throwable e) {
-            // here ,just clear, don't throw error
-            LOG.debug("delete temp directory occur error,{}", TEMP_DIRECTORY, e);
-        }
-
-    }
-
-
-    /**
-     * @see #deleteBigColumnTempDirectoryOnFactoryClose()
-     */
-    private static boolean isBigColumnTempFile(final Path path, BasicFileAttributes attributes) {
-        if (Files.isDirectory(path)) {
-            return false;
-        }
-        final String name = path.getFileName().toString();
-        return (name.startsWith(BIG_COLUMN_FILE_PREFIX) && name.endsWith(BIG_COLUMN_FILE_SUFFIX));
-    }
-
-    /**
-     * @see #deleteBigColumnTempDirectoryOnFactoryClose()
-     */
-    private static void deleteBigColumnTempFileIfExists(final Path path) {
-        try {
-            if (Files.deleteIfExists(path)) {
-                LOG.debug("delete big column temp file complete,{}", path);
-            }
-        } catch (Throwable e) {
-            // here ,just clear, don't throw error
-            LOG.debug("delete big column temp file occur error,{}", path, e);
-        }
-    }
 
 
     /**
@@ -713,12 +682,15 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
         private final long totalBytes;
 
+        private final boolean debugEnabled;
+
         private long wroteBytes = 0L;
 
         private BigColumn(int columnIndex, Path path, long totalBytes) {
             this.columnIndex = columnIndex;
             this.path = path;
             this.totalBytes = totalBytes;
+            this.debugEnabled = LOG.isDebugEnabled();
         }
 
 
@@ -738,6 +710,12 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             this.wroteBytes = wroteBytes;
             if (wroteBytes > this.totalBytes) {
                 throw new IllegalArgumentException("length error");
+            }
+
+            if (this.debugEnabled) {
+                final long reset;
+                reset = restBytes();
+                LOG.debug("bigColumn[{}] rest bytes {} about {} MB", this.columnIndex, reset, reset >> 20);
             }
             return wroteBytes == this.totalBytes;
         }

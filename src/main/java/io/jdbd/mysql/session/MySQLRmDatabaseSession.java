@@ -573,8 +573,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
         @Override
-        public Mono<PoolRmDatabaseSession> ping(int timeoutSeconds) {
-            return this.protocol.ping(timeoutSeconds)
+        public Mono<PoolRmDatabaseSession> ping() {
+            return this.protocol.ping()
                     .thenReturn(this);
         }
 
@@ -584,6 +584,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                     .thenReturn(this);
         }
 
+        @Override
+        public Publisher<PoolRmDatabaseSession> logicallyClose() {
+            return this.protocol.logicallyClose()
+                    .thenReturn(this);
+        }
 
     }// MySQLPoolRmDatabaseSession
 

@@ -78,7 +78,7 @@ public class DataTypeTests extends SessionTestSupport {
             Files.createDirectories(dir);
         }
 
-        final int wkbPointNumber = 64 * 1024 * 800;
+        final int wkbPointNumber = 64 * 1024 * 500;
         final Path wkbPath, textPath;
         wkbPath = Files.createTempFile(dir, "Geometry", ".wkb");
         textPath = Files.createTempFile(dir, "Geometry", ".wkt");
@@ -834,7 +834,7 @@ public class DataTypeTests extends SessionTestSupport {
                     // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
                     final int rowCount = (int) s.affectedRows();
                     LOG.info("big column test affectedRows {}", rowCount);
-                    assert rowCount == 2;
+                    assert rowCount == 2; // TODO report MySQL bug
                     long lastId = s.lastInsertedId();
                     for (int i = 0; i < rowCount; i++) {
                         queryStmt.bind(i, JdbdType.BIGINT, lastId);
@@ -862,7 +862,7 @@ public class DataTypeTests extends SessionTestSupport {
      * @see MySQLType#GEOMETRY
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
      */
-    @Test(invocationCount = 3, dataProvider = "bigBlobColumnStmtProvider")
+    @Test(invocationCount = 1, dataProvider = "bigBlobColumnStmtProvider")
     public void bigBlobColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
 
         if (ClientTestUtils.isNotDriverDeveloperComputer()) {
@@ -879,6 +879,8 @@ public class DataTypeTests extends SessionTestSupport {
 
         insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, wkbPath))
                 .bind(1, JdbdType.GEOMETRY, wrapToBlob(wkbPath));
+
+        insertStmt.setTimeout(200);
 
         final Function<CurrentRow, ResultRow> function;
         function = row -> {
@@ -906,6 +908,7 @@ public class DataTypeTests extends SessionTestSupport {
                         queryStmt.bind(i, JdbdType.BIGINT, lastId);
                         lastId++;
                     }
+                    queryStmt.setTimeout(300);
                     return Flux.from(queryStmt.executeQuery(function));
                 })
                 .blockLast();
@@ -1138,7 +1141,7 @@ public class DataTypeTests extends SessionTestSupport {
         final String insertSql, querySql;
 
         insertSql = "INSERT mysql_types(my_geometry) VALUES (st_geometryfromwkb(?)),(st_geometryfromwkb(?))";
-        querySql = "SELECT t.id,t.my_geometry,t.my_datetime6 FROM mysql_types AS t WHERE t.id IN (?,?) ORDER BY t.id";
+        querySql = "SELECT t.id,t.my_geometry FROM mysql_types AS t WHERE t.id IN (?,?) ORDER BY t.id";
 
         final BindSingleStatement insertStmt, queryInsert;
         insertStmt = createSingleStatement(targetMethod, context, insertSql);

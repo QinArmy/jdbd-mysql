@@ -42,7 +42,7 @@ public class SessionFactoryTests extends SessionTestSupport {
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
                 .flatMap(LocalDatabaseSession::startTransaction)
-                .doOnNext(session -> LOG.debug("{}", session))
+                .doOnNext(session -> LOG.info("session info {}", session))
                 .flatMap(LocalDatabaseSession::commit)
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)

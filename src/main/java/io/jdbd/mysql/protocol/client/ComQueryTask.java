@@ -408,7 +408,9 @@ final class ComQueryTask extends MySQLCommandTask {
 
     private final Stmt stmt;
 
-    private Phase phase;
+    private final Runnable timeoutCancelFunc;
+
+    private Phase phase = Phase.NONE;
 
 
     private ComQueryTask(final Stmt stmt, ResultSink sink, TaskAdjutant adjutant) {
@@ -417,6 +419,15 @@ final class ComQueryTask extends MySQLCommandTask {
             throw new JdbdException("negotiatedCapability not support multi statement.");
         }
         this.stmt = stmt;
+
+        final int timeoutMills;
+        timeoutMills = stmt.getTimeout();
+        if (timeoutMills > 0) {
+            this.timeoutCancelFunc = adjutant.getFactory()
+                    .startTimeoutTask(adjutant.handshake10().threadId, timeoutMills);
+        } else {
+            this.timeoutCancelFunc = null;
+        }
     }
 
     @Override
@@ -488,10 +499,8 @@ final class ComQueryTask extends MySQLCommandTask {
             publishError(this.sink::error);
             return true;
         }
-
-        boolean taskEnd = false, continueRead = Packets.hasOnePacket(cumulateBuffer);
+        boolean taskEnd = this.phase == Phase.TASK_END, continueRead = Packets.hasOnePacket(cumulateBuffer);
         while (continueRead) {
-            LOG.debug("decode phase : {}", this.phase);
             switch (this.phase) {
                 case READ_EXECUTE_RESPONSE:
                     taskEnd = readExecuteResponse(cumulateBuffer, serverStatusConsumer);
@@ -511,6 +520,10 @@ final class ComQueryTask extends MySQLCommandTask {
         }
 
         if (taskEnd) {
+            final Runnable timeoutCancelFunc = this.timeoutCancelFunc;
+            if (timeoutCancelFunc != null) {
+                timeoutCancelFunc.run();
+            }
             if (log.isTraceEnabled()) {
                 log.trace("COM_QUERY instant[{}] task end.", this);
             }
@@ -826,6 +839,7 @@ final class ComQueryTask extends MySQLCommandTask {
 
 
 
+
     /*################################## blow private static method ##################################*/
 
     /**
@@ -877,6 +891,8 @@ final class ComQueryTask extends MySQLCommandTask {
 
 
     private enum Phase {
+        NONE,
+
         ERROR_ON_START,
         READ_EXECUTE_RESPONSE,
         READ_TEXT_RESULT_SET,

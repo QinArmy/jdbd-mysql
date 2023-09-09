@@ -87,15 +87,12 @@ final class LongParameterWriter {
         if (source instanceof Blob) {
             Flux.from(((Blob) source).value())
                     .subscribe(new ByteArraySubscription(this, batchIndex, paramValue, sink));
-
-            LOG.debug("subscribe Blob");
         } else if (source instanceof BlobPath) {
             sendBinaryFie(batchIndex, paramValue, (BlobPath) source, sink);
         } else if (source instanceof Clob) {
             Flux.from(((Clob) source).value())
                     .map(s -> s.toString().getBytes(this.writer.clientCharset))
                     .subscribe(new ByteArraySubscription(this, batchIndex, paramValue, sink));
-            LOG.debug("subscribe Clob");
         } else if (source instanceof TextPath) {
             sendTextFile(batchIndex, paramValue, (TextPath) source, sink);
         } else {

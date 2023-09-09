@@ -50,7 +50,10 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
         this.sink = sink;
         this.capability = adjutant.capability();
         this.resultSetReader = createResultSetReader();
+
     }
+
+
 
     /*################################## blow StmtTask method ##################################*/
 
@@ -110,6 +113,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
         }
     }
 
+
     public final int nextSequenceId() {
         int sequenceId = this.sequenceId++;
         if (sequenceId > 0xFF) {
@@ -141,6 +145,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
     abstract boolean executeNextGroup();
 
     abstract boolean executeNextFetch();
+
 
 
     final void readErrorPacket(final ByteBuf cumulateBuffer) {
@@ -213,18 +218,20 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
         serverStatusConsumer.accept(ok);
 
         final int resultIndex = nextResultNo(); // must increment result index.
-        final boolean noMoreResult = !ok.hasMoreResult();
+        final boolean hasMoreResult = ok.hasMoreResult();
 
         final boolean taskEnd;
         if (this.isCancelled()) {
-            taskEnd = noMoreResult;
+            taskEnd = !hasMoreResult;
         } else {
             // emit update result.
             this.sink.next(MySQLResultStates.fromUpdate(resultIndex, ok));
-            if (noMoreResult && hasMoreGroup()) {
+            if (hasMoreResult) {
+                taskEnd = false;
+            } else if (hasMoreGroup()) {
                 taskEnd = executeNextGroup();
             } else {
-                taskEnd = noMoreResult;
+                taskEnd = true;
             }
         }
         return taskEnd;

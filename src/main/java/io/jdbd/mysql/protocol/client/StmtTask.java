@@ -6,20 +6,22 @@ import java.nio.file.Path;
 
 interface StmtTask extends MetaAdjutant {
 
- boolean isCancelled();
+    boolean isCancelled();
+
+    boolean hasError();
 
     void next(ResultItem result);
 
- void addErrorToTask(Throwable error);
+    void addErrorToTask(Throwable error);
 
- void addBigColumnPath(Path path);
+    void addBigColumnPath(Path path);
 
- TaskAdjutant adjutant();
+    TaskAdjutant adjutant();
 
- void updateSequenceId(int sequenceId);
+    void updateSequenceId(int sequenceId);
 
 
- int nextResultNo();
+    int nextResultNo();
 
 
 }

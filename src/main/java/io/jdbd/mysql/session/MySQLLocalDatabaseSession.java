@@ -125,7 +125,6 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
 
-
     @Override
     public final Publisher<LocalDatabaseSession> commit() {
         return this.commit(Option.EMPTY_OPTION_FUNC);
@@ -327,14 +326,20 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
         @Override
-        public Mono<PoolLocalDatabaseSession> ping(int timeoutSeconds) {
-            return this.protocol.ping(timeoutSeconds)
+        public Mono<PoolLocalDatabaseSession> ping() {
+            return this.protocol.ping()
                     .thenReturn(this);
         }
 
         @Override
         public Mono<PoolLocalDatabaseSession> reset() {
             return this.protocol.reset()
+                    .thenReturn(this);
+        }
+
+        @Override
+        public Publisher<PoolLocalDatabaseSession> logicallyClose() {
+            return this.protocol.logicallyClose()
                     .thenReturn(this);
         }
 

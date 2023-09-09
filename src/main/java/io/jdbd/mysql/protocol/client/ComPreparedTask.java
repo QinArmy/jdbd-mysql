@@ -238,6 +238,10 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     private final CommandWriter commandWriter;
 
+    private final Runnable timeoutCancelFunc;
+
+    private final long startTime;
+
     private int statementId;
 
     private Warning warning;
@@ -269,6 +273,16 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         this.stmt = stmt;
         this.taskPhase = TaskPhase.PREPARED;
         this.commandWriter = ExecuteCommandWriter.create(this);
+        final int timeoutMills;
+        timeoutMills = stmt.getTimeout();
+        if (timeoutMills > 0) {
+            this.timeoutCancelFunc = adjutant.getFactory()
+                    .startTimeoutTask(adjutant.handshake10().threadId, timeoutMills);
+            this.startTime = System.currentTimeMillis();
+        } else {
+            this.timeoutCancelFunc = null;
+            this.startTime = 0;
+        }
     }
 
     @Override
@@ -295,9 +309,17 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
     @Override
-    public void handleExecuteMessageError() {
-
+    public Mono<ByteBuf> handleExecuteMessageError(final Throwable error) {
+        final Mono<ByteBuf> mono;
+        if (this.adjutant.inEventLoop()) {
+            handleExecuteMessageErrorInEventLoop(error);
+            mono = Mono.empty();
+        } else {
+            mono = Mono.create(sink -> this.adjutant.execute(() -> handleExecuteMessageErrorInEventLoop(error)));
+        }
+        return mono;
     }
+
 
     @Override
     public boolean isSupportFetch() {
@@ -558,6 +580,10 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         }
         if (taskEnd && this.taskPhase != TaskPhase.SUSPEND) {
             this.taskPhase = TaskPhase.END;
+            final Runnable timeoutCancelFunc = this.timeoutCancelFunc;
+            if (timeoutCancelFunc != null) {
+                timeoutCancelFunc.run();
+            }
             switch (this.bindPhase) {
                 case ABANDON_BIND:
                 case ERROR_ON_BIND:
@@ -649,8 +675,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     boolean executeNextGroup() {
 
         if (this.nextGroupNeedReset) {
-            this.packetPublisher = Mono.just(createResetPacket());
-            this.taskPhase = TaskPhase.READ_RESET_RESPONSE;
+            executeReset();
             return false;
         }
 
@@ -727,6 +752,16 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         packet.writeByte(Packets.COM_STMT_PREPARE);
         packet.writeBytes(sqlBytes);
         return Packets.createPacketPublisher(packet, this::nextSequenceId, this.adjutant);
+    }
+
+    /**
+     * @see #executeNextGroup()
+     * @see #handleExecuteMessageErrorInEventLoop(Throwable)
+     */
+    private void executeReset() {
+        assert this.nextGroupNeedReset;
+        this.packetPublisher = Mono.just(createResetPacket());
+        this.taskPhase = TaskPhase.READ_RESET_RESPONSE;
     }
 
     private ParamSingleStmt getActualStmt() {
@@ -1078,6 +1113,25 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     private boolean isNeedCloseStatement() {
         return true;
+    }
+
+    /**
+     * @see #handleExecuteMessageError(Throwable)
+     */
+    private void handleExecuteMessageErrorInEventLoop(final Throwable error) {
+        addError(error);
+        final boolean needReset = this.nextGroupNeedReset;
+        if (needReset) {
+            executeReset();
+        }
+
+        if (this.inDecodeMethod()) {
+            return;
+        }
+
+        if (!needReset && isNeedCloseStatement()) {
+            activelySendPacketsAndEndTask(Mono.just(createCloseStatementPacket()));
+        }
     }
 
 

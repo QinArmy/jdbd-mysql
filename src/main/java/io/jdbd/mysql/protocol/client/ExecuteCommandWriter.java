@@ -10,8 +10,6 @@ import io.jdbd.type.LongParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -120,32 +118,12 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
         } else {
             this.stmtTask.nextGroupReset(); // next group need to reset
             publisher = longParamFlux.concatWith(defferBindParameters(batchIndex, bindGroup))
-                    .onErrorResume(this::handleSendError);
+                    .onErrorResume(this.stmtTask::handleExecuteMessageError);
         }
         return publisher;
     }
 
     /*################################## blow private method ##################################*/
-
-    private static final Logger LOG = LoggerFactory.getLogger(ExecuteCommandWriter.class);
-
-
-    private <T> Publisher<T> handleSendError(final Throwable e) {
-        final Mono<T> empty;
-        LOG.error("", e);
-        if (this.adjutant.inEventLoop()) {
-            this.stmtTask.addErrorToTask(MySQLExceptions.wrap(e));
-            this.stmtTask.handleExecuteMessageError();
-            empty = Mono.empty();
-        } else {
-            empty = Mono.create(sink -> this.adjutant.execute(() -> {
-                this.stmtTask.addErrorToTask(MySQLExceptions.wrap(e));
-                this.stmtTask.handleExecuteMessageError();
-                sink.success();
-            }));
-        }
-        return empty;
-    }
 
 
     private List<ParamValue> getBindGroup(final int batchIndex) {

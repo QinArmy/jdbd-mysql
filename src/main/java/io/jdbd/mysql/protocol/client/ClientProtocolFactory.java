@@ -45,6 +45,11 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * <p>
@@ -70,11 +75,17 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     final int factoryTaskQueueSize;
 
-    final boolean forPoolVendor;
+    private final boolean forPoolVendor;
 
     private final ConnectionProvider connectionProvider;
 
     private final LoopResources loopResources;
+
+    private final ScheduledExecutorService executor;
+
+    private final AtomicReference<MySQLProtocol> killQueryConn = new AtomicReference<>(null);
+
+    private final AtomicBoolean createKillQueryConn = new AtomicBoolean(false);
 
     private ClientProtocolFactory(final MySQLHostInfo host, boolean forPoolVendor) {
         super(host.properties());
@@ -85,6 +96,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         this.factoryTaskQueueSize = env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
         this.connectionProvider = env.get(MySQLKey.CONNECTION_PROVIDER, ConnectionProvider::newConnection);
         this.loopResources = createEventLoopGroup(env);
+        this.executor = Executors.newScheduledThreadPool(2, this::newScheduledThread);
     }
 
 
@@ -123,7 +135,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         shutdownTimeout = Duration.ofMillis(env.getOrDefault(MySQLKey.SHUTDOWN_TIMEOUT));
 
         return this.loopResources.disposeLater(shutdownQuietPeriod, shutdownTimeout)
-                //.doOnTerminate(MySQLResultSetReader::deleteBigColumnTempDirectoryOnFactoryClose)  // TODO add ? conflict with CommandTask
                 .then(Mono.empty());
     }
 
@@ -145,9 +156,27 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .toString();
     }
 
+    /*-------------------below packet instance method -------------------*/
+
+
+    Runnable startTimeoutTask(final long threadId, final int timeoutMills) {
+        final TimeoutTimerTask task = new TimeoutTimerTask(threadId, this);
+        this.executor.schedule(task, timeoutMills, TimeUnit.MILLISECONDS);
+        return task::cancelTask;
+    }
+
+
 
 
     /*-------------------below private instance method -------------------*/
+
+
+    private Thread newScheduledThread(final Runnable runnable) {
+        final Thread thread;
+        thread = new Thread(runnable, factoryName() + "-timeout-timer");
+        thread.setDaemon(true);
+        return thread;
+    }
 
 
     /**
@@ -216,6 +245,45 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         }
         return LoopResources.create("jdbd-mysql", selectCount, workerCount, true);
     }
+
+
+    private static final class TimeoutTimerTask implements Runnable {
+
+        private final AtomicBoolean canceled = new AtomicBoolean(false);
+
+        private final long threadId;
+
+        private final ClientProtocolFactory factory;
+
+        private TimeoutTimerTask(long threadId, ClientProtocolFactory factory) {
+            this.threadId = threadId;
+            this.factory = factory;
+        }
+
+        @Override
+        public void run() {
+            if (this.canceled.get()) {
+                return;
+            }
+            this.factory.createProtocol()
+                    .flatMap(this::killQuery)
+                    .subscribe();
+        }
+
+        private void cancelTask() {
+            this.canceled.set(true);
+        }
+
+        private Mono<Void> killQuery(final MySQLProtocol protocol) {
+            if (this.canceled.get()) {
+                return protocol.close();
+            }
+            final String sql = "KILL QUERY " + this.threadId;
+            return protocol.update(Stmts.stmt(sql))
+                    .then(protocol.close());
+        }
+
+    }//TimeoutTimerTask
 
 
     private static final class ClientProtocolManager implements ProtocolManager {

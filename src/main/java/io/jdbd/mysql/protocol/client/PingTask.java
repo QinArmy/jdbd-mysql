@@ -17,10 +17,10 @@ import java.util.function.Consumer;
  */
 final class PingTask extends MySQLTask {
 
-    static Mono<Void> ping(final int timeoutMills, final TaskAdjutant adjutant) {
+    static Mono<Void> ping(final TaskAdjutant adjutant) {
         return Mono.create(sink -> {
             try {
-                PingTask task = new PingTask(sink, timeoutMills, adjutant);
+                PingTask task = new PingTask(sink, adjutant);
                 task.submit(sink::error);
             } catch (Throwable e) {
                 sink.error(MySQLExceptions.wrapIfNonJvmFatal(e));
@@ -31,15 +31,13 @@ final class PingTask extends MySQLTask {
 
     private final MonoSink<Void> sink;
 
-    private final int timeout;
 
     private boolean taskEnd;
 
 
-    private PingTask(MonoSink<Void> sink, int timeoutMills, TaskAdjutant adjutant) {
+    private PingTask(MonoSink<Void> sink, TaskAdjutant adjutant) {
         super(adjutant, sink::error);
         this.sink = sink;
-        this.timeout = timeoutMills;
     }
 
     @Override

@@ -262,10 +262,14 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public Mono<Void> ping(final int timeoutMills) {
-        return PingTask.ping(timeoutMills, this.adjutant);
+    public Mono<Void> ping() {
+        return PingTask.ping(this.adjutant);
     }
 
+    @Override
+    public Mono<Void> logicallyClose() {
+        return this.adjutant.logicallyClose();
+    }
 
     @Override
     public boolean supportMultiStmt() {
