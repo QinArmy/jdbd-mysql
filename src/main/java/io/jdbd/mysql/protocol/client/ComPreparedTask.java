@@ -238,10 +238,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
     private final CommandWriter commandWriter;
 
-    private final Runnable timeoutCancelFunc;
-
-    private final long startTime;
-
     private int statementId;
 
     private Warning warning;
@@ -273,16 +269,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         this.stmt = stmt;
         this.taskPhase = TaskPhase.PREPARED;
         this.commandWriter = ExecuteCommandWriter.create(this);
-        final int timeoutMills;
-        timeoutMills = stmt.getTimeout();
-        if (timeoutMills > 0) {
-            this.timeoutCancelFunc = adjutant.getFactory()
-                    .startTimeoutTask(adjutant.handshake10().threadId, timeoutMills);
-            this.startTime = System.currentTimeMillis();
-        } else {
-            this.timeoutCancelFunc = null;
-            this.startTime = 0;
-        }
     }
 
     @Override
@@ -461,6 +447,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      */
     @Override
     protected Publisher<ByteBuf> start() {
+        if (startTimeoutTaskIfNeed()) {
+            this.taskPhase = TaskPhase.ERROR_ON_START;
+            return null;
+        }
+
         Publisher<ByteBuf> publisher;
         switch (this.taskPhase) {
             case PREPARED: {
@@ -578,12 +569,10 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     throw MySQLExceptions.unexpectedEnum(this.taskPhase);
             }
         }
+
         if (taskEnd && this.taskPhase != TaskPhase.SUSPEND) {
             this.taskPhase = TaskPhase.END;
-            final Runnable timeoutCancelFunc = this.timeoutCancelFunc;
-            if (timeoutCancelFunc != null) {
-                timeoutCancelFunc.run();
-            }
+            cancelTimeoutTaskIfNeed();
             switch (this.bindPhase) {
                 case ABANDON_BIND:
                 case ERROR_ON_BIND:
@@ -739,6 +728,19 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         return taskEnd;
     }
 
+    @Override
+    int getStmtTimeout() {
+        final ParamSingleStmt stmt = this.stmt;
+        final int timeoutMills;
+        if (stmt instanceof MySQLPrepareStmt && ((MySQLPrepareStmt) stmt).stmt == null) {
+            timeoutMills = 0;
+        } else {
+            timeoutMills = stmt.getTimeout();
+        }
+        return timeoutMills;
+    }
+
+
     /*################################## blow private method ##################################*/
 
     private Publisher<ByteBuf> createPreparePacket() {
@@ -795,21 +797,25 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         switch (this.bindPhase) {
             case WAIT_BIND: {
                 try {
+                    this.bindPhase = BindPhase.BIND_COMPLETE;
                     ((MySQLPrepareStmt) this.stmt).setStmt(stmt);
                     ((PrepareSink) this.sink).setSink(sink);
-                    this.bindPhase = BindPhase.BIND_COMPLETE;
 
                     final TaskPhase oldTaskPhase = this.taskPhase;
 
                     this.taskPhase = TaskPhase.EXECUTE;
-                    if (executeNextGroup()) {
+                    if (hasError()) {
+                        publishError(sink::error);
+                    } else if (executeNextGroup()) {
                         this.taskPhase = TaskPhase.END;
                         publishError(sink::error);
                     } else if (oldTaskPhase == TaskPhase.SUSPEND) {
                         this.taskPhase = TaskPhase.RESUME;
                         this.resume(sink::error);
+                        startTimeoutTaskIfNeed();
                     } else {
                         this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
+                        startTimeoutTaskIfNeed();
                     }
                 } catch (Throwable e) {
                     // here bug
@@ -1251,7 +1257,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
     /*################################## blow private static method ##################################*/
-
 
 
     /*################################## blow private static inner class ##################################*/

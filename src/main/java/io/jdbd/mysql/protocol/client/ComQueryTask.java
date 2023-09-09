@@ -408,7 +408,6 @@ final class ComQueryTask extends MySQLCommandTask {
 
     private final Stmt stmt;
 
-    private final Runnable timeoutCancelFunc;
 
     private Phase phase = Phase.NONE;
 
@@ -419,15 +418,6 @@ final class ComQueryTask extends MySQLCommandTask {
             throw new JdbdException("negotiatedCapability not support multi statement.");
         }
         this.stmt = stmt;
-
-        final int timeoutMills;
-        timeoutMills = stmt.getTimeout();
-        if (timeoutMills > 0) {
-            this.timeoutCancelFunc = adjutant.getFactory()
-                    .startTimeoutTask(adjutant.handshake10().threadId, timeoutMills);
-        } else {
-            this.timeoutCancelFunc = null;
-        }
     }
 
     @Override
@@ -451,6 +441,10 @@ final class ComQueryTask extends MySQLCommandTask {
     @Nullable
     @Override
     protected Publisher<ByteBuf> start() {
+        if (startTimeoutTaskIfNeed()) {
+            this.phase = Phase.ERROR_ON_START;
+            return null;
+        }
         Publisher<ByteBuf> publisher;
         final Stmt stmt = this.stmt;
 
@@ -474,10 +468,11 @@ final class ComQueryTask extends MySQLCommandTask {
             }
             this.phase = Phase.READ_EXECUTE_RESPONSE;
         } catch (Throwable e) {
+            this.phase = Phase.ERROR_ON_START;
+            cancelTimeoutTaskIfNeed();
             if (log.isDebugEnabled()) {
                 log.debug("create COM_QUERY packet error for {}", stmt.getClass().getName(), e);
             }
-            this.phase = Phase.ERROR_ON_START;
             publisher = null;
             if (MySQLExceptions.isByteBufOutflow(e)) {
                 addError(MySQLExceptions.tooLargeObject(e));
@@ -520,10 +515,7 @@ final class ComQueryTask extends MySQLCommandTask {
         }
 
         if (taskEnd) {
-            final Runnable timeoutCancelFunc = this.timeoutCancelFunc;
-            if (timeoutCancelFunc != null) {
-                timeoutCancelFunc.run();
-            }
+            cancelTimeoutTaskIfNeed();
             if (log.isTraceEnabled()) {
                 log.trace("COM_QUERY instant[{}] task end.", this);
             }
@@ -544,7 +536,9 @@ final class ComQueryTask extends MySQLCommandTask {
             log.error("Unknown error.", e);
         } else {
             this.phase = Phase.TASK_END;
+            cancelTimeoutTaskIfNeed();
             addError(MySQLExceptions.wrapIfNonJvmFatal(e));
+
             log.error("occur error ", e);
             publishError(this.sink::error);
         }
@@ -555,13 +549,24 @@ final class ComQueryTask extends MySQLCommandTask {
 
     @Override
     protected void onChannelClose() {
-        super.onChannelClose();
+        if (this.phase == Phase.TASK_END) {
+            return;
+        }
+        this.phase = Phase.TASK_END;
+        cancelTimeoutTaskIfNeed();
+        addError(MySQLExceptions.unexpectedSessionClose());
+        publishError(this.sink::error);
         deleteBigColumnFileIfNeed();
     }
 
     @Override
     void handleReadResultSetEnd() {
         this.phase = Phase.READ_EXECUTE_RESPONSE;
+    }
+
+    @Override
+    int getStmtTimeout() {
+        return this.stmt.getTimeout();
     }
 
     @Override
@@ -644,6 +649,10 @@ final class ComQueryTask extends MySQLCommandTask {
         final String localFilePath;
         localFilePath = Packets.readStringFixed(cumulateBuffer, payloadLength, this.adjutant.charsetClient());
 
+        if (suspendTimeoutTaskIfNeed()) {
+            return;
+        }
+
         final Path path = Paths.get(localFilePath);
 
         try {
@@ -703,6 +712,7 @@ final class ComQueryTask extends MySQLCommandTask {
             sink.next(Packets.createEmptyPacket(this.adjutant.allocator(), nextSequenceId()));
         } finally {
             sink.complete();
+            resumeTimeoutTaskIfNeed();
         }
 
 
@@ -836,6 +846,7 @@ final class ComQueryTask extends MySQLCommandTask {
             throw new JdbdException(message, e);
         }
     }
+
 
 
 

@@ -880,7 +880,7 @@ public class DataTypeTests extends SessionTestSupport {
         insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, wkbPath))
                 .bind(1, JdbdType.GEOMETRY, wrapToBlob(wkbPath));
 
-        insertStmt.setTimeout(200);
+        insertStmt.setTimeout(50);
 
         final Function<CurrentRow, ResultRow> function;
         function = row -> {
@@ -901,7 +901,7 @@ public class DataTypeTests extends SessionTestSupport {
 
         Mono.from(insertStmt.executeUpdate())
                 .flatMapMany(s -> {
-                    // LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
+                    LOG.info("affectedRows : {} , lastId : {}", s.affectedRows(), s.lastInsertedId());
                     final int rowCount = (int) s.affectedRows();
                     long lastId = s.lastInsertedId();
                     for (int i = 0; i < rowCount; i++) {

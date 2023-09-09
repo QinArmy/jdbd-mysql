@@ -54,9 +54,9 @@ import java.util.function.IntFunction;
  *
  * @since 1.0
  */
-abstract class MySQLResultSetReader implements ResultSetReader {
+public abstract class MySQLResultSetReader implements ResultSetReader {
 
-    private static final Path TEMP_DIRECTORY = Paths.get(System.getProperty("java.io.tmpdir"), "jdbd/mysql/big_row")
+    public static final Path TEMP_DIRECTORY = Paths.get(System.getProperty("java.io.tmpdir"), "jdbd/mysql/big_row")
             .toAbsolutePath();
 
 

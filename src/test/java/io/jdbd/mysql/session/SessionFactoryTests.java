@@ -46,7 +46,7 @@ public class SessionFactoryTests extends SessionTestSupport {
                 .flatMap(LocalDatabaseSession::commit)
                 .map(PoolLocalDatabaseSession.class::cast)
                 .flatMap(PoolLocalDatabaseSession::reset)
-                .flatMap(session -> session.ping(200))
+                .flatMap(PoolLocalDatabaseSession::ping)
                 .flatMap(DatabaseSession::close)
                 .then()
                 .block();
@@ -62,7 +62,7 @@ public class SessionFactoryTests extends SessionTestSupport {
                 .doOnNext(session -> LOG.debug("{}", session))
                 .map(PoolRmDatabaseSession.class::cast)
                 .flatMap(PoolRmDatabaseSession::reset)
-                .flatMap(session -> session.ping(200))
+                .flatMap(PoolRmDatabaseSession::ping)
                 .flatMap(DatabaseSession::close)
                 .blockLast();
 

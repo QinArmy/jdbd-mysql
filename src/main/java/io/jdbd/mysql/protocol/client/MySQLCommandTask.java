@@ -3,8 +3,11 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.mysql.protocol.UnrecognizedCollationException;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLStates;
 import io.jdbd.result.ResultItem;
+import io.jdbd.statement.TimeoutException;
 import io.jdbd.vendor.result.ResultSink;
+import io.jdbd.vendor.task.TimeoutTask;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +37,8 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
     final ResultSink sink;
 
     final int capability;
+
+    private TimeoutTask timeoutTask;
 
     private final ResultSetReader resultSetReader;
 
@@ -79,13 +84,31 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
     @Override
     public final void addErrorToTask(Throwable error) {
+        final TimeoutTask timeoutTask = this.timeoutTask;
         if (error instanceof UnrecognizedCollationException) {
             if (!containsError(UnrecognizedCollationException.class)) {
                 addError(error);
             }
-        } else {
+        } else if (timeoutTask == null
+                || !(error instanceof MySQLServerException)
+                || !MySQLStates.ER_QUERY_INTERRUPTED.equals(((MySQLServerException) error).getSqlState())) {
             addError(error);
-        }
+        } else switch (timeoutTask.currentStatus()) {
+            case RUNNING:
+            case NORMAL_END:
+            case CANCELED_AND_END:
+                addError(MySQLExceptions.statementTimeout(timeoutTask.startTimeMills(), getStmtTimeout(), error));
+                break;
+            case CANCELED:
+                addError(error);
+                break;
+            case SUSPEND:
+            case NONE:
+            default:
+                timeoutTask.cancel();
+                addError(error);
+
+        } //  else switch
 
     }
 
@@ -147,7 +170,6 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
     abstract boolean executeNextFetch();
 
 
-
     final void readErrorPacket(final ByteBuf cumulateBuffer) {
         final int payloadLength;
         payloadLength = Packets.readInt3(cumulateBuffer);
@@ -155,8 +177,9 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
         final MySQLServerException error;
         error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability, this.adjutant.errorCharset());
-        addError(error);
+        addErrorToTask(error);
     }
+
 
     /**
      * @return true:task end
@@ -252,6 +275,77 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
         this.bigColumnPathList = null;
 
     }
+
+
+    final void cancelTimeoutTaskIfNeed() {
+        final TimeoutTask timeoutTask = this.timeoutTask;
+        if (timeoutTask != null) {
+            timeoutTask.cancel();
+        }
+    }
+
+    /**
+     * @return true : timeout
+     */
+    final boolean suspendTimeoutTaskIfNeed() {
+        final TimeoutTask timeoutTask = this.timeoutTask;
+        final boolean timeout;
+        timeout = timeoutTask != null && timeoutTask.suspend();
+        if (timeout && !containsError(TimeoutException.class)) {
+            addError(MySQLExceptions.statementTimeout(timeoutTask.startTimeMills(), getStmtTimeout(), null));
+        }
+        return timeout;
+    }
+
+    /**
+     * @return true : timeout
+     */
+    final boolean resumeTimeoutTaskIfNeed() {
+        final TimeoutTask timeoutTask = this.timeoutTask;
+        final boolean timeout;
+        timeout = timeoutTask != null && timeoutTask.resume();
+        if (timeout && !containsError(TimeoutException.class)) {
+            addError(MySQLExceptions.statementTimeout(timeoutTask.startTimeMills(), getStmtTimeout(), null));
+        }
+        return timeout;
+    }
+
+    final boolean isTimeout() {
+        final TimeoutTask timeoutTask = this.timeoutTask;
+        final boolean timeout;
+        timeout = timeoutTask != null && timeoutTask.isTimeout();
+        if (timeout && !containsError(TimeoutException.class)) {
+            addError(MySQLExceptions.statementTimeout(timeoutTask.startTimeMills(), getStmtTimeout(), null));
+        }
+        return timeout;
+    }
+
+    /**
+     * @return true : timeout
+     */
+    final boolean startTimeoutTaskIfNeed() {
+        final int timeoutMills;
+        timeoutMills = getStmtTimeout();
+        final boolean timeout;
+        if (timeoutMills > 0 && this.timeoutTask == null) {
+            this.log.debug("start timeout task after bind success");
+            final TimeoutTask task;
+            this.timeoutTask = task = this.adjutant.getFactory()
+                    .startTimeoutTask(this.adjutant.handshake10().threadId, timeoutMills);
+            timeout = task.isTimeout();
+
+            if (timeout && !containsError(TimeoutException.class)) {
+                addError(MySQLExceptions.statementTimeout(task.startTimeMills(), getStmtTimeout(), null));
+            }
+        } else {
+            timeout = false;
+        }
+
+        return timeout;
+    }
+
+
+    abstract int getStmtTimeout();
 
 
     /*-------------------below private method-------------------*/

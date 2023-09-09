@@ -22,6 +22,8 @@ import io.jdbd.vendor.stmt.JdbdValues;
 import io.jdbd.vendor.stmt.ParamStmt;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
+import io.jdbd.vendor.task.JdbdTimeoutTask;
+import io.jdbd.vendor.task.TimeoutTask;
 import io.jdbd.vendor.util.SQLStates;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.unix.DomainSocketAddress;
@@ -48,8 +50,6 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * <p>
@@ -82,10 +82,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     private final LoopResources loopResources;
 
     private final ScheduledExecutorService executor;
-
-    private final AtomicReference<MySQLProtocol> killQueryConn = new AtomicReference<>(null);
-
-    private final AtomicBoolean createKillQueryConn = new AtomicBoolean(false);
 
     private ClientProtocolFactory(final MySQLHostInfo host, boolean forPoolVendor) {
         super(host.properties());
@@ -159,10 +155,10 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     /*-------------------below packet instance method -------------------*/
 
 
-    Runnable startTimeoutTask(final long threadId, final int timeoutMills) {
+    TimeoutTask startTimeoutTask(final long threadId, final int timeoutMills) {
         final TimeoutTimerTask task = new TimeoutTimerTask(threadId, this);
         this.executor.schedule(task, timeoutMills, TimeUnit.MILLISECONDS);
-        return task::cancelTask;
+        return task;
     }
 
 
@@ -175,7 +171,19 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         final Thread thread;
         thread = new Thread(runnable, factoryName() + "-timeout-timer");
         thread.setDaemon(true);
+        thread.setPriority(Thread.MAX_PRIORITY);
         return thread;
+    }
+
+
+    /**
+     * just for {@link TimeoutTimerTask#killQuery()}
+     */
+    private Mono<MySQLProtocol> createTimeoutHandlerProtocol() {
+        return this.newConnection() //1. create network connection
+                .map(this::mapProtocolManager) // 2. map ClientProtocolManager
+                .flatMap(ClientProtocolManager::authenticate) //3. authenticate
+                .map(ClientProtocol::create);         //4. create ClientProtocol
     }
 
 
@@ -209,6 +217,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                 .connect()
                 .onErrorMap(ClientProtocolFactory::mapConnectionError);
     }
+
 
     /**
      * @see #newConnection()
@@ -247,13 +256,12 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     }
 
 
-    private static final class TimeoutTimerTask implements Runnable {
-
-        private final AtomicBoolean canceled = new AtomicBoolean(false);
+    private static final class TimeoutTimerTask extends JdbdTimeoutTask {
 
         private final long threadId;
 
         private final ClientProtocolFactory factory;
+
 
         private TimeoutTimerTask(long threadId, ClientProtocolFactory factory) {
             this.threadId = threadId;
@@ -261,27 +269,21 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         }
 
         @Override
-        public void run() {
-            if (this.canceled.get()) {
-                return;
-            }
-            this.factory.createProtocol()
-                    .flatMap(this::killQuery)
-                    .subscribe();
+        protected Mono<Void> killQuery() {
+            return this.factory.createTimeoutHandlerProtocol()
+                    .flatMap(this::flatKillQuery);
         }
 
-        private void cancelTask() {
-            this.canceled.set(true);
-        }
 
-        private Mono<Void> killQuery(final MySQLProtocol protocol) {
-            if (this.canceled.get()) {
+        private Mono<Void> flatKillQuery(final MySQLProtocol protocol) {
+            if (isCanceled()) {
                 return protocol.close();
             }
             final String sql = "KILL QUERY " + this.threadId;
             return protocol.update(Stmts.stmt(sql))
-                    .then(protocol.close());
+                    .then();
         }
+
 
     }//TimeoutTimerTask
 
