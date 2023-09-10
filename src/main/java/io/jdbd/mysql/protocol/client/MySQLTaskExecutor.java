@@ -13,6 +13,7 @@ import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
+import io.jdbd.vendor.util.JdbdSoftReference;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
@@ -148,6 +152,10 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         private final MySQLTaskExecutor taskExecutor;
 
+        private final Predicate<SQLMode> sqlModeFunc;
+
+        private final BiFunction<String, JdbdSoftReference<MySQLStatement>, JdbdSoftReference<MySQLStatement>> stmtComputeFunc;
+
         private final MySQLParser stmtParser;
 
         private final List<Runnable> sessionCloseListenerList = MySQLCollections.arrayList(1);
@@ -175,7 +183,9 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         private MySQLTaskAdjutant(MySQLTaskExecutor taskExecutor) {
             super(taskExecutor);
             this.taskExecutor = taskExecutor;
-            this.stmtParser = DefaultMySQLParser.create(this::containSQLMode);
+            this.sqlModeFunc = this::containSQLMode;
+            this.stmtComputeFunc = this::computeStmt;
+            this.stmtParser = DefaultMySQLParser.create(this.sqlModeFunc);
         }
 
 
@@ -354,30 +364,32 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
         @Override
-        public MySQLStatement parse(String singleSql) throws JdbdException {
-            MySQLParser parser = this.stmtParser;
-            if (parser == null) {
-                throw new IllegalStateException("Cannot access MySQLParser now.");
+        public MySQLStatement parse(final String singleSql) throws JdbdException {
+            final ConcurrentMap<String, JdbdSoftReference<MySQLStatement>> stmtMap;
+            stmtMap = this.taskExecutor.factory.statementMap;
+
+            JdbdSoftReference<MySQLStatement> ref;
+            ref = stmtMap.compute(singleSql, this.stmtComputeFunc);
+
+            MySQLStatement statement;
+            statement = ref.get();
+            if (statement == null) {
+                this.taskExecutor.factory.clearInvalidStmtSoftRef();
+                statement = this.stmtParser.parse(singleSql);
+                stmtMap.put(singleSql, JdbdSoftReference.reference(statement));
             }
-            return parser.parse(singleSql);
+            return statement;
         }
 
+
         @Override
-        public boolean isSingleStmt(String sql) throws JdbdException {
-            MySQLParser parser = this.stmtParser;
-            if (parser == null) {
-                throw new IllegalStateException("Cannot access MySQLParser now.");
-            }
-            return parser.isSingleStmt(sql);
+        public boolean isSingleStmt(final String sql) throws JdbdException {
+            return this.taskExecutor.factory.statementMap.get(sql) != null || this.stmtParser.isSingleStmt(sql);
         }
 
         @Override
         public boolean isMultiStmt(String sql) throws JdbdException {
-            MySQLParser parser = this.stmtParser;
-            if (parser == null) {
-                throw new IllegalStateException("Cannot access MySQLParser now.");
-            }
-            return parser.isMultiStmt(sql);
+            return this.stmtParser.isMultiStmt(sql);
         }
 
 
@@ -452,6 +464,25 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
                 match = sessionEnv != null && sessionEnv.containSqlMode(mode);
             }
             return match;
+        }
+
+        /**
+         * @see #parse(String)
+         */
+        private JdbdSoftReference<MySQLStatement> computeStmt(final String sql, final @Nullable JdbdSoftReference<MySQLStatement> oldRef) {
+            MySQLStatement statement;
+
+            final JdbdSoftReference<MySQLStatement> newRef;
+            if (oldRef == null || (statement = oldRef.get()) == null || statement.isInvalid(this.sqlModeFunc)) {
+                statement = this.stmtParser.parse(sql);
+                newRef = JdbdSoftReference.reference(statement);
+            } else {
+                newRef = oldRef;
+            }
+            if (oldRef != null && newRef != oldRef) {
+                this.taskExecutor.factory.clearInvalidStmtSoftRef();
+            }
+            return newRef;
         }
 
 

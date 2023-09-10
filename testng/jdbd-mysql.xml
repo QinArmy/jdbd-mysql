@@ -16,6 +16,9 @@
             <class name="io.jdbd.mysql.statement.BindSingleStatementTests"/>
             <class name="io.jdbd.mysql.statement.MultiStatementTests"/>
             <class name="io.jdbd.mysql.statement.StaticStatementTests"/>
+
+            <!-- dataType tests -->
+            <class name="io.jdbd.mysql.statement.DataTypeTests"/>
         </classes>
     </test>
 </suite>

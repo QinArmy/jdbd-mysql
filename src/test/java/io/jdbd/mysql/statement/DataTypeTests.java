@@ -78,7 +78,7 @@ public class DataTypeTests extends SessionTestSupport {
             Files.createDirectories(dir);
         }
 
-        final int wkbPointNumber = 64 * 1024 * 500;
+        final int wkbPointNumber = 64 * 1024 * 200;
         final Path wkbPath, textPath;
         wkbPath = Files.createTempFile(dir, "Geometry", ".wkb");
         textPath = Files.createTempFile(dir, "Geometry", ".wkt");
@@ -113,7 +113,7 @@ public class DataTypeTests extends SessionTestSupport {
         }
 
 
-        final int wktPointNumber = 64 * 1024 * 300;
+        final int wktPointNumber = 64 * 1024 * 100;
         try (FileChannel channel = FileChannel.open(textPath, StandardOpenOption.APPEND)) {
             buffer.writeBytes("LINESTRING(".getBytes(WKT_CHARSET));
             double d;

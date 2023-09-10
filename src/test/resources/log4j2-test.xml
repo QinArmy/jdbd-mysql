@@ -17,10 +17,10 @@
         </RollingFile>
     </Appenders>
     <Loggers>
-        <Logger name="io.jdbd.mysql.protocol.client.ComPreparedTask" level="TRACE" additivity="false">
+        <Logger name="io.jdbd.mysql.protocol.client.ComPreparedTask" level="DEBUG" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-        <Logger name="io.jdbd.mysql.protocol.client.ComQueryTask" level="TRACE" additivity="false">
+        <Logger name="io.jdbd.mysql.protocol.client.ComQueryTask" level="DEBUG" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
         <Logger name="io.jdbd.vendor.task.JdbdTimeoutTask" level="TRACE" additivity="false">

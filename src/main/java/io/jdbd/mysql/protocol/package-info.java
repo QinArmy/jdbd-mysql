@@ -1,2 +1,2 @@
-@reactor.util.annotation.NonNullApi
+@io.jdbd.lang.NonNullApi
 package io.jdbd.mysql.protocol;

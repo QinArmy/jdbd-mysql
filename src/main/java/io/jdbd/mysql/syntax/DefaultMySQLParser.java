@@ -62,13 +62,13 @@ public final class DefaultMySQLParser implements MySQLParser {
 
     private static final char BACK_SLASH = '\\';
 
-    private static final String LOAD = "LOAD";
-
-    private static final String DATA = "DATA";
-
-    private static final String XML = "XML";
-
-    private static final String LOCAL = "LOCAL";
+//    private static final String LOAD = "LOAD";
+//
+//    private static final String DATA = "DATA";
+//
+//    private static final String XML = "XML";
+//
+//    private static final String LOCAL = "LOCAL";
 
 
     private final Predicate<SQLMode> sqlModeFunction;
@@ -117,7 +117,7 @@ public final class DefaultMySQLParser implements MySQLParser {
         ansiQuotes = this.sqlModeFunction.test(SQLMode.ANSI_QUOTES);
         backslashEscapes = !this.sqlModeFunction.test(SQLMode.NO_BACKSLASH_ESCAPES);
 
-        boolean inQuotes = false, inDoubleQuotes = false, inQuoteId = false, inDoubleId = false, localInfile = false;
+        boolean inQuotes = false, inDoubleQuotes = false, inQuoteId = false, inDoubleId = false;
         final int sqlLength = sql.length();
         int lastParmEnd = 0, stmtCount = 0;
         final List<String> endpointList;
@@ -221,12 +221,6 @@ public final class DefaultMySQLParser implements MySQLParser {
                 firstEachStmt = Character.toUpperCase(ch);
                 if (firstStmtChar == Constants.EMPTY_CHAR) {
                     firstStmtChar = firstEachStmt;
-                    //TODO  search for "ON DUPLICATE KEY UPDATE" if not an INSERT statement
-                    //@see com.mysql.cj.ParseInfo.ParseInfo(java.lang.String, com.mysql.cj.Session, java.lang.String, boolean)
-                    if (ch == 'L' && sql.regionMatches(true, i, LOAD, 0, LOAD.length())) {
-                        localInfile = isLocalInfile(sql, i);
-
-                    }
                 }
 
             }
@@ -263,7 +257,7 @@ public final class DefaultMySQLParser implements MySQLParser {
                 } else {
                     endpointList.add("");
                 }
-                returnValue = new DefaultMySQLStatement(sql, endpointList, localInfile);
+                returnValue = new DefaultMySQLStatement(sql, endpointList, backslashEscapes, ansiQuotes);
             }
             break;
             default:
@@ -278,48 +272,48 @@ public final class DefaultMySQLParser implements MySQLParser {
     /*################################## blow private static method ##################################*/
 
 
-    private static boolean isLocalInfile(final String sql, final int i) {
-        final int sqlLength = sql.length();
-
-        int wordIndex = i + LOAD.length();
-        if (wordIndex >= sqlLength || !Character.isWhitespace(sql.charAt(wordIndex))) {
-            return false;
-        }
-
-        for (int j = wordIndex; j < sqlLength; j++) {
-            if (!Character.isWhitespace(sql.charAt(j))) {
-                wordIndex = j;
-                break;
-            }
-        }
-
-        boolean match = false;
-        if (sql.regionMatches(true, wordIndex, DATA, 0, DATA.length())) {
-            match = true;
-            wordIndex += DATA.length();
-        } else if (sql.regionMatches(true, wordIndex, XML, 0, XML.length())) {
-            match = true;
-            wordIndex += XML.length();
-        }
-        if (!match || wordIndex >= sqlLength || !Character.isWhitespace(sql.charAt(wordIndex))) {
-            return false;
-        }
-
-        for (int j = wordIndex; j < sqlLength; j++) {
-            if (!Character.isWhitespace(sql.charAt(j))) {
-                wordIndex = j;
-                break;
-            }
-        }
-        match = false;
-        if (sql.regionMatches(true, wordIndex, LOCAL, 0, LOCAL.length())) {
-            wordIndex += LOCAL.length();
-            if (wordIndex < sqlLength && Character.isWhitespace(sql.charAt(wordIndex))) {
-                match = true;
-            }
-        }
-        return match;
-    }
+//    private static boolean isLocalInfile(final String sql, final int i) {
+//        final int sqlLength = sql.length();
+//
+//        int wordIndex = i + LOAD.length();
+//        if (wordIndex >= sqlLength || !Character.isWhitespace(sql.charAt(wordIndex))) {
+//            return false;
+//        }
+//
+//        for (int j = wordIndex; j < sqlLength; j++) {
+//            if (!Character.isWhitespace(sql.charAt(j))) {
+//                wordIndex = j;
+//                break;
+//            }
+//        }
+//
+//        boolean match = false;
+//        if (sql.regionMatches(true, wordIndex, DATA, 0, DATA.length())) {
+//            match = true;
+//            wordIndex += DATA.length();
+//        } else if (sql.regionMatches(true, wordIndex, XML, 0, XML.length())) {
+//            match = true;
+//            wordIndex += XML.length();
+//        }
+//        if (!match || wordIndex >= sqlLength || !Character.isWhitespace(sql.charAt(wordIndex))) {
+//            return false;
+//        }
+//
+//        for (int j = wordIndex; j < sqlLength; j++) {
+//            if (!Character.isWhitespace(sql.charAt(j))) {
+//                wordIndex = j;
+//                break;
+//            }
+//        }
+//        match = false;
+//        if (sql.regionMatches(true, wordIndex, LOCAL, 0, LOCAL.length())) {
+//            wordIndex += LOCAL.length();
+//            if (wordIndex < sqlLength && Character.isWhitespace(sql.charAt(wordIndex))) {
+//                match = true;
+//            }
+//        }
+//        return match;
+//    }
 
 
     /**

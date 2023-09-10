@@ -11,6 +11,7 @@ import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.protocol.MySQLProtocolFactory;
 import io.jdbd.mysql.protocol.MySQLServerVersion;
+import io.jdbd.mysql.syntax.MySQLStatement;
 import io.jdbd.mysql.util.*;
 import io.jdbd.result.CurrentRow;
 import io.jdbd.result.ResultItem;
@@ -24,6 +25,7 @@ import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.task.JdbdTimeoutTask;
 import io.jdbd.vendor.task.TimeoutTask;
+import io.jdbd.vendor.util.JdbdSoftReference;
 import io.jdbd.vendor.util.SQLStates;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.unix.DomainSocketAddress;
@@ -47,9 +49,11 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * <p>
@@ -79,6 +83,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     final int factoryTaskQueueSize;
 
+    final ConcurrentMap<String, JdbdSoftReference<MySQLStatement>> statementMap = MySQLCollections.concurrentHashMap();
+
     private final boolean forPoolVendor;
 
     private final ConnectionProvider connectionProvider;
@@ -86,6 +92,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     private final LoopResources loopResources;
 
     private final ScheduledExecutorService executor;
+
+    private final AtomicBoolean clearInvalidStmtSwitch = new AtomicBoolean(false);
 
     private ClientProtocolFactory(final MySQLHostInfo host, boolean forPoolVendor) {
         super(host.properties());
@@ -166,9 +174,31 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     }
 
 
+    void clearInvalidStmtSoftRef() {
+        if (this.clearInvalidStmtSwitch.compareAndSet(false, true)) {
+            this.executor.execute(this::clearInvalidStmtSoftRefTask);
+        }
+    }
+
+
+
 
 
     /*-------------------below private instance method -------------------*/
+
+    private void clearInvalidStmtSoftRefTask() {
+        final Iterator<Map.Entry<String, JdbdSoftReference<MySQLStatement>>> iterator;
+        iterator = this.statementMap.entrySet().iterator();
+        Map.Entry<String, JdbdSoftReference<MySQLStatement>> entry;
+        while (iterator.hasNext()) {
+            entry = iterator.next();
+            if (entry.getValue().get() == null) {
+                iterator.remove();
+            }
+        }
+
+        this.executor.schedule(() -> this.clearInvalidStmtSwitch.set(false), 3, TimeUnit.MINUTES);
+    }
 
 
     private Thread newScheduledThread(final Runnable runnable) {
