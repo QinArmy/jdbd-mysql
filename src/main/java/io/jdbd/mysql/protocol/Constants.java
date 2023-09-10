@@ -42,9 +42,9 @@ public interface Constants {
     String TIMESTAMP_SPACE = "TIMESTAMP ";
 
 
-    byte EMPTY_CHAR_BYTE = '\0';
+    byte NUL_BYTE = '\0';
 
-    byte BACK_SLASH_BYTE = '\\';
+    char BACK_SLASH = '\\';
 
     byte QUOTE_CHAR_BYTE = '\'';
 
@@ -58,7 +58,7 @@ public interface Constants {
 
     String SPACE_COMMA_SPACE = " , ";
 
-    char EMPTY_CHAR = '\0';
+    char NUL = '\0';
 
     char QUOTE = '\'';
 

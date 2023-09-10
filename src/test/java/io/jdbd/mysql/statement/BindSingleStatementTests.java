@@ -41,6 +41,7 @@ import java.util.function.Function;
  * All test method's session of  statement parameter  is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
  * </p>
  */
+
 public class BindSingleStatementTests extends SessionTestSupport {
 
 
@@ -56,7 +57,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeUpdate()
      */
-    @Test(invocationCount = 3, dataProvider = "insertDatProvider")
+    @Test(invocationCount = 6, dataProvider = "insertDatProvider")
     public void executeUpdateInsert(final BindSingleStatement statement) {
 
         statement.bind(0, JdbdType.TIME, LocalTime.now())
@@ -77,7 +78,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
     }
 
-    @Test(invocationCount = 3, dataProvider = "insertDatProvider")
+    @Test(invocationCount = 6, dataProvider = "insertDatProvider")
     public void executeBatchUpdateInsert(final BindSingleStatement statement) {
         final int batchItemCount = 800;
 
@@ -118,7 +119,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeQuery(Function, Consumer)
      */
-    @Test(invocationCount = 3, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
+    @Test(invocationCount = 6, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void executeQuery(final BindSingleStatement statement) {
 
         statement.bind(0, JdbdType.BIGINT, 1)
@@ -155,7 +156,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeUpdate()
      */
-    @Test(invocationCount = 3, dataProvider = "callOutParameterProvider")
+    @Test(invocationCount = 6, dataProvider = "callOutParameterProvider")
     public void executeAsFluxCallOutParameter(final BindSingleStatement statement) {
 
         statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
@@ -188,7 +189,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeUpdate()
      */
-    @Test(invocationCount = 3, dataProvider = "insertDatProvider", dependsOnMethods = "executeBatchUpdateInsert")
+    @Test(invocationCount = 6, dataProvider = "insertDatProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void executeBatchUpdate(final BindSingleStatement statement) {
         final int batchItemCount = 3;
 
@@ -227,7 +228,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeBatchQuery()
      */
-    @Test(invocationCount = 3, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
+    @Test(invocationCount = 6, dataProvider = "executeQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void executeBatchQuery(final BindSingleStatement statement) {
 
 
@@ -290,7 +291,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeBatchAsMulti()
      */
-    @Test(invocationCount = 3, dataProvider = "callOutParameterProvider")
+    @Test(invocationCount = 6, dataProvider = "callOutParameterProvider")
     public void executeBatchAsMulti(final BindSingleStatement statement) {
 
         final int batchItemCount = 3;
@@ -356,7 +357,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *
      * @see BindSingleStatement#executeBatchAsMulti()
      */
-    @Test(invocationCount = 3, dataProvider = "callOutParameterProvider")
+    @Test(invocationCount = 6, dataProvider = "callOutParameterProvider")
     public void executeBatchAsFlux(final BindSingleStatement statement) {
 
         final int batchItemCount = 3;
@@ -393,7 +394,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/query-attributes.html">Query Attributes</a>
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY , static statement Query Attributes bind</a>
      */
-    @Test(invocationCount = 3, dataProvider = "queryAttrProvider")
+    @Test(invocationCount = 6, dataProvider = "queryAttrProvider")
     public void queryWithQueryAttributes(final BindSingleStatement statement) {
         final DatabaseSession session;
         session = statement.getSession();
@@ -426,7 +427,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
     /**
      * @see io.jdbd.statement.Statement#setFetchSize(int)
      */
-    @Test(invocationCount = 3, dataProvider = "simpleQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
+    @Test(invocationCount = 6, dataProvider = "simpleQueryProvider", dependsOnMethods = "executeBatchUpdateInsert")
     public void queryWithFetch(final BindSingleStatement statement) {
         statement.bind(0, JdbdType.INTEGER, 20)
                 .setFetchSize(5);

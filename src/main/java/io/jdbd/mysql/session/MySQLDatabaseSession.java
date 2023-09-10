@@ -241,7 +241,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (this.isClosed()) {
             throw MySQLExceptions.sessionHaveClosed();
         }
-        return MySQLDatabaseMetadata.create(this.protocol);
+        return MySQLDatabaseMetadata.create(this);
     }
 
     /**

@@ -655,6 +655,7 @@ final class QueryCommandWriter extends BinaryWriter {
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences"> Special Character Escape Sequences</a>
      */
     private void writeByteEscapes(final ByteBuf packet, final byte[] bytes, final int length) {
         if (length < 0 || length > bytes.length) {
@@ -671,25 +672,25 @@ final class QueryCommandWriter extends BinaryWriter {
                 }
                 packet.writeByte(Constants.QUOTE);
                 lastWritten = i; // not i+1 as b wasn't written.
-            } else if (b == Constants.EMPTY_CHAR_BYTE) {
+            } else if (b == Constants.NUL_BYTE) {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
                 }
-                packet.writeByte(Constants.BACK_SLASH_BYTE);
+                packet.writeByte(Constants.BACK_SLASH);
                 packet.writeByte('0');
                 lastWritten = i + 1;
             } else if (b == '\032') {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
                 }
-                packet.writeByte(Constants.BACK_SLASH_BYTE);
+                packet.writeByte(Constants.BACK_SLASH);
                 packet.writeByte('Z');
                 lastWritten = i + 1;
-            } else if (b == Constants.BACK_SLASH_BYTE) {
+            } else if (b == Constants.BACK_SLASH) {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
                 }
-                packet.writeByte(Constants.BACK_SLASH_BYTE);
+                packet.writeByte(Constants.BACK_SLASH);
                 lastWritten = i; // not i+1 as b wasn't written.
             }
 

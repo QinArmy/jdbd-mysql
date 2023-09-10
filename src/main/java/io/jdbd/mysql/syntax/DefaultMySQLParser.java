@@ -127,7 +127,7 @@ public final class DefaultMySQLParser implements MySQLParser {
             endpointList = Collections.emptyList();
         }
 
-        char ch, firstStmtChar = Constants.EMPTY_CHAR, firstEachStmt = Constants.EMPTY_CHAR;
+        char ch, firstStmtChar = Constants.NUL, firstEachStmt = Constants.NUL;
         for (int i = 0; i < sqlLength; i++) {
             ch = sql.charAt(i);
 
@@ -204,8 +204,8 @@ public final class DefaultMySQLParser implements MySQLParser {
                         return 2;// not single statement.
                     case MULTI: {
                         stmtCount++;
-                        if (firstEachStmt != Constants.EMPTY_CHAR) {
-                            firstEachStmt = Constants.EMPTY_CHAR;
+                        if (firstEachStmt != Constants.NUL) {
+                            firstEachStmt = Constants.NUL;
                         }
                     }
                     break;
@@ -217,9 +217,9 @@ public final class DefaultMySQLParser implements MySQLParser {
                     endpointList.add(sql.substring(lastParmEnd, i));
                     lastParmEnd = i + 1;
                 }
-            } else if (firstEachStmt == Constants.EMPTY_CHAR && Character.isLetter(ch)) {
+            } else if (firstEachStmt == Constants.NUL && Character.isLetter(ch)) {
                 firstEachStmt = Character.toUpperCase(ch);
-                if (firstStmtChar == Constants.EMPTY_CHAR) {
+                if (firstStmtChar == Constants.NUL) {
                     firstStmtChar = firstEachStmt;
                 }
 
@@ -245,7 +245,7 @@ public final class DefaultMySQLParser implements MySQLParser {
             case MULTI: {
                 if (stmtCount == 0) {
                     stmtCount = 1;
-                } else if (mode == Mode.MULTI && stmtCount > 0 && firstEachStmt != Constants.EMPTY_CHAR) {
+                } else if (mode == Mode.MULTI && stmtCount > 0 && firstEachStmt != Constants.NUL) {
                     stmtCount++;
                 }
                 returnValue = stmtCount;

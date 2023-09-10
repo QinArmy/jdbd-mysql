@@ -6,6 +6,7 @@ import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.vendor.util.JdbdStrings;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -56,6 +57,25 @@ public abstract class MySQLStrings extends JdbdStrings {
                     .append(Constants.BACKTICK);
         }
         return error;
+    }
+
+    /**
+     * This method don't append space before literal.
+     */
+    public static void appendLiteral(final @Nullable String text, final boolean backslashEscapes,
+                                     final StringBuilder builder) {
+        if (text == null) {
+            builder.append(Constants.NULL);
+        } else if (isMySqlSimpleIdentifier(text)) {
+            builder.append(Constants.QUOTE)
+                    .append(text)
+                    .append(Constants.QUOTE);
+        } else if (backslashEscapes) {
+            appendBackslashEscapes(text, builder);
+        } else {
+            builder.append("_utf8mb4 0x")
+                    .append(MySQLBuffers.hexEscapesText(true, text.getBytes(StandardCharsets.UTF_8)));
+        }
     }
 
 
@@ -243,5 +263,58 @@ public abstract class MySQLStrings extends JdbdStrings {
                 String.format("Index[%s] Char[%s] nearby[%s] format error."
                         , currentIndex, input.charAt(currentIndex), input.substring(start, end)));
     }
+
+
+    /**
+     * @see #appendLiteral(String, boolean, StringBuilder)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences"> Special Character Escape Sequences</a>
+     */
+    private static void appendBackslashEscapes(final String text, final StringBuilder builder) {
+        builder.append(Constants.QUOTE);
+
+        final int length = text.length();
+        char ch;
+        int lastWritten = 0;
+        for (int i = 0; i < length; i++) {
+            ch = text.charAt(i);
+            if (ch == Constants.QUOTE) {
+                if (i > lastWritten) {
+                    builder.append(text, lastWritten, i);
+                }
+                builder.append(Constants.QUOTE);
+                lastWritten = i; // not i+1 as b wasn't written.
+            } else if (ch == Constants.NUL) {
+                if (i > lastWritten) {
+                    builder.append(text, lastWritten, i);
+                }
+                builder.append(Constants.BACK_SLASH)
+                        .append('0');
+                lastWritten = i + 1;
+            } else if (ch == '\032') {
+                if (i > lastWritten) {
+                    builder.append(text, lastWritten, i);
+                }
+                builder.append(Constants.BACK_SLASH)
+                        .append('Z');
+                lastWritten = i + 1;
+            } else if (ch == Constants.BACK_SLASH) {
+                if (i > lastWritten) {
+                    builder.append(text, lastWritten, i);
+                }
+                builder.append(Constants.BACK_SLASH);
+                lastWritten = i; // not i+1 as b wasn't written.
+            }
+
+        }// for loop
+
+        if (lastWritten < length) {
+            builder.append(text, lastWritten, length);
+        }
+
+        builder.append(Constants.QUOTE);
+
+    }
+
 
 }

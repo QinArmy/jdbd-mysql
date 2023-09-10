@@ -451,6 +451,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         switch (this.taskPhase) {
             case PREPARED: {
                 try {
+                    if (!(this.stmt instanceof PrepareStmt) && startTimeoutTaskIfNeed()) {
+                        publisher = null;
+                        this.taskPhase = TaskPhase.ERROR_ON_START;
+                        break;
+                    }
                     publisher = createPreparePacket();
                     this.taskPhase = TaskPhase.READ_PREPARE_RESPONSE;
 
@@ -1115,7 +1120,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
         } else {
             this.taskPhase = TaskPhase.EXECUTE;
-            startTimeoutTaskIfNeed();
             taskEnd = executeNextGroup();
         }
         return taskEnd;
