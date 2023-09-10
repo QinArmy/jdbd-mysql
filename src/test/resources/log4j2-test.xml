@@ -23,7 +23,13 @@
         <Logger name="io.jdbd.mysql.protocol.client.ComQueryTask" level="TRACE" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
+        <Logger name="io.jdbd.vendor.task.JdbdTimeoutTask" level="TRACE" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
         <Logger name="io.jdbd.mysql.protocol.client.MySQLTaskExecutor" level="TRACE" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Logger name="io.jdbd.mysql.protocol.client.ClientProtocolFactory" level="TRACE" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
         <Logger name="io.jdbd.vendor.task.CommunicationTaskExecutor" level="TRACE" additivity="false">

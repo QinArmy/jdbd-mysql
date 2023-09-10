@@ -64,7 +64,11 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         if (host.isUnixDomainSocket()) {
             LOG.debug("use unix domain socket : {}", host.host());
         }
-        return new ClientProtocolFactory(host, forPoolVendor);
+        final ClientProtocolFactory factory;
+        factory = new ClientProtocolFactory(host, forPoolVendor);
+        factory.executor.execute(() -> {
+        });
+        return factory;
     }
 
 
@@ -171,20 +175,19 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         final Thread thread;
         thread = new Thread(runnable, factoryName() + "-timeout-timer");
         thread.setDaemon(true);
-        thread.setPriority(Thread.MAX_PRIORITY);
         return thread;
     }
 
 
-    /**
-     * just for {@link TimeoutTimerTask#killQuery()}
-     */
-    private Mono<MySQLProtocol> createTimeoutHandlerProtocol() {
-        return this.newConnection() //1. create network connection
-                .map(this::mapProtocolManager) // 2. map ClientProtocolManager
-                .flatMap(ClientProtocolManager::authenticate) //3. authenticate
-                .map(ClientProtocol::create);         //4. create ClientProtocol
-    }
+//    /**
+//     * just for {@link TimeoutTimerTask#killQuery()}
+//     */
+//    private Mono<MySQLProtocol> createTimeoutHandlerProtocol() {
+//        return this.newConnection() //1. create network connection
+//                .map(this::mapProtocolManager) // 2. map ClientProtocolManager
+//                .flatMap(ClientProtocolManager::authenticate) //3. authenticate
+//                .map(ClientProtocol::create);         //4. create ClientProtocol
+//    }
 
 
     /**
@@ -270,18 +273,23 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         @Override
         protected Mono<Void> killQuery() {
-            return this.factory.createTimeoutHandlerProtocol()
+            return this.factory.createProtocol()
                     .flatMap(this::flatKillQuery);
         }
 
 
         private Mono<Void> flatKillQuery(final MySQLProtocol protocol) {
+            LOG.debug("kill query task run");
             if (isCanceled()) {
                 return protocol.close();
             }
             final String sql = "KILL QUERY " + this.threadId;
             return protocol.update(Stmts.stmt(sql))
-                    .then();
+                    .doOnSuccess(s -> LOG.debug("KILL QUERY states {}", s.affectedRows()))
+                    .onErrorResume(error -> protocol.close()
+                            .then(Mono.error(error))
+                    )
+                    .then(protocol.close());
         }
 
 

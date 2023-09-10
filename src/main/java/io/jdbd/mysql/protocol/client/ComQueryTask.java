@@ -449,6 +449,8 @@ final class ComQueryTask extends MySQLCommandTask {
         final Stmt stmt = this.stmt;
 
         try {
+            suspendTimeoutTaskIfNeed();
+
             final IntSupplier sequenceId = this::nextSequenceId;
             if (stmt instanceof StaticStmt || stmt instanceof StaticMultiStmt) {
                 publisher = QueryCommandWriter.staticCommand(stmt, sequenceId, this.adjutant);
@@ -465,6 +467,14 @@ final class ComQueryTask extends MySQLCommandTask {
                 publisher = QueryCommandWriter.bindableMultiCommand(multiStmt, sequenceId, this.adjutant);
             } else {
                 throw new IllegalStateException(String.format("Unknown stmt[%s]", stmt.getClass().getName()));
+            }
+
+            if (publisher instanceof Mono) {
+                publisher = Mono.from(publisher)
+                        .doOnSuccess(s -> resumeTimeoutTaskIfNeed());
+            } else {
+                publisher = Flux.from(publisher)
+                        .doOnComplete(this::resumeTimeoutTaskIfNeed);
             }
             this.phase = Phase.READ_EXECUTE_RESPONSE;
         } catch (Throwable e) {

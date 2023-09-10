@@ -54,9 +54,9 @@ import java.util.function.IntFunction;
  *
  * @since 1.0
  */
-public abstract class MySQLResultSetReader implements ResultSetReader {
+abstract class MySQLResultSetReader implements ResultSetReader {
 
-    public static final Path TEMP_DIRECTORY = Paths.get(System.getProperty("java.io.tmpdir"), "jdbd/mysql/big_row")
+    private static final Path TEMP_DIRECTORY = Paths.get(System.getProperty("java.io.tmpdir"), "jdbd/mysql/big_row")
             .toAbsolutePath();
 
 
@@ -451,6 +451,7 @@ public abstract class MySQLResultSetReader implements ResultSetReader {
                     error = MySQLServerException.read(cumulateBuffer, payloadLength, this.capability,
                             this.adjutant.errorCharset());
                     this.task.addErrorToTask(error);
+                    LOG.debug("result set response error", error);
                     states = States.END_ON_ERROR;
                 }
                 break outerLoop;
@@ -497,6 +498,10 @@ public abstract class MySQLResultSetReader implements ResultSetReader {
                 }// default
 
             }// switch
+
+            if (cancelled) {
+                continue;
+            }
 
             oneRowEnd = readOneRow(payload, payload != cumulateBuffer, currentRow);  // read one row
 

@@ -862,7 +862,7 @@ public class DataTypeTests extends SessionTestSupport {
      * @see MySQLType#GEOMETRY
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/spatial-types.html"> Spatial Data Types </a>
      */
-    @Test(invocationCount = 1, dataProvider = "bigBlobColumnStmtProvider")
+    @Test(invocationCount = 3, dataProvider = "bigBlobColumnStmtProvider")
     public void bigBlobColumn(final BindSingleStatement insertStmt, final BindSingleStatement queryStmt) {
 
         if (ClientTestUtils.isNotDriverDeveloperComputer()) {
@@ -880,7 +880,7 @@ public class DataTypeTests extends SessionTestSupport {
         insertStmt.bind(0, JdbdType.GEOMETRY, BlobPath.from(false, wkbPath))
                 .bind(1, JdbdType.GEOMETRY, wrapToBlob(wkbPath));
 
-        insertStmt.setTimeout(50);
+        // insertStmt.setTimeout(50);
 
         final Function<CurrentRow, ResultRow> function;
         function = row -> {
@@ -908,7 +908,7 @@ public class DataTypeTests extends SessionTestSupport {
                         queryStmt.bind(i, JdbdType.BIGINT, lastId);
                         lastId++;
                     }
-                    queryStmt.setTimeout(300);
+                    // queryStmt.setTimeout(300);
                     return Flux.from(queryStmt.executeQuery(function));
                 })
                 .blockLast();

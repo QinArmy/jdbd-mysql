@@ -447,11 +447,6 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      */
     @Override
     protected Publisher<ByteBuf> start() {
-        if (startTimeoutTaskIfNeed()) {
-            this.taskPhase = TaskPhase.ERROR_ON_START;
-            return null;
-        }
-
         Publisher<ByteBuf> publisher;
         switch (this.taskPhase) {
             case PREPARED: {
@@ -607,6 +602,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
             }// TODO fix me
             default: {
                 addError(MySQLExceptions.wrap(e));
+                cancelTimeoutTaskIfNeed();
                 this.packetPublisher = Mono.just(createCloseStatementPacket());
                 action = Action.MORE_SEND_AND_END;
             }
@@ -619,6 +615,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     protected void onChannelClose() {
         if (this.taskPhase != TaskPhase.END) {
             this.taskPhase = TaskPhase.END;
+            cancelTimeoutTaskIfNeed();
             this.sink.error(new SessionCloseException("Database session unexpected close."));
         }
     }
@@ -687,8 +684,22 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         }
         boolean taskEnd = false;
         try {
-            this.packetPublisher = this.commandWriter.writeCommand(batchIndex);
-            this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
+            if (suspendTimeoutTaskIfNeed()) {
+                taskEnd = true;
+            } else {
+                final Publisher<ByteBuf> publisher;
+                publisher = this.commandWriter.writeCommand(batchIndex);
+
+                if (publisher instanceof Mono) {
+                    this.packetPublisher = Mono.from(publisher)
+                            .doOnSuccess(s -> resumeTimeoutTaskIfNeed());
+                } else {
+                    this.packetPublisher = Flux.from(publisher)
+                            .doOnComplete(this::resumeTimeoutTaskIfNeed);
+                }
+
+                this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
+            }
         } catch (Throwable e) {
             taskEnd = true;
             addError(e);
@@ -806,16 +817,17 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
                     this.taskPhase = TaskPhase.EXECUTE;
                     if (hasError()) {
                         publishError(sink::error);
-                    } else if (executeNextGroup()) {
+                        break;
+                    }
+                    startTimeoutTaskIfNeed();
+                    if (executeNextGroup()) {
                         this.taskPhase = TaskPhase.END;
                         publishError(sink::error);
                     } else if (oldTaskPhase == TaskPhase.SUSPEND) {
                         this.taskPhase = TaskPhase.RESUME;
                         this.resume(sink::error);
-                        startTimeoutTaskIfNeed();
                     } else {
                         this.taskPhase = TaskPhase.READ_EXECUTE_RESPONSE;
-                        startTimeoutTaskIfNeed();
                     }
                 } catch (Throwable e) {
                     // here bug
@@ -1103,6 +1115,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
         } else {
             this.taskPhase = TaskPhase.EXECUTE;
+            startTimeoutTaskIfNeed();
             taskEnd = executeNextGroup();
         }
         return taskEnd;
