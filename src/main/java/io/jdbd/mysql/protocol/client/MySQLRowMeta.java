@@ -401,5 +401,10 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         return indexBaseZero;
     }
 
+    Charset columnCharset(Charset columnCharset) {
+        final Charset resultSetCharset = this.resultSetCharset;
+        return resultSetCharset == null ? columnCharset : resultSetCharset;
+    }
+
 
 }

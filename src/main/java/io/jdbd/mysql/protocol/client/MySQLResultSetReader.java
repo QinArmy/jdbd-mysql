@@ -820,6 +820,38 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             return value;
         }
 
+        @Override
+        public final String getString(final int indexBasedZero) throws JdbdException {
+            final MySQLRowMeta rowMeta = this.rowMeta;
+            final Object source;
+            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
+            if (source == null) {
+                return null;
+            }
+
+            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
+            final String value;
+            if (source instanceof byte[]) {
+                value = new String((byte[]) source, rowMeta.columnCharset(meta.columnCharset));
+            } else if (source instanceof BlobPath) {
+                try {
+                    if (Files.size(((BlobPath) source).value()) > (Integer.MAX_VALUE - 128)) {
+                        throw JdbdExceptions.cannotConvertColumnValue(meta, source, String.class, null);
+                    }
+                    final byte[] bytes;
+                    bytes = Files.readAllBytes(((BlobPath) source).value());
+                    value = new String(bytes, rowMeta.columnCharset(meta.columnCharset));
+                } catch (Throwable e) {
+                    throw JdbdExceptions.cannotConvertColumnValue(meta, source, String.class, e);
+                }
+            } else if (source instanceof Duration) {
+                value = MySQLTimes.durationToTimeText((Duration) source);
+            } else {
+                value = ColumnConverts.convertToTarget(meta, source, String.class, rowMeta.serverZone);
+            }
+            return value;
+        }
+
 
         @Override
         public final <T> List<T> getList(int indexBasedZero, Class<T> elementClass, IntFunction<List<T>> constructor)

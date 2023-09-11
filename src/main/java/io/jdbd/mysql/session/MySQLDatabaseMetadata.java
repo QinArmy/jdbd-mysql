@@ -5,6 +5,7 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.meta.*;
 import io.jdbd.mysql.MySQLDriver;
+import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.client.Charsets;
 import io.jdbd.mysql.util.MySQLBinds;
@@ -16,13 +17,18 @@ import io.jdbd.result.ResultStates;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.vendor.meta.VendorSchemaMeta;
+import io.jdbd.vendor.meta.VendorTableColumnMeta;
 import io.jdbd.vendor.meta.VendorTableMeta;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
@@ -33,6 +39,9 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     static MySQLDatabaseMetadata create(MySQLDatabaseSession<?> session) {
         return new MySQLDatabaseMetadata(session);
     }
+
+
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLDatabaseMetadata.class);
 
     private static final Option<String> ENGINE = Option.from("ENGINE", String.class);
 
@@ -132,7 +141,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         builder.append("SELECT COLUMN_NAME,DATA_TYPE,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT,ORDINAL_POSITION")
                 .append(",DATETIME_PRECISION,NUMERIC_PRECISION,NUMERIC_SCALE,EXTRA,COLUMN_COMMENT,CHARACTER_SET_NAME")
                 .append(",COLLATION_NAME,PRIVILEGES")
-                .append(" FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ");
+                .append(" FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ");
 
         final boolean backslashEscapes;
         backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
@@ -157,20 +166,32 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         final Function<CurrentRow, TableColumnMeta> function;
         function = row -> {
 
-            final Map<Option<?>, Object> optionMap = MySQLCollections.hashMap(7);
+            final MySQLType dataType;
+            dataType = mapColumnDataType(row);
 
-            optionMap.put(Option.NAME, row.getNonNull("COLUMN_NAME", String.class));
-            optionMap.put(COLUMN_DATA_TYPE, MySQLBinds.nameToMySQLType(row.getNonNull("DATA_TYPE", String.class)));
-            optionMap.put(COLUMN_POSITION, row.getNonNull("ORDINAL_POSITION", Integer.class));
-            optionMap.put(Option.PRECISION, mapColumnPrecision(row));
+            final Map<Option<?>, Object> map = MySQLCollections.hashMap((int) (13 / 0.75f));
 
-            optionMap.put(COLUMN_SCALE, mapColumnScale(row));
-            optionMap.put(COLUMN_NULLABLE_MODE, row.getNonNull("IS_NULLABLE", BooleanMode.class));
-            optionMap.put(COLUMN_AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
-            optionMap.put(COLUMN_GENERATED_MODE, mapGeneratedMode(row));
+            map.put(Option.NAME, row.getNonNull("COLUMN_NAME", String.class));
+            map.put(COLUMN_DATA_TYPE, dataType);
+            map.put(COLUMN_POSITION, row.getNonNull("ORDINAL_POSITION", Integer.class));
+            map.put(Option.PRECISION, mapColumnPrecision(row));
 
+            map.put(COLUMN_SCALE, mapColumnScale(row));
+            map.put(COLUMN_NULLABLE_MODE, row.getOrDefault("IS_NULLABLE", BooleanMode.class, BooleanMode.UNKNOWN));
+            map.put(COLUMN_AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
+            map.put(COLUMN_GENERATED_MODE, mapGeneratedMode(row));
 
-            return null;
+            map.put(COLUMN_DEFAULT, row.get("COLUMN_DEFAULT", String.class));
+            map.put(COLUMN_COMMENT, row.get("COLUMN_COMMENT", String.class));
+            map.put(Option.CHARSET, Charsets.getJavaCharsetByCharsetName(row.get("CHARACTER_SET_NAME", String.class)));
+            map.put(Option.COLLATION, row.get("COLLATION_NAME", String.class));
+
+            map.put(Option.PRIVILEGE, row.get("PRIVILEGES", String.class));
+
+            final Function<Class<?>, Set<?>> enumSetFunc;
+            enumSetFunc = createEnumSetFunc(dataType, row);
+
+            return VendorTableColumnMeta.from(tableMeta, enumSetFunc, map::get);
         };
 
         return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);
@@ -323,14 +344,14 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
             final String tableType, collation;
             tableType = mysqlTableTypeToJdbdTableType(schemaMetaOfTable.schema(), row.getNonNull(2, String.class));
-            collation = row.getNonNull(5, String.class);
+            collation = row.get(5, String.class);
 
             final Map<Option<?>, Object> optionMap = MySQLCollections.hashMap(7);
 
             optionMap.put(Option.TYPE_NAME, tableType);
             optionMap.put(ENGINE, row.get(4, String.class));
             optionMap.put(Option.COLLATION, collation);
-            optionMap.put(Option.CHARSET, Charsets.tryGetJavaCharsetByCollationName(collation));
+            optionMap.put(Option.CHARSET, Charsets.getJavaCharsetByCollationName(collation));
 
 
             return VendorTableMeta.from(schemaMetaOfTable, row.getNonNull(1, String.class),
@@ -388,6 +409,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      * @see #columnsOfTable(TableMeta, Function)
      */
     private long mapColumnPrecision(CurrentRow row) {
+        // TODO
         return 0;
     }
 
@@ -395,7 +417,54 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      * @see #columnsOfTable(TableMeta, Function)
      */
     private int mapColumnScale(CurrentRow row) {
+        // TODO
         return 0;
+    }
+
+    /**
+     * @see #columnsOfTable(TableMeta, Function)
+     */
+    @SuppressWarnings("deprecation")
+    private MySQLType mapColumnDataType(final CurrentRow row) {
+        final String dataType, columnType;
+        dataType = row.getNonNullString("DATA_TYPE").toUpperCase(Locale.ROOT);
+        columnType = row.getNonNullString("COLUMN_TYPE").toUpperCase(Locale.ROOT);
+
+        final MySQLType type, finalType;
+        type = MySQLBinds.MYSQL_TYPE_MAP.getOrDefault(dataType, MySQLType.UNKNOWN);
+
+        if (!columnType.contains("UNSIGNED")) {
+            finalType = type;
+        } else switch (type) {
+            case TINYINT:
+                finalType = MySQLType.TINYINT_UNSIGNED;
+                break;
+            case SMALLINT:
+                finalType = MySQLType.SMALLINT_UNSIGNED;
+                break;
+            case MEDIUMINT:
+                finalType = MySQLType.MEDIUMINT_UNSIGNED;
+                break;
+            case INT:
+                finalType = MySQLType.INT_UNSIGNED;
+                break;
+            case BIGINT:
+                finalType = MySQLType.BIGINT_UNSIGNED;
+                break;
+            case DOUBLE:
+                finalType = MySQLType.DOUBLE_UNSIGNED;
+                break;
+            case FLOAT:
+                finalType = MySQLType.FLOAT_UNSIGNED;
+                break;
+            case DECIMAL:
+                finalType = MySQLType.DECIMAL_UNSIGNED;
+                break;
+            default:
+                finalType = type;
+        }
+
+        return finalType;
     }
 
     /**
@@ -422,6 +491,107 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             mode = BooleanMode.FALSE;
         }
         return mode;
+    }
+
+
+    /**
+     * @return a unmodified set
+     * @see #createEnumSetFunc(MySQLType, CurrentRow)
+     */
+    private Set<String> mapEnumElementSet(final CurrentRow row) {
+        // eg 1 : enum('T','F')
+        // eg 2 : set('BEIJING','SHANGHAI','SHENZHEN','XIANGGANG','TAIBEI','AOMENG')
+        final String definition;
+        definition = row.get("COLUMN_TYPE", String.class);
+        if (definition == null) {
+            return Collections.emptySet();
+        }
+        final int leftIndex, rightIndex;
+        leftIndex = definition.indexOf('(');
+        rightIndex = definition.lastIndexOf(')');
+
+        if (leftIndex < 0 || rightIndex < 0) {
+            return Collections.emptySet();
+        }
+
+        try {
+            final boolean backslashEscapes;
+            backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
+
+            final int length = definition.length(), lasIndex = length - 1;
+
+            final Set<String> set = MySQLCollections.hashSet();
+
+            boolean inQuote = false;
+            char ch;
+            for (int i = 0, quoteLeftIndex = -1, quoteRightIndex = -1; i < length; i++) {
+                ch = definition.charAt(i);
+                if (inQuote) {
+                    if (backslashEscapes && ch == Constants.BACK_SLASH) {
+                        i++;
+                    } else if (ch != Constants.QUOTE) {
+                        continue;
+                    } else if (i < lasIndex && definition.charAt(i + 1) == Constants.QUOTE) {
+                        i++;
+                    } else {
+                        inQuote = false;
+                        quoteRightIndex = i;
+                    }
+
+                    continue;
+                }
+
+                if (ch == Constants.QUOTE) {
+                    inQuote = true;
+                    quoteLeftIndex = i + 1;
+                    quoteRightIndex = -1;
+                } else if (ch == Constants.COMMA || i == rightIndex) {
+                    set.add(definition.substring(quoteLeftIndex, quoteRightIndex).trim());
+                }
+            }
+            if (inQuote || set.size() == 0) {
+                throw new JdbdException(String.format("%s isn't enum or set type definition", definition));
+            }
+            return Collections.unmodifiableSet(set);
+        } catch (JdbdException e) {
+            throw e;
+        } catch (IndexOutOfBoundsException e) {
+            throw new JdbdException(String.format("%s isn't enum or set type definition", definition), e);
+        } catch (Exception e) {
+            throw MySQLExceptions.wrap(e);
+        }
+    }
+
+    /**
+     * @see #columnsOfTable(TableMeta, Function)
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Function<Class<?>, Set<?>> createEnumSetFunc(final MySQLType dataType, final CurrentRow row) {
+        final Function<Class<?>, Set<?>> enumSetFunc;
+        switch (dataType) {
+            case ENUM:
+            case SET: {
+                final Set<String> enumSet;
+                enumSet = mapEnumElementSet(row);
+                enumSetFunc = clazz -> {
+                    final Set<?> set;
+                    if (clazz == String.class) {
+                        set = enumSet;
+                    } else if (!Enum.class.isAssignableFrom(clazz)) {
+                        set = Collections.emptySet();
+                    } else if (clazz.isAnonymousClass()) {
+                        set = MySQLStrings.textSetToEnumSet(enumSet, (Class<? extends Enum>) clazz.getSuperclass(), true);
+                    } else {
+                        set = MySQLStrings.textSetToEnumSet(enumSet, (Class<? extends Enum>) clazz, true);
+                    }
+                    return set;
+                };
+            }
+            break;
+            default:
+                enumSetFunc = EMPTY_ENUMS_FUNC;
+        }
+        return enumSetFunc;
     }
 
     /*-------------------below private static methods -------------------*/

@@ -1,4 +1,5 @@
-CREATE TABLE IF NOT EXISTS mysql_types (
+CREATE TABLE IF NOT EXISTS mysql_types
+(
     id                    bigint AUTO_INCREMENT,
     my_datetime           datetime                                                            NULL DEFAULT CURRENT_TIMESTAMP,
     my_datetime6          datetime(6)                                                         NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -40,6 +41,7 @@ CREATE TABLE IF NOT EXISTS mysql_types (
     my_medium_text        mediumtext                                                          NULL,
     my_long_text          longtext                                                            NULL,
     my_enum               enum ('T','F')                                                      NULL DEFAULT 'F',
+    my_special_enum       enum ('army''s', 'qin, \\ ''')                                      NULL DEFAULT NULL,
     my_set                set ('BEIJING','SHANGHAI','SHENZHEN','XIANGGANG','TAIBEI','AOMENG') NULL DEFAULT 'BEIJING',
     my_json               json                                                                NULL,
 

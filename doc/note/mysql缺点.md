@@ -6,6 +6,8 @@
 6. prepare 协议 批量操作不能像 postgre 那样,所以 网络效率底.
 7. 包类型的确认太依赖于上下文,所以在做错误 skip 包麻烦
 8. 关键 变量 字符集 时区等,用户可能通过 sql 更改 这给 driver 解析 结果集带来麻烦，这可能造成解析错误.
+9. mysql 结果集类型的非常不好确定，简直是愚蠢,比如 INFORMATION_SCHEMA.COLUMNS 的 DATA_TYPE 列居然返回 blob 类型,相比较而方,则
+   postgre 这确定类型这个方面很确定.
 
 
 

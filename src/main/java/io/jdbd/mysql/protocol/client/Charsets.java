@@ -258,7 +258,7 @@ public abstract class Charsets {
         if ((customCollation = customCollationMap.get(collationIndex)) == null) {
             String m = String.format("Not found collation for index[%s]", collationIndex);
             throw new JdbdException(m);
-        } else if ((charset = getJavaCharsetByMySQLCharsetName(customCollation.charsetName)) == null) {
+        } else if ((charset = getJavaCharsetByCharsetName(customCollation.charsetName)) == null) {
             String m = String.format("Not found java charset for name[%s]", customCollation.charsetName);
             throw new JdbdException(m);
         }
@@ -276,27 +276,31 @@ public abstract class Charsets {
         }
         final CustomCollation customCollation;
         if ((customCollation = collationMap.get(collationIndex)) != null) {
-            charset = getJavaCharsetByMySQLCharsetName(customCollation.charsetName);
+            charset = getJavaCharsetByCharsetName(customCollation.charsetName);
         }
         return charset;
     }
 
     @Nullable
-    public static Charset getJavaCharsetByMySQLCharsetName(String mysqlCharsetName) {
-        MyCharset myCharset = NAME_TO_CHARSET.get(mysqlCharsetName);
-        if (myCharset == null) {
-            return null;
+    public static Charset getJavaCharsetByCharsetName(final @Nullable String mysqlCharsetName) {
+        final MyCharset myCharset;
+        final Charset charset;
+        if (mysqlCharsetName == null
+                || (myCharset = NAME_TO_CHARSET.get(mysqlCharsetName.toLowerCase(Locale.ROOT))) == null) {
+            charset = null;
+        } else {
+            charset = Charset.forName(myCharset.javaEncodingsUcList.get(0));
         }
-        return Charset.forName(myCharset.javaEncodingsUcList.get(0));
+        return charset;
     }
 
     @Nullable
-    public static Charset tryGetJavaCharsetByCollationName(final String collationName) {
+    public static Charset getJavaCharsetByCollationName(final @Nullable String collationName) {
         Charset charset;
         try {
             final Collation collation;
-            collation = NAME_TO_COLLATION.get(collationName.toLowerCase(Locale.ROOT));
-            if (collation == null) {
+            if (collationName == null
+                    || (collation = NAME_TO_COLLATION.get(collationName.toLowerCase(Locale.ROOT))) == null) {
                 charset = null;
             } else {
                 charset = Charset.forName(collation.myCharset.javaEncodingsUcList.get(0));

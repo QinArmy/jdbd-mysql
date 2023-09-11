@@ -1,6 +1,5 @@
 package io.jdbd.mysql.util;
 
-import io.jdbd.lang.Nullable;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.mysql.MySQLType;
@@ -19,27 +18,24 @@ import java.util.Set;
 
 public abstract class MySQLBinds extends JdbdBinds {
 
-
-    //TODO add alias mapping
-    private static final Map<String, MySQLType> MYSQL_TYPE_MAP = createMySqlTypeMap();
-
-
-    public static MySQLType nameToMySQLType(String typeName) {
-        return MYSQL_TYPE_MAP.getOrDefault(typeName.toUpperCase(Locale.ROOT), MySQLType.UNKNOWN);
+    private MySQLBinds() {
     }
 
-    @Nullable
+    //TODO add alias mapping
+    public static final Map<String, MySQLType> MYSQL_TYPE_MAP = createMySqlTypeMap();
+
+    // private static final Logger LOG = LoggerFactory.getLogger(MySQLBinds.class);
+
+
     public static MySQLType mapDataType(final DataType dataType) {
         final MySQLType type;
-        if (dataType == MySQLType.UNKNOWN) {
-            type = null;
-        } else if (dataType instanceof MySQLType) {
+        if (dataType instanceof MySQLType) {
             type = (MySQLType) dataType;
         } else if (!(dataType instanceof JdbdType)) {
             if (dataType.isUserDefined()) { // mysql don't support user defined type.
-                type = null;
+                type = MySQLType.UNKNOWN;
             } else {
-                type = MYSQL_TYPE_MAP.get(dataType.typeName().toUpperCase(Locale.ROOT));
+                type = MYSQL_TYPE_MAP.getOrDefault(dataType.typeName().toUpperCase(Locale.ROOT), MySQLType.UNKNOWN);
             }
         } else switch ((JdbdType) dataType) {
             case NULL:
@@ -178,7 +174,7 @@ public abstract class MySQLBinds extends JdbdBinds {
             case COMPOSITE:
             case INTERNAL_USE:
             default:
-                type = null;
+                type = MySQLType.UNKNOWN;
         }
         return type;
     }
@@ -261,13 +257,20 @@ public abstract class MySQLBinds extends JdbdBinds {
 
     private static Map<String, MySQLType> createMySqlTypeMap() {
         final MySQLType[] valueArray = MySQLType.values();
-        final Map<String, MySQLType> map = JdbdCollections.hashMap((int) ((valueArray.length + 9) / 0.75f));
+        final Map<String, MySQLType> map = JdbdCollections.hashMap((int) ((valueArray.length + 18) / 0.75f));
         for (MySQLType value : valueArray) {
-            if (value == MySQLType.UNKNOWN) {
-                continue;
-            }
             map.put(value.typeName(), value);
         }
+
+        map.put("INTEGER", MySQLType.INT);
+        map.put("INTEGER UNSIGNED", MySQLType.INT_UNSIGNED);
+        map.put("DEC", MySQLType.DECIMAL);
+        map.put("DEC UNSIGNED", MySQLType.DECIMAL_UNSIGNED);
+
+        map.put("NUMERIC", MySQLType.DECIMAL);
+        map.put("NUMERIC UNSIGNED", MySQLType.DECIMAL_UNSIGNED);
+        map.put("DOUBLE PRECISION", MySQLType.DECIMAL);
+        map.put("DOUBLE PRECISION UNSIGNED", MySQLType.DECIMAL_UNSIGNED);
 
         map.put("POINT", MySQLType.GEOMETRY);
         map.put("LINESTRING", MySQLType.GEOMETRY);
@@ -275,11 +278,12 @@ public abstract class MySQLBinds extends JdbdBinds {
         map.put("LINEARRING", MySQLType.GEOMETRY);
 
         map.put("POLYGON", MySQLType.GEOMETRY);
-        map.put("GEOMETRYCOLLECTION", MySQLType.GEOMETRY);
         map.put("MULTIPOINT", MySQLType.GEOMETRY);
         map.put("MULTILINESTRING", MySQLType.GEOMETRY);
-
         map.put("MULTIPOLYGON", MySQLType.GEOMETRY);
+
+        map.put("GEOMCOLLECTION", MySQLType.GEOMETRY);
+        map.put("GEOMETRYCOLLECTION", MySQLType.GEOMETRY);
         return MySQLCollections.unmodifiableMap(map);
     }
 

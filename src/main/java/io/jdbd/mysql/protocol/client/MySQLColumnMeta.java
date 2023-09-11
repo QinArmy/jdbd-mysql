@@ -27,24 +27,24 @@ final class MySQLColumnMeta implements ColumnMeta {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLColumnMeta.class);
 
-    static final int NOT_NULL_FLAG = 1;
-    static final int PRI_KEY_FLAG = 1 << 1;
-    static final int UNIQUE_KEY_FLAG = 1 << 2;
-    static final int MULTIPLE_KEY_FLAG = 1 << 3;
+    static final byte NOT_NULL_FLAG = 1;
+    static final byte PRI_KEY_FLAG = 1 << 1;
+    static final byte UNIQUE_KEY_FLAG = 1 << 2;
+    static final byte MULTIPLE_KEY_FLAG = 1 << 3;
 
-    static final int BLOB_FLAG = 1 << 4;
-    static final int UNSIGNED_FLAG = 1 << 5;
-    static final int ZEROFILL_FLAG = 1 << 6;
-    static final int BINARY_FLAG = 1 << 7;
+    static final byte BLOB_FLAG = 1 << 4;
+    static final byte UNSIGNED_FLAG = 1 << 5;
+    static final byte ZEROFILL_FLAG = 1 << 6;
+    static final short BINARY_FLAG = 1 << 7;
 
-    static final int ENUM_FLAG = 1 << 8;
-    static final int AUTO_INCREMENT_FLAG = 1 << 9;
-    static final int TIMESTAMP_FLAG = 1 << 10;
-    static final int SET_FLAG = 1 << 11;
+    static final short ENUM_FLAG = 1 << 8;
+    static final short AUTO_INCREMENT_FLAG = 1 << 9;
+    static final short TIMESTAMP_FLAG = 1 << 10;
+    static final short SET_FLAG = 1 << 11;
 
-    static final int NO_DEFAULT_VALUE_FLAG = 1 << 12;
-    static final int ON_UPDATE_NOW_FLAG = 1 << 13;
-    static final int PART_KEY_FLAG = 1 << 14;
+    static final short NO_DEFAULT_VALUE_FLAG = 1 << 12;
+    static final short ON_UPDATE_NOW_FLAG = 1 << 13;
+    static final short PART_KEY_FLAG = 1 << 14;
     static final int NUM_FLAG = 1 << 15;
 
     final int columnIndex;
@@ -142,7 +142,6 @@ final class MySQLColumnMeta implements ColumnMeta {
     public boolean isUnsigned() {
         return (this.definitionFlags & UNSIGNED_FLAG) != 0;
     }
-
 
     long obtainPrecision(final Map<Integer, CustomCollation> customCollationMap) {
         long precision;
@@ -587,58 +586,58 @@ final class MySQLColumnMeta implements ColumnMeta {
         return type;
     }
 
-    private static MySQLType fromBlob(final MySQLColumnMeta columnMeta, final FixedEnv env) {
+    private static MySQLType fromBlob(final MySQLColumnMeta meta, final FixedEnv env) {
         // Sometimes MySQL uses this protocol-level type for all possible BLOB variants,
         // we can divine what the actual type is by the length reported
 
-        final MySQLType mySQLType;
+        final MySQLType type;
 
-        final long maxLength = columnMeta.length;
+        final long maxLength = meta.length;
         // fixing initial type according to length
         if (maxLength <= 255L) {
-            mySQLType = fromTinyBlob(columnMeta, env);
-        } else if (columnMeta.length <= (1 << 16) - 1) {
-            if (columnMeta.isBinary() || !isBlobTypeReturnText(columnMeta, env)) {
-                mySQLType = MySQLType.BLOB;
+            type = fromTinyBlob(meta, env);
+        } else if (meta.length <= (1 << 16) - 1) {
+            if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
+                type = MySQLType.TEXT;
             } else {
-                mySQLType = MySQLType.TEXT;
+                type = MySQLType.BLOB;
             }
         } else if (maxLength <= (1 << 24) - 1) {
-            mySQLType = fromMediumBlob(columnMeta, env);
+            type = fromMediumBlob(meta, env);
         } else {
-            mySQLType = fromLongBlob(columnMeta, env);
+            type = fromLongBlob(meta, env);
         }
-        return mySQLType;
+        return type;
     }
 
-    private static MySQLType fromTinyBlob(final MySQLColumnMeta columnMeta, final FixedEnv env) {
-        final MySQLType mySQLType;
-        if (columnMeta.isBinary() || !isBlobTypeReturnText(columnMeta, env)) {
-            mySQLType = MySQLType.TINYBLOB;
+    private static MySQLType fromTinyBlob(final MySQLColumnMeta meta, final FixedEnv env) {
+        final MySQLType type;
+        if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
+            type = MySQLType.TINYTEXT;
         } else {
-            mySQLType = MySQLType.TINYTEXT;
+            type = MySQLType.TINYBLOB;
         }
-        return mySQLType;
+        return type;
     }
 
-    private static MySQLType fromMediumBlob(final MySQLColumnMeta columnMeta, final FixedEnv env) {
-        final MySQLType mySQLType;
-        if (columnMeta.isBinary() || !isBlobTypeReturnText(columnMeta, env)) {
-            mySQLType = MySQLType.MEDIUMBLOB;
+    private static MySQLType fromMediumBlob(final MySQLColumnMeta meta, final FixedEnv env) {
+        final MySQLType type;
+        if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
+            type = MySQLType.MEDIUMTEXT;
         } else {
-            mySQLType = MySQLType.MEDIUMTEXT;
+            type = MySQLType.MEDIUMBLOB;
         }
-        return mySQLType;
+        return type;
     }
 
-    private static MySQLType fromLongBlob(final MySQLColumnMeta columnMeta, final FixedEnv env) {
-        final MySQLType mySQLType;
-        if (columnMeta.isBinary() || !isBlobTypeReturnText(columnMeta, env)) {
-            mySQLType = MySQLType.LONGBLOB;
+    private static MySQLType fromLongBlob(final MySQLColumnMeta meta, final FixedEnv env) {
+        final MySQLType type;
+        if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
+            type = MySQLType.LONGTEXT;
         } else {
-            mySQLType = MySQLType.LONGTEXT;
+            type = MySQLType.LONGBLOB;
         }
-        return mySQLType;
+        return type;
     }
 
     private static MySQLType fromString(MySQLColumnMeta columnMeta) {

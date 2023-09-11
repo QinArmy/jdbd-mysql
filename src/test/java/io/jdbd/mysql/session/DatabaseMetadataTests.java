@@ -3,9 +3,11 @@ package io.jdbd.mysql.session;
 import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.meta.SchemaMeta;
 import io.jdbd.meta.TableMeta;
+import io.jdbd.mysql.MySQLType;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.vendor.meta.VendorSchemaMeta;
+import io.jdbd.vendor.meta.VendorTableColumnMeta;
 import io.jdbd.vendor.meta.VendorTableMeta;
 import org.testng.Assert;
 import org.testng.ITestContext;
@@ -45,7 +47,7 @@ public class DatabaseMetadataTests extends SessionTestSupport {
     public void schemas(final DatabaseMetaData metaData) {
         Flux.from(metaData.schemas(Option.EMPTY_OPTION_FUNC))
                 .doOnNext(s -> Assert.assertTrue(s instanceof VendorSchemaMeta))
-                .doOnNext(s -> LOG.info("schema : {}", s))
+                .doOnNext(s -> LOG.info("schema : {}", s.toString())) // use toString() ,test bug
                 .count()
                 .doOnNext(s -> LOG.info("schema count : {}", s))
                 .block();
@@ -59,7 +61,7 @@ public class DatabaseMetadataTests extends SessionTestSupport {
 
         Flux.from(metaData.tablesOfCurrentSchema(Option.EMPTY_OPTION_FUNC))
                 .doOnNext(s -> Assert.assertTrue(s instanceof VendorTableMeta))
-                .doOnNext(s -> LOG.info("tablesOfCurrentSchema item : {}", s.toString()))
+                .doOnNext(s -> LOG.info("tablesOfCurrentSchema item : {}", s.toString())) // use toString() ,test bug
                 .count()
                 .doOnNext(c -> LOG.info("tablesOfCurrentSchema table count : {}", c))
                 .block();
@@ -76,13 +78,32 @@ public class DatabaseMetadataTests extends SessionTestSupport {
         count = Flux.from(metaData.schemas(Option.EMPTY_OPTION_FUNC))
                 .flatMap(s -> s.databaseMetadata().tablesOfSchema(s, optionFunc))
                 .doOnNext(s -> Assert.assertTrue(s instanceof VendorTableMeta))
-                .doOnNext(s -> LOG.info("tablesOfSchema item : {}", s))
+                .doOnNext(s -> LOG.info("tablesOfSchema item : {}", s.toString())) // use toString() ,test bug
+                .doOnNext(s -> LOG.info("tablesOfSchema privilegeSet : {}", s.privilegeSet()))
                 .count()
                 .doOnNext(c -> LOG.info("tablesOfSchema table count : {}", c))
                 .block();
 
         Assert.assertNotNull(count);
 
+    }
+
+    /**
+     * @see DatabaseMetaData#columnsOfTable(TableMeta, Function)
+     */
+    @Test(invocationCount = 4, dataProvider = "columnsOfTableProvider", dependsOnMethods = {"schemas", "tablesOfCurrentSchema"})
+    public void columnsOfTable(final DatabaseMetaData metaData, final Function<Option<?>, ?> optionFunc) {
+
+        Flux.from(metaData.tablesOfCurrentSchema(Option.EMPTY_OPTION_FUNC))
+                .flatMap(s -> metaData.columnsOfTable(s, optionFunc))
+                .doOnNext(s -> Assert.assertTrue(s instanceof VendorTableColumnMeta))
+                .doOnNext(s -> LOG.info("columnsOfTable item : {}", s.toString())) // use toString() ,test bug
+                .doOnNext(s -> LOG.info("columnsOfTable privilegeSet : {}", s.privilegeSet()))
+                .filter(s -> s.dataType() != MySQLType.UNKNOWN)
+                .count()
+                .doOnNext(n -> LOG.info("columnsOfTable table count : {}", n))
+                .doOnNext(n -> Assert.assertTrue(n > 0))
+                .block();
     }
 
     /**
@@ -202,6 +223,68 @@ public class DatabaseMetadataTests extends SessionTestSupport {
                         value = null;
                     }
                     return value;
+                };
+        }
+
+        return new Object[][]{{session.databaseMetaData(), optionFunc}};
+
+    }
+
+
+    /**
+     * @see #columnsOfTable(DatabaseMetaData, Function)
+     */
+    @DataProvider(name = "columnsOfTableProvider", parallel = true)
+    public final Object[][] columnsOfTableProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String key;
+        key = keyNameOfSession(targetMethod);
+
+        final int currentInvocationCount = targetMethod.getCurrentInvocationCount() + 1;
+
+        final boolean closeSession;
+        closeSession = currentInvocationCount == targetMethod.getInvocationCount();
+
+        Object sessionHolder;
+        sessionHolder = context.getAttribute(key);
+        final DatabaseSession session;
+        if (sessionHolder instanceof TestSessionHolder) {
+            session = ((TestSessionHolder) sessionHolder).session;
+        } else {
+            session = Mono.from(sessionFactory.localSession())
+                    .block();
+            assert session != null;
+        }
+
+        context.setAttribute(key, new TestSessionHolder(session, closeSession));
+
+
+        final Function<Option<?>, ?> optionFunc;
+        switch ((currentInvocationCount % 4)) {
+            case 1:
+                optionFunc = Option.EMPTY_OPTION_FUNC;
+                break;
+            case 2:
+                optionFunc = option -> {
+                    if (option == Option.NAME) {
+                        return "my_special_enum";
+                    }
+                    return null;
+                };
+                break;
+            case 3:
+                optionFunc = option -> {
+                    if (option == Option.NAME) {
+                        return "my%";
+                    }
+                    return null;
+                };
+                break;
+            default:
+                optionFunc = option -> {
+                    if (option == Option.NAME) {
+                        return "my_special_enum,my_enum,my_set,my_datetime,my_date";
+                    }
+                    return null;
                 };
         }
 
