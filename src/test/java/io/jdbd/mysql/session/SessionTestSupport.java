@@ -1,6 +1,7 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.Driver;
+import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.mysql.util.MySQLCollections;
@@ -86,7 +87,8 @@ public abstract class SessionTestSupport {
         boolean match = false;
         for (Class<?> parameterType : method.getParameterTypes()) {
             if (DatabaseSession.class.isAssignableFrom(parameterType)
-                    || Statement.class.isAssignableFrom(parameterType)) {
+                    || Statement.class.isAssignableFrom(parameterType)
+                    || DatabaseMetaData.class.isAssignableFrom(parameterType)) {
                 match = true;
                 break;
             }
@@ -118,6 +120,25 @@ public abstract class SessionTestSupport {
     @DataProvider(name = "rmSessionProvider", parallel = true)
     public final Object[][] createRmSession(final ITestNGMethod targetMethod, final ITestContext context) {
         return createDatabaseSession(false, targetMethod, context);
+    }
+
+    @DataProvider(name = "databaseMetadataProvider", parallel = true)
+    public final Object[][] databaseMetadataProvider(final ITestNGMethod targetMethod, final ITestContext context) {
+        final String key;
+        key = keyNameOfSession(targetMethod);
+
+        final Object sessionValue;
+        sessionValue = context.getAttribute(key);
+        final DatabaseSession session;
+        if (sessionValue instanceof DatabaseSession) {
+            session = (DatabaseSession) sessionValue;
+        } else {
+            session = Mono.from(sessionFactory.localSession())
+                    .block();
+            assert session != null;
+            context.setAttribute(key, session);
+        }
+        return new Object[][]{{session.databaseMetaData()}};
     }
 
     /**
@@ -185,7 +206,7 @@ public abstract class SessionTestSupport {
 
         final String methodName, keyOfSession;
         methodName = targetMethod.getMethodName();
-        keyOfSession = targetMethod.getRealClass().getName() + '.' + methodName + "#session";
+        keyOfSession = keyNameOfSession(targetMethod);
 
         final DatabaseSession session;
         if (local) {

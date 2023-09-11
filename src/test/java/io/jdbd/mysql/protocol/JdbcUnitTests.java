@@ -17,9 +17,11 @@ public class JdbcUnitTests {
     @Test
     public void statement() throws SQLException {
         try (Connection conn = DriverManager.getConnection(URL, createProperties())) {
-
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("CALL demoSp('army',0)");
+            DatabaseMetaData metaData = conn.getMetaData();
+            try (ResultSet resultSet = metaData.getTables(conn.getCatalog(), conn.getSchema(), "%", new String[]{"TABLE", "VIEW"})) {
+                while (resultSet.next()) {
+                    System.out.printf("%s : %s", resultSet.getString("TABLE_NAME"), resultSet.getString("REMARKS"));
+                }
             }
         }
 
