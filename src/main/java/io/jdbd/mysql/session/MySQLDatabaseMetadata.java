@@ -170,9 +170,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             optionMap.put(COLUMN_GENERATED_MODE, mapGeneratedMode(row));
 
 
-            return VendorTableMeta.from(schemaMetaOfTable, row.getNonNull(1, String.class),
-                    row.getNonNull(3, String.class), optionMap::get
-            );
+            return null;
         };
 
         return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);

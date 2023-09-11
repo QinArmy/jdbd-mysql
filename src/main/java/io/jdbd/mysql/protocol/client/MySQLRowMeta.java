@@ -237,7 +237,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
      * jdbd-mysql support following options :
      *     <ul>
      *         <li>{@link Option#SERVER_ZONE}</li>
-     *         <li>{@link Option#COLUMN_PRECISION}</li>
+     *         <li>{@link Option#PRECISION}</li>
      *         <li>{@link #COLLATION_INDEX}</li>
      *         <li>{@link #CHARSET}</li>
      *         <li>{@link #FIXED_LENGTH}</li>
@@ -255,7 +255,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         final Object value;
         if (Option.SERVER_ZONE == option) {
             value = this.serverZone;
-        } else if (Option.COLUMN_PRECISION == option) {
+        } else if (Option.PRECISION == option) {
             value = meta.obtainPrecision(this.customCollationMap);
         } else if (COLLATION_INDEX.equals(option)) {
             value = meta.collationIndex;
