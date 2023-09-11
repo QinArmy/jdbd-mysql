@@ -59,7 +59,7 @@ public class DatabaseMetadataTests extends SessionTestSupport {
 
         Flux.from(metaData.tablesOfCurrentSchema(Option.EMPTY_OPTION_FUNC))
                 .doOnNext(s -> Assert.assertTrue(s instanceof VendorTableMeta))
-                .doOnNext(s -> LOG.info("tablesOfCurrentSchema item : {}", s))
+                .doOnNext(s -> LOG.info("tablesOfCurrentSchema item : {}", s.toString()))
                 .count()
                 .doOnNext(c -> LOG.info("tablesOfCurrentSchema table count : {}", c))
                 .block();
@@ -80,6 +80,7 @@ public class DatabaseMetadataTests extends SessionTestSupport {
                 .count()
                 .doOnNext(c -> LOG.info("tablesOfSchema table count : {}", c))
                 .block();
+
         Assert.assertNotNull(count);
 
     }

@@ -7,6 +7,7 @@ import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.vendor.stmt.Value;
 import io.jdbd.vendor.util.JdbdBinds;
+import io.jdbd.vendor.util.JdbdCollections;
 import io.jdbd.vendor.util.JdbdExceptions;
 import io.netty.buffer.ByteBuf;
 
@@ -20,7 +21,12 @@ public abstract class MySQLBinds extends JdbdBinds {
 
 
     //TODO add alias mapping
-    private static final Map<String, MySQLType> MYSQL_TYPE_MAP = createSqlTypeMap(MySQLType.values());
+    private static final Map<String, MySQLType> MYSQL_TYPE_MAP = createMySqlTypeMap();
+
+
+    public static MySQLType nameToMySQLType(String typeName) {
+        return MYSQL_TYPE_MAP.getOrDefault(typeName.toUpperCase(Locale.ROOT), MySQLType.UNKNOWN);
+    }
 
     @Nullable
     public static MySQLType mapDataType(final DataType dataType) {
@@ -250,6 +256,31 @@ public abstract class MySQLBinds extends JdbdBinds {
         if (packet.refCnt() > 0) {
             packet.release();
         }
+    }
+
+
+    private static Map<String, MySQLType> createMySqlTypeMap() {
+        final MySQLType[] valueArray = MySQLType.values();
+        final Map<String, MySQLType> map = JdbdCollections.hashMap((int) ((valueArray.length + 9) / 0.75f));
+        for (MySQLType value : valueArray) {
+            if (value == MySQLType.UNKNOWN) {
+                continue;
+            }
+            map.put(value.typeName(), value);
+        }
+
+        map.put("POINT", MySQLType.GEOMETRY);
+        map.put("LINESTRING", MySQLType.GEOMETRY);
+        map.put("LINE", MySQLType.GEOMETRY);
+        map.put("LINEARRING", MySQLType.GEOMETRY);
+
+        map.put("POLYGON", MySQLType.GEOMETRY);
+        map.put("GEOMETRYCOLLECTION", MySQLType.GEOMETRY);
+        map.put("MULTIPOINT", MySQLType.GEOMETRY);
+        map.put("MULTILINESTRING", MySQLType.GEOMETRY);
+
+        map.put("MULTIPOLYGON", MySQLType.GEOMETRY);
+        return MySQLCollections.unmodifiableMap(map);
     }
 
 }

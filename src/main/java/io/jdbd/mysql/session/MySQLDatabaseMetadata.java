@@ -6,6 +6,8 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.meta.*;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.mysql.protocol.client.Charsets;
+import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
@@ -24,11 +26,15 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
+import static io.jdbd.vendor.meta.VendorTableColumnMeta.*;
+
 final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements DatabaseMetaData {
 
     static MySQLDatabaseMetadata create(MySQLDatabaseSession<?> session) {
         return new MySQLDatabaseMetadata(session);
     }
+
+    private static final Option<String> ENGINE = Option.from("ENGINE", String.class);
 
 
     private final MySQLDatabaseSession<?> session;
@@ -101,21 +107,77 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     @Override
     public Publisher<TableMeta> tablesOfSchema(final SchemaMeta schemaMeta, final Function<Option<?>, ?> optionFunc) {
-        if (!(schemaMeta instanceof VendorSchemaMeta) || schemaMeta.isPseudoSchema()) {
+        if (!(schemaMeta instanceof VendorSchemaMeta)
+                || schemaMeta.databaseMetadata() != this
+                || schemaMeta.isPseudoSchema()) {
             return Flux.error(MySQLExceptions.unknownSchemaMeta(schemaMeta));
         }
         return queryTableMeta(schemaMeta, optionFunc);
     }
 
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-columns-table.html">The INFORMATION_SCHEMA COLUMNS Table</a>
+     */
     @Override
-    public Publisher<TableColumnMeta> columnsOfTable(TableMeta tableMeta, Function<Option<?>, ?> optionFunc) {
-        if (!(tableMeta instanceof VendorTableMeta)) {
+    public Publisher<TableColumnMeta> columnsOfTable(final TableMeta tableMeta, final Function<Option<?>, ?> optionFunc) {
+        final SchemaMeta schemaMeta;
+        if (!(tableMeta instanceof VendorTableMeta)
+                || (schemaMeta = tableMeta.schemaMeta()).isPseudoSchema()
+                || schemaMeta.databaseMetadata() != this) {
             return Flux.error(MySQLExceptions.unknownTableMeta(tableMeta));
         }
 
-        return null;
+        final StringBuilder builder = new StringBuilder(256);
+        builder.append("SELECT COLUMN_NAME,DATA_TYPE,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT,ORDINAL_POSITION")
+                .append(",DATETIME_PRECISION,NUMERIC_PRECISION,NUMERIC_SCALE,EXTRA,COLUMN_COMMENT,CHARACTER_SET_NAME")
+                .append(",COLLATION_NAME,PRIVILEGES")
+                .append(" FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ");
+
+        final boolean backslashEscapes;
+        backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
+
+        MySQLStrings.appendLiteral(schemaMeta.schema(), backslashEscapes, builder);
+
+        builder.append(" AND TABLE_NAME = ");
+
+        MySQLStrings.appendLiteral(tableMeta.tableName(), backslashEscapes, builder);
+
+
+        final Object nameValue;
+        nameValue = optionFunc.apply(Option.NAME);
+        if (nameValue instanceof String) {
+            builder.append(" AND COLUMN_NAME ");
+            appendNamePredicate((String) nameValue, backslashEscapes, builder, UnaryOperator.identity());
+        }
+
+        builder.append(" ORDER BY TABLE_SCHEMA,TABLE_NAME,ORDINAL_POSITION");
+
+
+        final Function<CurrentRow, TableColumnMeta> function;
+        function = row -> {
+
+            final Map<Option<?>, Object> optionMap = MySQLCollections.hashMap(7);
+
+            optionMap.put(Option.NAME, row.getNonNull("COLUMN_NAME", String.class));
+            optionMap.put(COLUMN_DATA_TYPE, MySQLBinds.nameToMySQLType(row.getNonNull("DATA_TYPE", String.class)));
+            optionMap.put(COLUMN_POSITION, row.getNonNull("ORDINAL_POSITION", Integer.class));
+            optionMap.put(Option.PRECISION, mapColumnPrecision(row));
+
+            optionMap.put(COLUMN_SCALE, mapColumnScale(row));
+            optionMap.put(COLUMN_NULLABLE_MODE, row.getNonNull("IS_NULLABLE", BooleanMode.class));
+            optionMap.put(COLUMN_AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
+            optionMap.put(COLUMN_GENERATED_MODE, mapGeneratedMode(row));
+
+
+            return VendorTableMeta.from(schemaMetaOfTable, row.getNonNull(1, String.class),
+                    row.getNonNull(3, String.class), optionMap::get
+            );
+        };
+
+        return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);
     }
+
 
     @Override
     public Publisher<TableIndexMeta> indexesOfTable(TableMeta tableMeta, Function<Option<?>, ?> optionFunc) {
@@ -209,6 +271,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     /**
      * @see #tablesOfCurrentSchema(Function)
      * @see #tablesOfSchema(SchemaMeta, Function)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-tables-table.html"> The INFORMATION_SCHEMA TABLES Table</a>
      */
     private Flux<TableMeta> queryTableMeta(@Nullable SchemaMeta schemaMeta, Function<Option<?>, ?> optionFunc) {
         final String schemaName;
@@ -218,8 +281,8 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             schemaName = schemaMeta.schema();
         }
         final StringBuilder builder = new StringBuilder(256);
-        builder.append("SELECT TABLE_SCHEMA,TABLE_NAME,TABLE_TYPE,TABLE_COMMENT FROM INFORMATION_SCHEMA.TABLES")
-                .append(" WHERE TABLE_SCHEMA ");
+        builder.append("SELECT TABLE_SCHEMA,TABLE_NAME,TABLE_TYPE,TABLE_COMMENT,ENGINE,TABLE_COLLATION")
+                .append(" FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA ");
 
         final boolean backslashEscapes;
         backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
@@ -258,13 +321,22 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             } else {
                 schemaMetaOfTable = schemaMetaOfTableHolder[0];
             }
-            final String tableType;
+
+
+            final String tableType, collation;
             tableType = mysqlTableTypeToJdbdTableType(schemaMetaOfTable.schema(), row.getNonNull(2, String.class));
-            final Function<Option<?>, ?> tableOptionFunc;
-            tableOptionFunc = option -> option == Option.TYPE_NAME ? tableType : null;
+            collation = row.getNonNull(5, String.class);
+
+            final Map<Option<?>, Object> optionMap = MySQLCollections.hashMap(7);
+
+            optionMap.put(Option.TYPE_NAME, tableType);
+            optionMap.put(ENGINE, row.get(4, String.class));
+            optionMap.put(Option.COLLATION, collation);
+            optionMap.put(Option.CHARSET, Charsets.tryGetJavaCharsetByCollationName(collation));
+
 
             return VendorTableMeta.from(schemaMetaOfTable, row.getNonNull(1, String.class),
-                    row.getNonNull(3, String.class), tableOptionFunc
+                    row.getNonNull(3, String.class), optionMap::get
             );
         };
 
@@ -312,6 +384,46 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         }
         builder.append(')');
 
+    }
+
+    /**
+     * @see #columnsOfTable(TableMeta, Function)
+     */
+    private long mapColumnPrecision(CurrentRow row) {
+        return 0;
+    }
+
+    /**
+     * @see #columnsOfTable(TableMeta, Function)
+     */
+    private int mapColumnScale(CurrentRow row) {
+        return 0;
+    }
+
+    /**
+     * @see #columnsOfTable(TableMeta, Function)
+     */
+    private BooleanMode mapAutoIncrementMode(CurrentRow row) {
+        final BooleanMode mode;
+        if (row.getNonNull("EXTRA", String.class).equalsIgnoreCase("auto_increment")) {
+            mode = BooleanMode.TRUE;
+        } else {
+            mode = BooleanMode.FALSE;
+        }
+        return mode;
+    }
+
+    /**
+     * @see #columnsOfTable(TableMeta, Function)
+     */
+    private BooleanMode mapGeneratedMode(CurrentRow row) {
+        final BooleanMode mode;
+        if (row.getNonNull("EXTRA", String.class).toUpperCase(Locale.ROOT).contains("GENERATED")) {
+            mode = BooleanMode.TRUE;
+        } else {
+            mode = BooleanMode.FALSE;
+        }
+        return mode;
     }
 
     /*-------------------below private static methods -------------------*/

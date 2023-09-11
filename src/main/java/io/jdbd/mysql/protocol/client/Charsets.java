@@ -290,6 +290,23 @@ public abstract class Charsets {
         return Charset.forName(myCharset.javaEncodingsUcList.get(0));
     }
 
+    @Nullable
+    public static Charset tryGetJavaCharsetByCollationName(final String collationName) {
+        Charset charset;
+        try {
+            final Collation collation;
+            collation = NAME_TO_COLLATION.get(collationName.toLowerCase(Locale.ROOT));
+            if (collation == null) {
+                charset = null;
+            } else {
+                charset = Charset.forName(collation.myCharset.javaEncodingsUcList.get(0));
+            }
+        } catch (Exception e) {
+            charset = null;
+        }
+        return charset;
+    }
+
 
     public static int getCollationIndexForJavaEncoding(String javaEncoding, MySQLServerVersion version) {
         MyCharset myCharset = getMysqlCharsetForJavaEncoding(javaEncoding, version);
