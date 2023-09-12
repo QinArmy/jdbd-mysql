@@ -18,9 +18,9 @@ public class JdbcUnitTests {
     public void statement() throws SQLException {
         try (Connection conn = DriverManager.getConnection(URL, createProperties())) {
             DatabaseMetaData metaData = conn.getMetaData();
-            try (ResultSet resultSet = metaData.getColumnPrivileges(conn.getCatalog(), conn.getSchema(), "mysql_types", "%")) {
+            try (ResultSet resultSet = metaData.getIndexInfo(conn.getCatalog(), conn.getSchema(), "mysql_types", true, true)) {
                 while (resultSet.next()) {
-                    System.out.printf("%s : %s\n", resultSet.getString("TABLE_NAME"), resultSet.getString("PRIVILEGE"));
+                    System.out.printf("%s : %s\n", resultSet.getString("COLUMN_NAME"), resultSet.getString("TYPE"));
                 }
             }
         }

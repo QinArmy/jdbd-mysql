@@ -1,14 +1,13 @@
 package io.jdbd.mysql.protocol.client;
 
-import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.type.Blob;
 import io.jdbd.type.BlobPath;
 import io.jdbd.type.Clob;
 import io.jdbd.type.TextPath;
+import io.jdbd.util.JdbdUtils;
 import io.jdbd.vendor.result.ColumnMeta;
 import io.jdbd.vendor.stmt.ParamValue;
-import io.jdbd.vendor.util.JdbdBinds;
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -108,7 +107,7 @@ final class LongParameterWriter {
 
         final int paramIndex = paramValue.getIndex();
         final Path path = blobPath.value();
-        try (FileChannel channel = FileChannel.open(path, MySQLBinds.openOptionSet(blobPath))) {
+        try (FileChannel channel = FileChannel.open(path, JdbdUtils.openOptionSet(blobPath))) {
             final long totalSize;
             totalSize = channel.size();
 
@@ -161,7 +160,7 @@ final class LongParameterWriter {
 
         ByteBuf packet = null;
 
-        try (BufferedReader reader = JdbdBinds.newReader(textPath, 8192)) {
+        try (BufferedReader reader = JdbdUtils.newBufferedReader(textPath, 8192)) {
 
             final Charset clientCharset = this.writer.clientCharset;
 

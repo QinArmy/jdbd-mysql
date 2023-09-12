@@ -12,6 +12,8 @@
             <class name="io.jdbd.mysql.session.LocalDatabaseSessionTests"/>
             <class name="io.jdbd.mysql.session.RmDatabaseSessionTests"/>
 
+            <class name="io.jdbd.mysql.session.DatabaseMetadataTests"/>
+
             <!-- statement tests -->
             <class name="io.jdbd.mysql.statement.BindSingleStatementTests"/>
             <class name="io.jdbd.mysql.statement.MultiStatementTests"/>

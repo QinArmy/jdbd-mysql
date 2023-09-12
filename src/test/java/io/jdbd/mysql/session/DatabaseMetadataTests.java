@@ -8,6 +8,7 @@ import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.vendor.meta.VendorSchemaMeta;
 import io.jdbd.vendor.meta.VendorTableColumnMeta;
+import io.jdbd.vendor.meta.VendorTableIndexMeta;
 import io.jdbd.vendor.meta.VendorTableMeta;
 import org.testng.Assert;
 import org.testng.ITestContext;
@@ -104,6 +105,19 @@ public class DatabaseMetadataTests extends SessionTestSupport {
                 .doOnNext(n -> LOG.info("columnsOfTable table count : {}", n))
                 .doOnNext(n -> Assert.assertTrue(n > 0))
                 .block();
+    }
+
+    /**
+     * @see DatabaseMetaData#indexesOfTable(TableMeta, Function)
+     */
+    @Test(dependsOnMethods = {"schemas", "tablesOfCurrentSchema"})
+    public void indexesOfTable(final DatabaseMetaData metaData) {
+
+        Flux.from(metaData.tablesOfCurrentSchema(Option.EMPTY_OPTION_FUNC))
+                .flatMap(s -> metaData.indexesOfTable(s, Option.EMPTY_OPTION_FUNC))
+                .doOnNext(s -> Assert.assertTrue(s instanceof VendorTableIndexMeta))
+                .doOnNext(s -> LOG.info("indexesOfTable item : {}", s.toString())) // use toString() ,test bug
+                .blockLast();
     }
 
     /**

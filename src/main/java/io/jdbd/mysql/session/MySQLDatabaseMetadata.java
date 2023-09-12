@@ -13,26 +13,25 @@ import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.CurrentRow;
+import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
-import io.jdbd.vendor.meta.VendorSchemaMeta;
-import io.jdbd.vendor.meta.VendorTableColumnMeta;
-import io.jdbd.vendor.meta.VendorTableMeta;
+import io.jdbd.vendor.VendorOptions;
+import io.jdbd.vendor.meta.*;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
-import java.util.Collections;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-import static io.jdbd.vendor.meta.VendorTableColumnMeta.*;
+import static io.jdbd.vendor.meta.VendorTableColumnMeta.EMPTY_ENUMS_FUNC;
 
 final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements DatabaseMetaData {
 
@@ -172,17 +171,17 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             final Map<Option<?>, Object> map = MySQLCollections.hashMap((int) (13 / 0.75f));
 
             map.put(Option.NAME, row.getNonNull("COLUMN_NAME", String.class));
-            map.put(COLUMN_DATA_TYPE, dataType);
-            map.put(COLUMN_POSITION, row.getNonNull("ORDINAL_POSITION", Integer.class));
+            map.put(VendorOptions.DATA_TYPE, dataType);
+            map.put(VendorOptions.POSITION, row.getNonNull("ORDINAL_POSITION", Integer.class));
             map.put(Option.PRECISION, mapColumnPrecision(dataType, row));
 
-            map.put(COLUMN_SCALE, mapColumnScale(dataType, row));
-            map.put(COLUMN_NULLABLE_MODE, row.getOrDefault("IS_NULLABLE", BooleanMode.class, BooleanMode.UNKNOWN));
-            map.put(COLUMN_AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
-            map.put(COLUMN_GENERATED_MODE, mapGeneratedMode(row));
+            map.put(VendorOptions.SCALE, mapColumnScale(dataType, row));
+            map.put(VendorOptions.NULLABLE_MODE, row.getOrDefault("IS_NULLABLE", BooleanMode.class, BooleanMode.UNKNOWN));
+            map.put(VendorOptions.AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
+            map.put(VendorOptions.GENERATED_MODE, mapGeneratedMode(row));
 
-            map.put(COLUMN_DEFAULT, row.getString("COLUMN_DEFAULT"));
-            map.put(COLUMN_COMMENT, row.getString("COLUMN_COMMENT"));
+            map.put(VendorOptions.DEFAULT_VALUE, row.getString("COLUMN_DEFAULT"));
+            map.put(VendorOptions.COMMENT, row.getString("COLUMN_COMMENT"));
             map.put(Option.CHARSET, Charsets.getJavaCharsetByCharsetName(row.getString("CHARACTER_SET_NAME")));
             map.put(Option.COLLATION, row.getString("COLLATION_NAME"));
 
@@ -196,7 +195,9 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);
     }
 
-
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-statistics-table.html"> The INFORMATION_SCHEMA STATISTICS Table</a>
+     */
     @Override
     public Publisher<TableIndexMeta> indexesOfTable(final TableMeta tableMeta, final Function<Option<?>, ?> optionFunc) {
         final SchemaMeta schemaMeta;
@@ -206,7 +207,70 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             return Flux.error(MySQLExceptions.unknownTableMeta(tableMeta));
         }
 
-        return Flux.empty();
+        final StringBuilder builder = new StringBuilder(490);
+        builder.append("SELECT it.INDEX_NAME,it.NON_UNIQUE,it.INDEX_TYPE,it.COLUMN_NAME")
+                .append(",it.COLLATION,it.CARDINALITY,it.NULLABLE,it.IS_VISIBLE,it.INDEX_COMMENT,ct.COLUMN_KEY")
+                .append(" FROM INFORMATION_SCHEMA.STATISTICS AS it JOIN INFORMATION_SCHEMA.COLUMNS AS ct")
+                .append(" ON it.TABLE_SCHEMA = ct.TABLE_SCHEMA AND it.TABLE_NAME = ct.TABLE_NAME")
+                .append(" AND it.COLUMN_NAME = ct.COLUMN_NAME")
+                .append(" WHERE it.TABLE_SCHEMA = ");
+
+        final boolean backslashEscapes;
+        backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
+
+        MySQLStrings.appendLiteral(schemaMeta.schema(), backslashEscapes, builder);
+
+        builder.append(" AND it.TABLE_NAME = ");
+
+        MySQLStrings.appendLiteral(tableMeta.tableName(), backslashEscapes, builder);
+
+
+        final Object nameValue, uniqueValue;
+        nameValue = optionFunc.apply(Option.NAME);
+        if (nameValue instanceof String) {
+            builder.append(" AND it.INDEX_NAME ");
+            appendNamePredicate((String) nameValue, backslashEscapes, builder, UnaryOperator.identity());
+        }
+        uniqueValue = optionFunc.apply(Option.UNIQUE);
+        if (uniqueValue instanceof Boolean) {
+            builder.append(" AND it.NON_UNIQUE = ")
+                    .append((Boolean) uniqueValue ? '0' : '1');
+        }
+
+        builder.append(" ORDER BY it.NON_UNIQUE,it.INDEX_NAME,it.SEQ_IN_INDEX");
+
+        final AtomicReference<String> indexNameHolder = new AtomicReference<>(null);
+        final Predicate<ResultRow> bufferPredicate;
+        bufferPredicate = row -> {
+            final String name;
+            name = row.getNonNullString("INDEX_NAME");
+            return !name.equals(indexNameHolder.getAndSet(name));
+        };
+
+
+        final Function<List<ResultRow>, TableIndexMeta> mapBufferToIndexMetaFunc;
+        mapBufferToIndexMetaFunc = rowList -> {
+            // first, map columnList
+            final List<IndexColumnMeta> columnList;
+            columnList = mapToIndexColumnList(rowList);
+
+            final ResultRow firstRow = rowList.get(0);
+            final KeyType keyType;
+            keyType = mapToKeyType(firstRow);
+
+            final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+
+            map.put(VendorOptions.INDEX_TYPE, firstRow.getNonNullString("INDEX_TYPE"));
+            map.put(VendorOptions.KEY_TYPE, keyType);
+            map.put(Option.UNIQUE, keyType.isUnique());
+            map.put(VendorOptions.COMMENT, firstRow.getString("INDEX_COMMENT"));
+
+            return VendorTableIndexMeta.from(tableMeta, firstRow.getNonNullString("INDEX_NAME"), columnList, map::get);
+        };
+
+        return this.protocol.query(Stmts.stmt(builder.toString()), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES)
+                .bufferUntil(bufferPredicate, true)
+                .map(mapBufferToIndexMetaFunc);
     }
 
 
@@ -672,7 +736,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
                     if (clazz == String.class) {
                         set = enumSet;
                     } else if (!Enum.class.isAssignableFrom(clazz)) {
-                        set = Collections.emptySet();
+                        throw new IllegalArgumentException(String.format("enum set don't support %s", clazz.getName()));
                     } else if (clazz.isAnonymousClass()) {
                         set = MySQLStrings.textSetToEnumSet(enumSet, (Class<? extends Enum>) clazz.getSuperclass(), true);
                     } else {
@@ -687,6 +751,102 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         }
         return enumSetFunc;
     }
+
+    /**
+     * @see #indexesOfTable(TableMeta, Function)
+     * @see #mapToIndexColumnMeta(ResultRow)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-statistics-table.html"> The INFORMATION_SCHEMA STATISTICS Table</a>
+     */
+    private List<IndexColumnMeta> mapToIndexColumnList(final List<ResultRow> rowList) {
+        final List<IndexColumnMeta> columnList = MySQLCollections.arrayList(rowList.size());
+
+        String lastIndexName = null, indexName;
+        for (final ResultRow row : rowList) {
+            indexName = row.getNonNullString("INDEX_NAME");
+            if (lastIndexName != null && !lastIndexName.equals(indexName)) {
+                String m = String.format("index[%s] column row buffer error", indexName);
+                throw new JdbdException(m);
+            }
+            lastIndexName = indexName;
+            columnList.add(mapToIndexColumnMeta(row));
+        }
+        return columnList;
+    }
+
+    /**
+     * @see #indexesOfTable(TableMeta, Function)
+     * @see #mapToIndexColumnList(List)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-statistics-table.html"> The INFORMATION_SCHEMA STATISTICS Table</a>
+     */
+    private IndexColumnMeta mapToIndexColumnMeta(final ResultRow row) {
+        final Map<Option<?>, Object> map = MySQLCollections.hashMap(9);
+
+        map.put(VendorOptions.CARDINALITY, row.getOrDefault("CARDINALITY", Long.class, 0L));
+
+        switch (row.getStringOrDefault("COLLATION", "").toUpperCase(Locale.ROOT)) {
+            case "A":
+                map.put(VendorOptions.SORTING, Sorting.ASC);
+                break;
+            case "D":
+                map.put(VendorOptions.SORTING, Sorting.DESC);
+                break;
+            default:
+                map.put(VendorOptions.SORTING, Sorting.NONE);
+        }
+
+        map.put(VendorOptions.NULLS_SORTING, NullsSorting.UNKNOWN); // mysql don't support
+
+        switch (row.getStringOrDefault("NULLABLE", "UNKNOWN").toUpperCase(Locale.ROOT)) {
+            case "YES":
+                map.put(VendorOptions.NULLABLE_MODE, BooleanMode.TRUE);
+                break;
+            case "":
+            case "NO":
+                map.put(VendorOptions.NULLABLE_MODE, BooleanMode.FALSE);
+                break;
+            default:
+                map.put(VendorOptions.NULLABLE_MODE, BooleanMode.UNKNOWN);
+        }
+
+        map.put(VendorOptions.VISIBLE, row.getOrDefault("IS_VISIBLE", BooleanMode.class, BooleanMode.UNKNOWN));
+        return VendorIndexColumnMeta.from(row.getNonNullString("COLUMN_NAME"), map::get);
+    }
+
+    /**
+     * @param firstRow the first row that representing the first column of index.
+     * @see #indexesOfTable(TableMeta, Function)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-statistics-table.html"> The INFORMATION_SCHEMA STATISTICS Table</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-columns-table.html">The INFORMATION_SCHEMA COLUMNS Table</a>
+     */
+    private KeyType mapToKeyType(final ResultRow firstRow) {
+        final KeyType keyType;
+        switch (firstRow.getStringOrDefault("COLUMN_KEY", "").toUpperCase(Locale.ROOT)) {
+            case "PRI":
+                keyType = KeyType.PRIMARY_KEY;
+                break;
+            case "UNI":
+                keyType = KeyType.UNIQUE_KEY;
+                break;
+            case "MUL": {
+                switch (firstRow.getStringOrDefault("INDEX_TYPE", "").toUpperCase(Locale.ROOT)) {
+                    case "FULLTEXT":
+                        keyType = KeyType.FULL_TEXT_KEY;
+                        break;
+                    case "SPATIAL":
+                        keyType = KeyType.SPATIAL_KEY;
+                        break;
+                    default:
+                        keyType = KeyType.INDEX_KEY;
+                }
+            }
+            break;
+            default:
+                keyType = KeyType.NONE;
+
+        }
+        return keyType;
+    }
+
 
     /*-------------------below private static methods -------------------*/
 

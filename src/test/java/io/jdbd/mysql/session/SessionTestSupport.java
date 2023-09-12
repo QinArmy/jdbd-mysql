@@ -13,8 +13,8 @@ import io.jdbd.statement.Statement;
 import io.jdbd.type.Blob;
 import io.jdbd.type.Clob;
 import io.jdbd.type.TextPath;
+import io.jdbd.util.JdbdUtils;
 import io.jdbd.vendor.env.Environment;
-import io.jdbd.vendor.util.JdbdBinds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -74,7 +74,7 @@ public abstract class SessionTestSupport {
                     .flatMap(session -> Mono.from(session.executeUpdate(sql))
                             .then(Mono.from(session.close()))
                     )
-                    .doOnSuccess(s -> LOG.info("{} ; complete", sql))
+                    .doOnSuccess(v -> LOG.info("{} ; complete", sql))
                     .then(Mono.defer(() -> Mono.from(sessionFactory.close())))
                     .block();
         }
@@ -330,7 +330,7 @@ public abstract class SessionTestSupport {
     }
 
     private static void publishTextFile(final FluxSink<CharSequence> sink, final Path path, final Charset charset) {
-        try (BufferedReader reader = JdbdBinds.newReader(TextPath.from(false, charset, path), 8192)) {
+        try (BufferedReader reader = JdbdUtils.newBufferedReader(TextPath.from(false, charset, path), 8192)) {
             final CharBuffer charBuffer = CharBuffer.allocate(4096);
 
             while (reader.read(charBuffer) > 0) {

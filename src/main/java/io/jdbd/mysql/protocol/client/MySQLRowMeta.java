@@ -1,7 +1,10 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
-import io.jdbd.meta.*;
+import io.jdbd.meta.BooleanMode;
+import io.jdbd.meta.DataType;
+import io.jdbd.meta.JdbdType;
+import io.jdbd.meta.KeyType;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.FieldType;
@@ -314,32 +317,32 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     }
 
     @Override
-    public KeyMode getKeyMode(final int indexBasedZero) throws JdbdException {
+    public KeyType getKeyMode(final int indexBasedZero) throws JdbdException {
         final int flags;
         flags = this.columnMetaArray[checkIndex(indexBasedZero)].definitionFlags;
-        final KeyMode mode;
+        final KeyType mode;
         if ((flags & MySQLColumnMeta.PRI_KEY_FLAG) != 0) {
-            mode = KeyMode.PRIMARY_KEY;
+            mode = KeyType.PRIMARY_KEY;
         } else if ((flags & MySQLColumnMeta.UNIQUE_KEY_FLAG) != 0) {
-            mode = KeyMode.UNIQUE_KEY;
+            mode = KeyType.UNIQUE_KEY;
         } else if ((flags & MySQLColumnMeta.MULTIPLE_KEY_FLAG) != 0) {
-            mode = KeyMode.MULTIPLE_KEY; // TODO check ?
+            mode = KeyType.INDEX_KEY; // TODO check ?
         } else {
-            mode = KeyMode.UNKNOWN;
+            mode = KeyType.UNKNOWN;
         }
         return mode;
     }
 
     @Override
-    public NullMode getNullMode(final int indexBasedZero) throws JdbdException {
+    public BooleanMode getNullableMode(final int indexBasedZero) throws JdbdException {
         final int flags;
         flags = this.columnMetaArray[checkIndex(indexBasedZero)].definitionFlags;
 
-        final NullMode mode;
+        final BooleanMode mode;
         if ((flags & MySQLColumnMeta.NOT_NULL_FLAG) != 0 || (flags & MySQLColumnMeta.PRI_KEY_FLAG) != 0) {
-            mode = NullMode.NON_NULL;
+            mode = BooleanMode.FALSE;
         } else {
-            mode = NullMode.NULLABLE;
+            mode = BooleanMode.TRUE;
         }
         return mode;
     }
