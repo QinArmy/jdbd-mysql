@@ -28,6 +28,20 @@ public class JdbcUnitTests {
     }
 
     @Test
+    public void DatabaseMetaData() throws SQLException {
+        try (Connection conn = DriverManager.getConnection(URL, createProperties())) {
+            DatabaseMetaData metaData = conn.getMetaData();
+            System.out.println(metaData.getSQLKeywords());
+            try (ResultSet resultSet = metaData.getTypeInfo()) {
+                while (resultSet.next()) {
+                    System.out.printf("%s : %s\n", resultSet.getString("TYPE_NAME"), resultSet.getString("NUM_PREC_RADIX"));
+                }
+            }
+        }
+
+    }
+
+    @Test
     public void prepare() throws SQLException {
         Properties prop = new Properties(createProperties());
         prop.put("useServerPrepStmts", "true");

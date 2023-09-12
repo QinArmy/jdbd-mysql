@@ -4,6 +4,7 @@ import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.meta.SchemaMeta;
 import io.jdbd.meta.TableMeta;
 import io.jdbd.mysql.MySQLType;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
 import io.jdbd.vendor.meta.VendorSchemaMeta;
@@ -18,6 +19,7 @@ import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -112,13 +114,36 @@ public class DatabaseMetadataTests extends SessionTestSupport {
      */
     @Test(dependsOnMethods = {"schemas", "tablesOfCurrentSchema"})
     public void indexesOfTable(final DatabaseMetaData metaData) {
+        final Map<Option<?>, Object> optionMap = MySQLCollections.hashMap();
 
+        // optionMap.put(Option.NAME,"mysql_types_pk_3434,PRIMARY,mysql_types_id_index34567");
+        // optionMap.put(Option.UNIQUE,Boolean.FALSE);
+        // optionMap.put(VendorOptions.INDEX_TYPE,"%");
         Flux.from(metaData.tablesOfCurrentSchema(Option.EMPTY_OPTION_FUNC))
-                .flatMap(s -> metaData.indexesOfTable(s, Option.EMPTY_OPTION_FUNC))
+                .flatMap(s -> metaData.indexesOfTable(s, optionMap::get))
                 .doOnNext(s -> Assert.assertTrue(s instanceof VendorTableIndexMeta))
                 .doOnNext(s -> LOG.info("indexesOfTable item : {}", s.toString())) // use toString() ,test bug
                 .blockLast();
     }
+
+    /**
+     * @see DatabaseMetaData#sqlKeyWords(boolean)
+     */
+    @Test
+    public void sqlKeyWords(final DatabaseMetaData metaData) {
+
+        Mono.from(metaData.sqlKeyWords(true))
+                .doOnNext(map -> Assert.assertTrue(map.size() >= 100))
+                //.doOnNext(map -> Assert.assertTrue(map.size() >= 262)) // MySQL 8.0
+                .block();
+
+        Mono.from(metaData.sqlKeyWords(false))
+                .doOnNext(map -> Assert.assertTrue(map.size() >= 100))
+                // .doOnNext(map -> Assert.assertTrue(map.size() >= 752)) // MySQL 8.0
+                // .doOnNext(this::printSqlKeyWordMap)
+                .block();
+    }
+
 
     /**
      * @see #tablesOfSchema(DatabaseMetaData, Function)
@@ -303,6 +328,31 @@ public class DatabaseMetadataTests extends SessionTestSupport {
         }
 
         return new Object[][]{{session.databaseMetaData(), optionFunc}};
+
+    }
+
+
+    /**
+     * @see #sqlKeyWords(DatabaseMetaData)
+     */
+    private void printSqlKeyWordMap(final Map<String, Boolean> map) {
+        final StringBuilder builder = new StringBuilder();
+        boolean output = false;
+        for (Map.Entry<String, Boolean> e : map.entrySet()) {
+            if (output) {
+                builder.append(System.lineSeparator());
+            }
+            builder.append(e.getKey())
+                    .append(" : reserved is ")
+                    .append(e.getValue());
+
+            if (!output) {
+                output = true;
+            }
+        }
+
+        LOG.info("{}", builder);
+
 
     }
 

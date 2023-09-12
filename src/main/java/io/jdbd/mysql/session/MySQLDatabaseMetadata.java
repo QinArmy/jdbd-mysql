@@ -24,6 +24,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -196,6 +197,13 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     }
 
     /**
+     * <p>
+     * optionFunc support dialect following dialect options :
+     *     <ul>
+     *         <li>{@link VendorOptions#INDEX_TYPE}</li>
+     *     </ul>
+     * </p>
+     *
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-statistics-table.html"> The INFORMATION_SCHEMA STATISTICS Table</a>
      */
     @Override
@@ -225,16 +233,23 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         MySQLStrings.appendLiteral(tableMeta.tableName(), backslashEscapes, builder);
 
 
-        final Object nameValue, uniqueValue;
+        final Object nameValue, uniqueValue, typeValue;
         nameValue = optionFunc.apply(Option.NAME);
         if (nameValue instanceof String) {
             builder.append(" AND it.INDEX_NAME ");
             appendNamePredicate((String) nameValue, backslashEscapes, builder, UnaryOperator.identity());
         }
+
         uniqueValue = optionFunc.apply(Option.UNIQUE);
         if (uniqueValue instanceof Boolean) {
             builder.append(" AND it.NON_UNIQUE = ")
                     .append((Boolean) uniqueValue ? '0' : '1');
+        }
+
+        typeValue = optionFunc.apply(VendorOptions.INDEX_TYPE);
+        if (typeValue instanceof String) {
+            builder.append(" AND it.INDEX_TYPE ");
+            appendNamePredicate((String) typeValue, backslashEscapes, builder, UnaryOperator.identity());
         }
 
         builder.append(" ORDER BY it.NON_UNIQUE,it.INDEX_NAME,it.SEQ_IN_INDEX");
@@ -279,14 +294,35 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         return null;
     }
 
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-keywords-table.html"> The INFORMATION_SCHEMA KEYWORDS Table</a>
+     */
     @Override
-    public Publisher<String> sqlKeyWords() {
-        return null;
+    public Publisher<Map<String, Boolean>> sqlKeyWords(boolean onlyReserved) {
+        final StringBuilder builder = new StringBuilder(80);
+        builder.append("SELECT WORD,RESERVED FROM INFORMATION_SCHEMA.KEYWORDS");
+        final int capacity;
+        if (onlyReserved) {
+            builder.append(" WHERE RESERVED = 1");
+            capacity = (int) (262 / 0.75f);
+        } else {
+            capacity = (int) (752 / 0.75f);
+        }
+        // here,don't need ConcurrentMap,because function always run in netty EventLoop .
+        final Map<String, Boolean> map = MySQLCollections.hashMap(capacity);
+        final Function<CurrentRow, Boolean> function;
+        function = row -> {
+            map.put(row.getNonNullString(0), row.getNonNull(1, Boolean.class));
+            return Boolean.TRUE;
+        };
+        return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES)
+                .then(Mono.just(Collections.unmodifiableMap(map)));
     }
 
     @Override
     public String identifierQuoteString() {
-        return null;
+        return String.valueOf(Constants.BACKTICK);
     }
 
     @Override
