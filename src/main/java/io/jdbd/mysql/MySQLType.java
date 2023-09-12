@@ -584,11 +584,5 @@ public enum MySQLType implements SQLType {
         return this == UNKNOWN;
     }
 
-    @Override
-    public final boolean isUserDefined() {
-        //MySQL don't support user defined type
-        return false;
-    }
-
 
 }

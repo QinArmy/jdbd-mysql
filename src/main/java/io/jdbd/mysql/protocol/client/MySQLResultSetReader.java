@@ -4,7 +4,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
-import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.BigColumnValue;
@@ -14,6 +13,7 @@ import io.jdbd.result.ResultRowMeta;
 import io.jdbd.session.Isolation;
 import io.jdbd.type.BlobPath;
 import io.jdbd.type.TextPath;
+import io.jdbd.util.JdbdUtils;
 import io.jdbd.vendor.env.Environment;
 import io.jdbd.vendor.result.ColumnConverts;
 import io.jdbd.vendor.result.ColumnMeta;
@@ -600,7 +600,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         return Flux.create(sink -> {
             final Charset charset;
             charset = path.charset();
-            try (FileChannel channel = FileChannel.open(path.value(), MySQLBinds.openOptionSet(path))) {
+            try (FileChannel channel = FileChannel.open(path.value(), JdbdUtils.openOptionSet(path))) {
                 final ByteBuffer buffer = ByteBuffer.allocate(2048);
 
                 for (int i = 0; channel.read(buffer) > 0; i++) {
@@ -624,7 +624,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
     @SuppressWarnings("all")
     private static Flux<byte[]> toBinaryFlux(final MySQLColumnMeta meta, final BlobPath path) {
         return Flux.create(sink -> {
-            try (FileChannel channel = FileChannel.open(path.value(), MySQLBinds.openOptionSet(path))) {
+            try (FileChannel channel = FileChannel.open(path.value(), JdbdUtils.openOptionSet(path))) {
 
                 final ByteBuffer buffer = ByteBuffer.allocate(2048);
                 byte[] dataBytes;
