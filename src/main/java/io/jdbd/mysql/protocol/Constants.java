@@ -62,6 +62,8 @@ public interface Constants {
 
     char QUOTE = '\'';
 
+    char DOUBLE_QUOTE = '"';
+
     char COMMA = ',';
 
     char SPACE = ' ';

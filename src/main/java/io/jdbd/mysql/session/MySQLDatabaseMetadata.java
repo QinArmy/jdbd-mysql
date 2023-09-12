@@ -137,10 +137,10 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             return Flux.error(MySQLExceptions.unknownTableMeta(tableMeta));
         }
 
-        final StringBuilder builder = new StringBuilder(256);
+        final StringBuilder builder = new StringBuilder(460);
         builder.append("SELECT COLUMN_NAME,DATA_TYPE,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT,ORDINAL_POSITION")
                 .append(",DATETIME_PRECISION,NUMERIC_PRECISION,NUMERIC_SCALE,EXTRA,COLUMN_COMMENT,CHARACTER_SET_NAME")
-                .append(",COLLATION_NAME,PRIVILEGES")
+                .append(",CHARACTER_MAXIMUM_LENGTH,CHARACTER_OCTET_LENGTH,COLLATION_NAME,PRIVILEGES")
                 .append(" FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ");
 
         final boolean backslashEscapes;
@@ -174,33 +174,39 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             map.put(Option.NAME, row.getNonNull("COLUMN_NAME", String.class));
             map.put(COLUMN_DATA_TYPE, dataType);
             map.put(COLUMN_POSITION, row.getNonNull("ORDINAL_POSITION", Integer.class));
-            map.put(Option.PRECISION, mapColumnPrecision(row));
+            map.put(Option.PRECISION, mapColumnPrecision(dataType, row));
 
-            map.put(COLUMN_SCALE, mapColumnScale(row));
+            map.put(COLUMN_SCALE, mapColumnScale(dataType, row));
             map.put(COLUMN_NULLABLE_MODE, row.getOrDefault("IS_NULLABLE", BooleanMode.class, BooleanMode.UNKNOWN));
             map.put(COLUMN_AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
             map.put(COLUMN_GENERATED_MODE, mapGeneratedMode(row));
 
-            map.put(COLUMN_DEFAULT, row.get("COLUMN_DEFAULT", String.class));
-            map.put(COLUMN_COMMENT, row.get("COLUMN_COMMENT", String.class));
-            map.put(Option.CHARSET, Charsets.getJavaCharsetByCharsetName(row.get("CHARACTER_SET_NAME", String.class)));
-            map.put(Option.COLLATION, row.get("COLLATION_NAME", String.class));
+            map.put(COLUMN_DEFAULT, row.getString("COLUMN_DEFAULT"));
+            map.put(COLUMN_COMMENT, row.getString("COLUMN_COMMENT"));
+            map.put(Option.CHARSET, Charsets.getJavaCharsetByCharsetName(row.getString("CHARACTER_SET_NAME")));
+            map.put(Option.COLLATION, row.getString("COLLATION_NAME"));
 
-            map.put(Option.PRIVILEGE, row.get("PRIVILEGES", String.class));
+            map.put(Option.PRIVILEGE, row.getString("PRIVILEGES"));
 
             final Function<Class<?>, Set<?>> enumSetFunc;
             enumSetFunc = createEnumSetFunc(dataType, row);
 
             return VendorTableColumnMeta.from(tableMeta, enumSetFunc, map::get);
         };
-
         return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);
     }
 
 
     @Override
-    public Publisher<TableIndexMeta> indexesOfTable(TableMeta tableMeta, Function<Option<?>, ?> optionFunc) {
-        return null;
+    public Publisher<TableIndexMeta> indexesOfTable(final TableMeta tableMeta, final Function<Option<?>, ?> optionFunc) {
+        final SchemaMeta schemaMeta;
+        if (!(tableMeta instanceof VendorTableMeta)
+                || (schemaMeta = tableMeta.schemaMeta()).isPseudoSchema()
+                || schemaMeta.databaseMetadata() != this) {
+            return Flux.error(MySQLExceptions.unknownTableMeta(tableMeta));
+        }
+
+        return Flux.empty();
     }
 
 
@@ -408,17 +414,58 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     /**
      * @see #columnsOfTable(TableMeta, Function)
      */
-    private long mapColumnPrecision(CurrentRow row) {
-        // TODO
-        return 0;
+    private long mapColumnPrecision(final MySQLType dataType, final CurrentRow row) {
+        final long precision;
+        switch (dataType) {
+            case BIT:
+            case DECIMAL:
+            case DECIMAL_UNSIGNED:
+                precision = row.getNonNull("NUMERIC_PRECISION", Long.class);
+                break;
+            case CHAR:
+            case VARCHAR:
+
+            case TINYTEXT:
+            case TEXT:
+            case MEDIUMTEXT:
+            case LONGTEXT:
+                precision = row.getNonNull("CHARACTER_MAXIMUM_LENGTH", Long.class);
+                break;
+
+            case BINARY:
+            case VARBINARY:
+
+            case TINYBLOB:
+            case BLOB:
+            case MEDIUMBLOB:
+            case LONGBLOB:
+                precision = row.getNonNull("CHARACTER_OCTET_LENGTH", Long.class);
+                break;
+            default:
+                precision = 0;
+        }
+        return precision;
     }
 
     /**
      * @see #columnsOfTable(TableMeta, Function)
      */
-    private int mapColumnScale(CurrentRow row) {
-        // TODO
-        return 0;
+    private int mapColumnScale(final MySQLType dataType, final CurrentRow row) {
+        final int scale;
+        switch (dataType) {
+            case DECIMAL:
+            case DECIMAL_UNSIGNED:
+                scale = row.getNonNull("NUMERIC_SCALE", Integer.class);
+                break;
+            case TIME:
+            case DATETIME:
+            case TIMESTAMP:
+                scale = row.getNonNull("DATETIME_PRECISION", Integer.class);
+                break;
+            default:
+                scale = 0;
+        }
+        return scale;
     }
 
     /**
@@ -472,7 +519,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     private BooleanMode mapAutoIncrementMode(CurrentRow row) {
         final BooleanMode mode;
-        if (row.getNonNull("EXTRA", String.class).equalsIgnoreCase("auto_increment")) {
+        if (row.getNonNullString("EXTRA").equalsIgnoreCase("auto_increment")) {
             mode = BooleanMode.TRUE;
         } else {
             mode = BooleanMode.FALSE;
@@ -485,7 +532,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     private BooleanMode mapGeneratedMode(CurrentRow row) {
         final BooleanMode mode;
-        if (row.getNonNull("EXTRA", String.class).toUpperCase(Locale.ROOT).contains("GENERATED")) {
+        if (row.getNonNullString("EXTRA").toUpperCase(Locale.ROOT).contains("GENERATED")) {
             mode = BooleanMode.TRUE;
         } else {
             mode = BooleanMode.FALSE;
@@ -497,12 +544,14 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     /**
      * @return a unmodified set
      * @see #createEnumSetFunc(MySQLType, CurrentRow)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-columns-table.html">The INFORMATION_SCHEMA COLUMNS Table</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences">Special Character Escape Sequences</a>
      */
     private Set<String> mapEnumElementSet(final CurrentRow row) {
         // eg 1 : enum('T','F')
         // eg 2 : set('BEIJING','SHANGHAI','SHENZHEN','XIANGGANG','TAIBEI','AOMENG')
         final String definition;
-        definition = row.get("COLUMN_TYPE", String.class);
+        definition = row.getString("COLUMN_TYPE");
         if (definition == null) {
             return Collections.emptySet();
         }
@@ -521,35 +570,80 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             final int length = definition.length(), lasIndex = length - 1;
 
             final Set<String> set = MySQLCollections.hashSet();
+            final StringBuilder builder = new StringBuilder(15);
 
+            int commaCount = 0;
             boolean inQuote = false;
-            char ch;
-            for (int i = 0, quoteLeftIndex = -1, quoteRightIndex = -1; i < length; i++) {
+            char ch, nextChar;
+            for (int i = 0, lastWritten = -1; i < length; i++) {
                 ch = definition.charAt(i);
                 if (inQuote) {
                     if (backslashEscapes && ch == Constants.BACK_SLASH) {
+                        if (i == lasIndex) {
+                            i++;
+                            continue;
+                        }
+                        switch (nextChar = definition.charAt(i + 1)) {
+                            case '0':
+                                nextChar = Constants.NUL;
+                                break;
+                            case 'b':
+                                nextChar = '\b';
+                                break;
+                            case 'n':
+                                nextChar = '\n';
+                                break;
+                            case 'r':
+                                nextChar = '\r';
+                                break;
+                            case 't':
+                                nextChar = '\t';
+                                break;
+                            case 'Z':
+                                nextChar = '\032';
+                                break;
+                            default:
+                                // no-op
+                        }
+                        if (i > lastWritten) {
+                            builder.append(definition, lastWritten, i);
+                        }
+                        builder.append(nextChar);
+
                         i++;
+
+                        lastWritten = i + 1; // after i ++
+
                     } else if (ch != Constants.QUOTE) {
                         continue;
                     } else if (i < lasIndex && definition.charAt(i + 1) == Constants.QUOTE) {
+                        if (i > lastWritten) {
+                            builder.append(definition, lastWritten, i); // append before i ++;
+                        }
                         i++;
+                        lastWritten = i; // after i ++,not i + 1, quote not append
                     } else {
                         inQuote = false;
-                        quoteRightIndex = i;
+                        if (i > lastWritten) {
+                            builder.append(definition, lastWritten, i);
+                        }
+                        set.add(builder.toString());
+                        builder.setLength(0); // clear
+                        lastWritten = -1;
                     }
 
                     continue;
-                }
+
+                } //  if (inQuote)
 
                 if (ch == Constants.QUOTE) {
                     inQuote = true;
-                    quoteLeftIndex = i + 1;
-                    quoteRightIndex = -1;
-                } else if (ch == Constants.COMMA || i == rightIndex) {
-                    set.add(definition.substring(quoteLeftIndex, quoteRightIndex).trim());
+                    lastWritten = i + 1;
+                } else if (ch == Constants.COMMA) {
+                    commaCount++;
                 }
             }
-            if (inQuote || set.size() == 0) {
+            if (inQuote || commaCount + 1 != set.size()) {
                 throw new JdbdException(String.format("%s isn't enum or set type definition", definition));
             }
             return Collections.unmodifiableSet(set);
