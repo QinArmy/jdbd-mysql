@@ -275,7 +275,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
 
     @Override
-    public <R> Publisher<R> queryOption(Option<R> option) {
+    public <R> Publisher<R> queryOption(final Option<R> option) {
         return null;
     }
 

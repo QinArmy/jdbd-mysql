@@ -66,10 +66,6 @@ public abstract class MySQLStrings extends JdbdStrings {
                                      final StringBuilder builder) {
         if (text == null) {
             builder.append(Constants.NULL);
-        } else if (isMySqlSimpleIdentifier(text)) {
-            builder.append(Constants.QUOTE)
-                    .append(text)
-                    .append(Constants.QUOTE);
         } else if (backslashEscapes) {
             appendBackslashEscapes(text, builder);
         } else {

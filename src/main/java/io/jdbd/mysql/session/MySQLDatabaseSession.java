@@ -356,6 +356,27 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         throw MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL);
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public final S appendLiteral(@Nullable String text, StringBuilder builder) throws JdbdException {
+        if (isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        }
+        MySQLStrings.appendLiteral(text, this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES), builder);
+        return (S) this;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public final S appendIdentifier(String identifier, StringBuilder builder) throws JdbdException {
+        if (isClosed()) {
+            throw MySQLExceptions.sessionHaveClosed();
+        } else if (MySQLStrings.appendMySqlIdentifier(identifier, builder)) {
+            throw MySQLExceptions.mysqlIdentifierContainBacktickError(identifier);
+        }
+        return (S) this;
+    }
+
     @Override
     public final <T> T valueOf(Option<T> option) throws JdbdException {
         return this.protocol.valueOf(option);
