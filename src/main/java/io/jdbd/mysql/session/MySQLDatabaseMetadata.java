@@ -291,7 +291,14 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
     @Override
     public <R> Publisher<R> queryOption(final Option<R> option) {
-        return null;
+        if (option != Option.USER) {
+            return Mono.error(new JdbdException(String.format("don't support %s", option)));
+        }
+        final Function<CurrentRow, String> function;
+        function = row -> row.getNonNullString(0);
+        return this.protocol.query(Stmts.stmt("SELECT CURRENT_USER()"), function, ResultStates.IGNORE_STATES)
+                .last()
+                .map(option.javaType()::cast);
     }
 
 
