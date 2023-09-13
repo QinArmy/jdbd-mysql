@@ -181,12 +181,12 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             map.put(VendorOptions.AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
             map.put(VendorOptions.GENERATED_MODE, mapGeneratedMode(row));
 
-            map.put(VendorOptions.DEFAULT_VALUE, row.getString("COLUMN_DEFAULT"));
-            map.put(VendorOptions.COMMENT, row.getString("COLUMN_COMMENT"));
-            map.put(Option.CHARSET, Charsets.getJavaCharsetByCharsetName(row.getString("CHARACTER_SET_NAME")));
-            map.put(Option.COLLATION, row.getString("COLLATION_NAME"));
+            map.put(VendorOptions.DEFAULT_VALUE, row.get("COLUMN_DEFAULT", String.class));
+            map.put(VendorOptions.COMMENT, row.get("COLUMN_COMMENT", String.class));
+            map.put(Option.CHARSET, Charsets.getJavaCharsetByCharsetName(row.get("CHARACTER_SET_NAME", String.class)));
+            map.put(Option.COLLATION, row.get("COLLATION_NAME", String.class));
 
-            map.put(Option.PRIVILEGE, row.getString("PRIVILEGES"));
+            map.put(Option.PRIVILEGE, row.get("PRIVILEGES", String.class));
 
             final Function<Class<?>, Set<?>> enumSetFunc;
             enumSetFunc = createEnumSetFunc(dataType, row);
@@ -258,7 +258,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         final Predicate<ResultRow> bufferPredicate;
         bufferPredicate = row -> {
             final String name;
-            name = row.getNonNullString("INDEX_NAME");
+            name = row.getNonNull("INDEX_NAME", String.class);
             return !name.equals(indexNameHolder.getAndSet(name));
         };
 
@@ -275,12 +275,12 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
             final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
 
-            map.put(VendorOptions.INDEX_TYPE, firstRow.getNonNullString("INDEX_TYPE"));
+            map.put(VendorOptions.INDEX_TYPE, firstRow.getNonNull("INDEX_TYPE", String.class));
             map.put(VendorOptions.KEY_TYPE, keyType);
             map.put(Option.UNIQUE, keyType.isUnique());
-            map.put(VendorOptions.COMMENT, firstRow.getString("INDEX_COMMENT"));
+            map.put(VendorOptions.COMMENT, firstRow.get("INDEX_COMMENT", String.class));
 
-            return VendorTableIndexMeta.from(tableMeta, firstRow.getNonNullString("INDEX_NAME"), columnList, map::get);
+            return VendorTableIndexMeta.from(tableMeta, firstRow.getNonNull("INDEX_NAME", String.class), columnList, map::get);
         };
 
         return this.protocol.query(Stmts.stmt(builder.toString()), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES)
@@ -295,7 +295,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             return Mono.error(new JdbdException(String.format("don't support %s", option)));
         }
         final Function<CurrentRow, String> function;
-        function = row -> row.getNonNullString(0);
+        function = row -> row.getNonNull(0, String.class);
         return this.protocol.query(Stmts.stmt("SELECT CURRENT_USER()"), function, ResultStates.IGNORE_STATES)
                 .last()
                 .map(option.javaType()::cast);
@@ -320,7 +320,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         final Map<String, Boolean> map = MySQLCollections.hashMap(capacity);
         final Function<CurrentRow, Boolean> function;
         function = row -> {
-            map.put(row.getNonNullString(0), row.getNonNull(1, Boolean.class));
+            map.put(row.getNonNull(0, String.class), row.getNonNull(1, Boolean.class));
             return Boolean.TRUE;
         };
         return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES)
@@ -547,8 +547,8 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     @SuppressWarnings("deprecation")
     private MySQLType mapColumnDataType(final CurrentRow row) {
         final String dataType, columnType;
-        dataType = row.getNonNullString("DATA_TYPE").toUpperCase(Locale.ROOT);
-        columnType = row.getNonNullString("COLUMN_TYPE").toUpperCase(Locale.ROOT);
+        dataType = row.getNonNull("DATA_TYPE", String.class).toUpperCase(Locale.ROOT);
+        columnType = row.getNonNull("COLUMN_TYPE", String.class).toUpperCase(Locale.ROOT);
 
         final MySQLType type, finalType;
         type = MySQLBinds.MYSQL_TYPE_MAP.getOrDefault(dataType, MySQLType.UNKNOWN);
@@ -592,7 +592,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     private BooleanMode mapAutoIncrementMode(CurrentRow row) {
         final BooleanMode mode;
-        if (row.getNonNullString("EXTRA").equalsIgnoreCase("auto_increment")) {
+        if (row.getNonNull("EXTRA", String.class).equalsIgnoreCase("auto_increment")) {
             mode = BooleanMode.TRUE;
         } else {
             mode = BooleanMode.FALSE;
@@ -605,7 +605,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     private BooleanMode mapGeneratedMode(CurrentRow row) {
         final BooleanMode mode;
-        if (row.getNonNullString("EXTRA").toUpperCase(Locale.ROOT).contains("GENERATED")) {
+        if (row.getNonNull("EXTRA", String.class).toUpperCase(Locale.ROOT).contains("GENERATED")) {
             mode = BooleanMode.TRUE;
         } else {
             mode = BooleanMode.FALSE;
@@ -624,7 +624,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         // eg 1 : enum('T','F')
         // eg 2 : set('BEIJING','SHANGHAI','SHENZHEN','XIANGGANG','TAIBEI','AOMENG')
         final String definition;
-        definition = row.getString("COLUMN_TYPE");
+        definition = row.get("COLUMN_TYPE", String.class);
         if (definition == null) {
             return Collections.emptySet();
         }
@@ -771,7 +771,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
         String lastIndexName = null, indexName;
         for (final ResultRow row : rowList) {
-            indexName = row.getNonNullString("INDEX_NAME");
+            indexName = row.getNonNull("INDEX_NAME", String.class);
             if (lastIndexName != null && !lastIndexName.equals(indexName)) {
                 String m = String.format("index[%s] column row buffer error", indexName);
                 throw new JdbdException(m);
@@ -792,7 +792,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
         map.put(VendorOptions.CARDINALITY, row.getOrDefault("CARDINALITY", Long.class, 0L));
 
-        switch (row.getStringOrDefault("COLLATION", "").toUpperCase(Locale.ROOT)) {
+        switch (row.getOrDefault("COLLATION", String.class, "").toUpperCase(Locale.ROOT)) {
             case "A":
                 map.put(VendorOptions.SORTING, Sorting.ASC);
                 break;
@@ -805,7 +805,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
         map.put(VendorOptions.NULLS_SORTING, NullsSorting.UNKNOWN); // mysql don't support
 
-        switch (row.getStringOrDefault("NULLABLE", "UNKNOWN").toUpperCase(Locale.ROOT)) {
+        switch (row.getOrDefault("NULLABLE", String.class, "UNKNOWN").toUpperCase(Locale.ROOT)) {
             case "YES":
                 map.put(VendorOptions.NULLABLE_MODE, BooleanMode.TRUE);
                 break;
@@ -818,7 +818,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         }
 
         map.put(VendorOptions.VISIBLE, row.getOrDefault("IS_VISIBLE", BooleanMode.class, BooleanMode.UNKNOWN));
-        return VendorIndexColumnMeta.from(row.getNonNullString("COLUMN_NAME"), map::get);
+        return VendorIndexColumnMeta.from(row.getNonNull("COLUMN_NAME", String.class), map::get);
     }
 
     /**
@@ -829,7 +829,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     private KeyType mapToKeyType(final ResultRow firstRow) {
         final KeyType keyType;
-        switch (firstRow.getStringOrDefault("COLUMN_KEY", "").toUpperCase(Locale.ROOT)) {
+        switch (firstRow.getOrDefault("COLUMN_KEY", String.class, "").toUpperCase(Locale.ROOT)) {
             case "PRI":
                 keyType = KeyType.PRIMARY_KEY;
                 break;
@@ -837,7 +837,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
                 keyType = KeyType.UNIQUE_KEY;
                 break;
             case "MUL": {
-                switch (firstRow.getStringOrDefault("INDEX_TYPE", "").toUpperCase(Locale.ROOT)) {
+                switch (firstRow.getOrDefault("INDEX_TYPE", String.class, "").toUpperCase(Locale.ROOT)) {
                     case "FULLTEXT":
                         keyType = KeyType.FULL_TEXT_KEY;
                         break;
