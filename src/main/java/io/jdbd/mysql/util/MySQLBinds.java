@@ -171,9 +171,7 @@ public abstract class MySQLBinds extends JdbdBinds {
             case DIALECT_TYPE:
             case UNKNOWN:
             case REF_CURSOR:
-            case USER_DEFINED:
             case COMPOSITE:
-            case INTERNAL_USE:
             default:
                 type = MySQLType.UNKNOWN;
         }

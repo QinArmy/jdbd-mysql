@@ -1,49 +1,24 @@
 package io.jdbd.mysql.util;
 
 
+import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.util.NameMode;
 import io.jdbd.vendor.util.JdbdStrings;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Stack;
+import java.util.*;
 
 public abstract class MySQLStrings extends JdbdStrings {
 
-
-    public static boolean isMySqlSimpleIdentifier(final @Nullable String text) {
-        if (text == null) {
-            return false;
-        }
-        final int length = text.length();
-        char ch;
-        boolean match = true;
-        for (int i = 0; i < length; i++) {
-            ch = text.charAt(i);
-            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_') {
-                continue;
-            }
-            if ((ch >= '0' && ch <= '9') || ch == '$') {
-                if (i == 0) {
-                    match = false;
-                    break;
-                }
-                continue;
-            }
-            match = false;
-            break;
-        }
-        return match;
-    }
 
     /**
      * This method don't append space before identifier.
      *
      * @return true : contain backtick
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
      */
     public static boolean appendMySqlIdentifier(final String text, final StringBuilder builder) {
         boolean error = false;
@@ -59,8 +34,46 @@ public abstract class MySQLStrings extends JdbdStrings {
         return error;
     }
 
+
+    /**
+     * @see io.jdbd.session.DatabaseSession#appendColumnName(String, NameMode, StringBuilder)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/5.7/en/identifier-case-sensitivity.html">Identifier Case Sensitivity</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_lower_case_table_names">lower_case_table_names</a>
+     */
+    public static void appendTableNameOrColumnName(final String objectName, final NameMode mode, final StringBuilder builder)
+            throws JdbdException {
+        if (isMySqlSimpleIdentifier(objectName)) {
+            switch (mode) {
+                case LOWER_CASE:
+                    builder.append(objectName.toLowerCase(Locale.ROOT));
+                    break;
+                case UPPER_CASE:
+                    builder.append(objectName.toUpperCase(Locale.ROOT));
+                    break;
+                case DEFAULT:
+                    builder.append(objectName);
+                    break;
+                default:
+                    throw MySQLExceptions.unexpectedEnum(mode);
+            }
+        } else if (objectName.indexOf(Constants.BACKTICK) > -1) {
+            throw MySQLExceptions.mysqlIdentifierContainBacktickError(objectName);
+        } else if (objectName.endsWith(" ")) {
+            throw new JdbdException("In MySQL,database, table, and column names cannot end with space characters");
+        } else {
+            builder.append(Constants.BACKTICK)
+                    .append(objectName)
+                    .append(Constants.BACKTICK);
+        }
+    }
+
+
     /**
      * This method don't append space before literal.
+     *
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences"> Special Character Escape Sequences</a>
      */
     public static void appendLiteral(final @Nullable String text, final boolean backslashEscapes,
                                      final StringBuilder builder) {
@@ -68,9 +81,11 @@ public abstract class MySQLStrings extends JdbdStrings {
             builder.append(Constants.NULL);
         } else if (backslashEscapes) {
             appendBackslashEscapes(text, builder);
-        } else {
+        } else if (text.indexOf(Constants.BACK_SLASH) > -1 || text.indexOf(Constants.ASCII_26) > -1) {
             builder.append("_utf8mb4 0x")
                     .append(MySQLBuffers.hexEscapesText(true, text.getBytes(StandardCharsets.UTF_8)));
+        } else {
+            escapeQuote(text, builder);
         }
     }
 
@@ -135,6 +150,7 @@ public abstract class MySQLStrings extends JdbdStrings {
      * @return the  list of strings, split by delimiter, maybe empty.
      * @throws IllegalArgumentException if an error occurs
      */
+    @Deprecated
     public static List<String> split(String input, String delimiter, String openMarker, String closeMarker) {
 
         final char[] delimiterArray = Objects.requireNonNull(delimiter, "delimiter").toCharArray();
@@ -260,6 +276,32 @@ public abstract class MySQLStrings extends JdbdStrings {
                         , currentIndex, input.charAt(currentIndex), input.substring(start, end)));
     }
 
+    /**
+     * @see #appendMySqlIdentifier(String, StringBuilder)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
+     */
+    private static boolean isMySqlSimpleIdentifier(final @Nullable String text) {
+        if (text == null) {
+            return false;
+        }
+        final int length = text.length();
+        char ch;
+        boolean match = true;
+        for (int i = 0; i < length; i++) {
+            ch = text.charAt(i);
+            if (ch > '\u0080' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' || ch == '$') {
+                continue;
+            }
+
+            if ((ch < '0' || ch > '9') || i == 0) {
+                match = false;
+                break;
+            }
+
+        }
+        return match;
+    }
+
 
     /**
      * @see #appendLiteral(String, boolean, StringBuilder)
@@ -279,15 +321,8 @@ public abstract class MySQLStrings extends JdbdStrings {
                     builder.append(text, lastWritten, i);
                 }
                 builder.append(Constants.QUOTE);
-                lastWritten = i; // not i+1 as b wasn't written.
-            } else if (ch == Constants.NUL) {
-                if (i > lastWritten) {
-                    builder.append(text, lastWritten, i);
-                }
-                builder.append(Constants.BACK_SLASH)
-                        .append('0');
-                lastWritten = i + 1;
-            } else if (ch == '\032') {
+                lastWritten = i; // not i+1 as ch wasn't written.
+            } else if (ch == Constants.ASCII_26) { //ASCII 26 (Control+Z);
                 if (i > lastWritten) {
                     builder.append(text, lastWritten, i);
                 }
@@ -310,6 +345,38 @@ public abstract class MySQLStrings extends JdbdStrings {
 
         builder.append(Constants.QUOTE);
 
+    }
+
+
+    /**
+     * @see #appendLiteral(String, boolean, StringBuilder)
+     * @see #appendBackslashEscapes(String, StringBuilder)
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences"> Special Character Escape Sequences</a>
+     */
+    private static void escapeQuote(final String text, final StringBuilder builder) {
+        builder.append(Constants.QUOTE);
+
+        final int length = text.length();
+        int lastWritten = 0;
+        char ch;
+        for (int i = 0; i < length; i++) {
+            ch = text.charAt(i);
+            if (ch != Constants.QUOTE) {
+                continue;
+            }
+            if (i > lastWritten) {
+                builder.append(text, lastWritten, i);
+            }
+            builder.append(Constants.QUOTE);
+            lastWritten = i; // not i+1 as ch wasn't written.
+        }
+
+        if (lastWritten < length) {
+            builder.append(text, lastWritten, length);
+        }
+
+        builder.append(Constants.QUOTE);
     }
 
 

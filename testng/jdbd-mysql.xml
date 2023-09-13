@@ -2,9 +2,11 @@
 <suite name="jdbd-mysql" verbose="1" parallel="methods" thread-count="30">
     <test name="feature">
         <classes>
+            <!-- util tests -->
             <class name="io.jdbd.mysql.util.MySQLTimesSuiteTests"/>
-            <class name="io.jdbd.mysql.syntax.MySQLParserSuiteTests"/>
             <class name="io.jdbd.mysql.env.MySQLUrlParserSuiteTests"/>
+            <class name="io.jdbd.mysql.syntax.MySQLParserSuiteTests"/>
+            <class name="io.jdbd.mysql.util.MySQLStringsTests"/>
 
             <!-- session tests -->
             <class name="io.jdbd.mysql.session.SessionFactoryTests"/>

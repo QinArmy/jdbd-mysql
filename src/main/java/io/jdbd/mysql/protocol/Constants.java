@@ -46,6 +46,11 @@ public interface Constants {
 
     char BACK_SLASH = '\\';
 
+    /**
+     * Control+Z
+     */
+    char ASCII_26 = '\032';
+
     byte QUOTE_CHAR_BYTE = '\'';
 
     byte DOUBLE_QUOTE_BYTE = '"';

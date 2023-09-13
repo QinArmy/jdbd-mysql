@@ -672,14 +672,7 @@ final class QueryCommandWriter extends BinaryWriter {
                 }
                 packet.writeByte(Constants.QUOTE);
                 lastWritten = i; // not i+1 as b wasn't written.
-            } else if (b == Constants.NUL_BYTE) {
-                if (i > lastWritten) {
-                    packet.writeBytes(bytes, lastWritten, i - lastWritten);
-                }
-                packet.writeByte(Constants.BACK_SLASH);
-                packet.writeByte('0');
-                lastWritten = i + 1;
-            } else if (b == '\032') {
+            } else if (b == Constants.ASCII_26) {
                 if (i > lastWritten) {
                     packet.writeBytes(bytes, lastWritten, i - lastWritten);
                 }

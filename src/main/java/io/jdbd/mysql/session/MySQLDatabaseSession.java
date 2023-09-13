@@ -15,6 +15,7 @@ import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.statement.StaticStatement;
+import io.jdbd.util.NameMode;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.result.NamedSavePoint;
 import io.jdbd.vendor.stmt.Stmts;
@@ -356,6 +357,10 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         throw MySQLExceptions.dontSupportDeclareCursor(MySQLDriver.MY_SQL);
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences"> Special Character Escape Sequences</a>
+     */
     @SuppressWarnings("unchecked")
     @Override
     public final S appendLiteral(@Nullable String text, StringBuilder builder) throws JdbdException {
@@ -366,14 +371,39 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return (S) this;
     }
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
+     */
     @SuppressWarnings("unchecked")
     @Override
     public final S appendIdentifier(String identifier, StringBuilder builder) throws JdbdException {
-        if (isClosed()) {
-            throw MySQLExceptions.sessionHaveClosed();
-        } else if (MySQLStrings.appendMySqlIdentifier(identifier, builder)) {
+        if (MySQLStrings.appendMySqlIdentifier(identifier, builder)) {
             throw MySQLExceptions.mysqlIdentifierContainBacktickError(identifier);
         }
+        return (S) this;
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/5.7/en/identifier-case-sensitivity.html">Identifier Case Sensitivity</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_lower_case_table_names">lower_case_table_names</a>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public final S appendTableName(String tableName, NameMode mode, StringBuilder builder) throws JdbdException {
+        MySQLStrings.appendTableNameOrColumnName(tableName, mode, builder);
+        return (S) this;
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/5.7/en/identifier-case-sensitivity.html">Identifier Case Sensitivity</a>
+     * @see <a href="https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_lower_case_table_names">lower_case_table_names</a>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public final S appendColumnName(String columnName, NameMode mode, StringBuilder builder) throws JdbdException {
+        MySQLStrings.appendTableNameOrColumnName(columnName, mode, builder);
         return (S) this;
     }
 
