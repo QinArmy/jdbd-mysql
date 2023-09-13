@@ -155,8 +155,17 @@ public class DataTypeTests extends SessionTestSupport {
 
     @AfterSuite
     public void deleteBigColumnFile() throws IOException {
-        Files.deleteIfExists(bigColumnWkbPath);
-        Files.deleteIfExists(bigColumnWktPath);
+        Path path;
+
+        path = bigColumnWkbPath;
+        if (path != null) {
+            Files.deleteIfExists(path);
+        }
+
+        path = bigColumnWktPath;
+        if (path != null) {
+            Files.deleteIfExists(path);
+        }
     }
 
 
