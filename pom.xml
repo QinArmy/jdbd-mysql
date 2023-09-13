@@ -16,7 +16,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <reactor.version>3.3.5.RELEASE</reactor.version>
-        <jdbd.spi.version>1.0-SNAPSHOT</jdbd.spi.version>
+        <jdbd.spi.version>0.8.0</jdbd.spi.version>
     </properties>
 
     <licenses>

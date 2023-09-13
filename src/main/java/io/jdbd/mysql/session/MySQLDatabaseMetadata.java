@@ -332,44 +332,10 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         return String.valueOf(Constants.BACKTICK);
     }
 
-    @Override
-    public Publisher<FunctionMeta> sqlFunctions(@Nullable SchemaMeta metaData, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
-
-    @Override
-    public Publisher<FunctionColumnMeta> sqlFunctionColumn(@Nullable SchemaMeta metaData, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
-
-    @Override
-    public Publisher<FunctionColumnMeta> sqlFunctionColumnOf(FunctionMeta functionMeta, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
-
-    @Override
-    public Publisher<ProcedureMeta> sqlProcedures(@Nullable SchemaMeta metaData, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
-
-    @Override
-    public Publisher<ProcedureColumnMeta> sqlProcedureColumn(@Nullable SchemaMeta metaData, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
-
-    @Override
-    public Publisher<ProcedureColumnMeta> sqlProcedureColumnOf(FunctionMeta functionMeta, Function<Option<?>, ?> optionFunc) {
-        return null;
-    }
 
     @Override
     public int sqlStateType() throws JdbdException {
-        return 0;
-    }
-
-    @Override
-    public Publisher<DataTypeMeta> sqlDataTypes() {
-        return null;
+        return DatabaseMetaData.SQL_STATE_SQL;
     }
 
     @Override
