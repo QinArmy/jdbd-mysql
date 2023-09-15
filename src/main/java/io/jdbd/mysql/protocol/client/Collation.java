@@ -10,7 +10,7 @@ public final class Collation {
     public final int priority;
     public final MyCharset myCharset;
 
-    //   public final String charsetName;
+  //  public final String charsetName;
     public final boolean existsInDatabase;
 
     Collation(int index, String name, int priority, String charsetName) {

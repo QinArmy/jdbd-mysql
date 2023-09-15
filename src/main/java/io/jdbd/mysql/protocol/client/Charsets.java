@@ -687,23 +687,23 @@ public abstract class Charsets {
         list.add(new Collation(308, "utf8mb4_zh_0900_as_cs", 0, "utf8mb4"));
         list.add(new Collation(309, "utf8mb4_0900_bin", 0, "utf8mb4"));
 
-        list.add(new Collation(310, "utf8mb4_nb_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(311, "utf8mb4_nb_0900_as_cs", 0, "utf8mb4"));
-        list.add(new Collation(312, "utf8mb4_nn_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(313, "utf8mb4_nn_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(310, "utf8mb4_nb_0900_ai_ci", 0, "utf8mb4")); // nwe collation 310 as of MySQL 8.1.0 mac
+        list.add(new Collation(311, "utf8mb4_nb_0900_as_cs", 0, "utf8mb4")); // nwe collation 311 as of MySQL 8.1.0 mac
+        list.add(new Collation(312, "utf8mb4_nn_0900_ai_ci", 0, "utf8mb4")); // nwe collation 312 as of MySQL 8.1.0 mac
+        list.add(new Collation(313, "utf8mb4_nn_0900_as_cs", 0, "utf8mb4")); // nwe collation 313 as of MySQL 8.1.0 mac
 
-        list.add(new Collation(314, "utf8mb4_sr_latn_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(315, "utf8mb4_sr_latn_0900_as_cs", 0, "utf8mb4"));
-        list.add(new Collation(316, "utf8mb4_bs_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(317, "utf8mb4_bs_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(314, "utf8mb4_sr_latn_0900_ai_ci", 0, "utf8mb4")); // nwe collation 314 as of MySQL 8.1.0 mac
+        list.add(new Collation(315, "utf8mb4_sr_latn_0900_as_cs", 0, "utf8mb4")); // nwe collation 315 as of MySQL 8.1.0 mac
+        list.add(new Collation(316, "utf8mb4_bs_0900_ai_ci", 0, "utf8mb4")); // nwe collation 316 as of MySQL 8.1.0 mac
+        list.add(new Collation(317, "utf8mb4_bs_0900_as_cs", 0, "utf8mb4")); // nwe collation 317 as of MySQL 8.1.0 mac
 
         list.add(new Collation(318, "utf8mb4_bg_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(319, "utf8mb4_bg_0900_as_cs", 0, "utf8mb4"));
-        list.add(new Collation(320, "utf8mb4_gl_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(321, "utf8mb4_gl_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(319, "utf8mb4_bg_0900_as_cs", 0, "utf8mb4")); // nwe collation 319 as of MySQL 8.1.0 mac
+        list.add(new Collation(320, "utf8mb4_gl_0900_ai_ci", 0, "utf8mb4")); // nwe collation 320 as of MySQL 8.1.0 mac
+        list.add(new Collation(321, "utf8mb4_gl_0900_as_cs", 0, "utf8mb4")); // nwe collation 321 as of MySQL 8.1.0 mac
 
-        list.add(new Collation(322, "utf8mb4_mn_cyrl_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(323, "utf8mb4_mn_cyrl_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(322, "utf8mb4_mn_cyrl_0900_ai_ci", 0, "utf8mb4")); // nwe collation 322 as of MySQL 8.1.0 mac
+        list.add(new Collation(323, "utf8mb4_mn_cyrl_0900_as_cs", 0, "utf8mb4")); // nwe collation 323 as of MySQL 8.1.0 mac
         list.add(new Collation(326, "utf8mb4_test_ci", 0, "utf8mb4", false)); // 326 don't exists in database, MySQL 8.1.0 mac
         list.add(new Collation(327, "utf16_test_ci", 0, "utf16", false)); // 327 don't exists in database, MySQL 8.1.0 mac
 

@@ -59,6 +59,8 @@ public class SessionTrackTests extends SessionTestSupport {
         Assert.assertNotNull(rowList);
 
         final Map<Integer, Collation> collationMap = MySQLCollections.hashMap();
+        final Map<Integer, Boolean> newCollationMap = MySQLCollections.hashMap();
+
         Collation collation;
         int id, priority;
         for (ResultRow row : rowList) {
@@ -66,6 +68,7 @@ public class SessionTrackTests extends SessionTestSupport {
             collation = Charsets.INDEX_TO_COLLATION.get(id);
             if (collation == null) {
                 priority = 0;
+                newCollationMap.put(id, Boolean.TRUE);
             } else {
                 priority = collation.priority;
             }
@@ -92,6 +95,8 @@ public class SessionTrackTests extends SessionTestSupport {
 
             final int collationSize = collationList.size();
             LOG.info("collationSize : {}", collationSize);
+
+            final String serverVersionStr = session.serverVersion().getVersion();
             for (int i = 0; i < collationSize; i++) {
                 collation = collationList.get(i);
 
@@ -137,7 +142,13 @@ public class SessionTrackTests extends SessionTestSupport {
                 if (idSet.contains(collation.index)) {
                     builder.append(" // ")
                             .append(collation.index)
-                            .append(" don't exists in database, MySQL 8.1.0 mac");
+                            .append(" don't exists in database, MySQL ")
+                            .append(serverVersionStr);
+                } else if (newCollationMap.containsKey(collation.index)) {
+                    builder.append(" // nwe collation ")
+                            .append(collation.index)
+                            .append(" as of MySQL ")
+                            .append(serverVersionStr);
                 }
 
 
