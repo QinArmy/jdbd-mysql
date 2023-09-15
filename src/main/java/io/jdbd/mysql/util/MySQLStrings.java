@@ -4,6 +4,7 @@ package io.jdbd.mysql.util;
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.util.JdbdUtils;
 import io.jdbd.util.NameMode;
 import io.jdbd.vendor.util.JdbdStrings;
 
@@ -115,7 +116,7 @@ public abstract class MySQLStrings extends JdbdStrings {
             appendBackslashEscapes(text, builder);
         } else if (text.indexOf(Constants.BACK_SLASH) > -1 || text.indexOf(Constants.ASCII_26) > -1) {
             builder.append("_utf8mb4 0x")
-                    .append(MySQLBuffers.hexEscapesText(true, text.getBytes(StandardCharsets.UTF_8)));
+                    .append(JdbdUtils.hexEscapesText(true, text.getBytes(StandardCharsets.UTF_8)));
         } else {
             escapeQuote(text, builder);
         }

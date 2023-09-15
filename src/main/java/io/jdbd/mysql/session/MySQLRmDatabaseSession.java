@@ -5,13 +5,17 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
-import io.jdbd.mysql.util.*;
+import io.jdbd.mysql.util.MySQLCollections;
+import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLNumbers;
+import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.pool.PoolRmDatabaseSession;
 import io.jdbd.result.DataRow;
 import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
+import io.jdbd.util.JdbdUtils;
 import io.jdbd.vendor.session.JdbdTransactionStatus;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
@@ -491,7 +495,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         assert hexString.startsWith("0x") : "mysql XA RECOVER convert xid response error";
 
         final byte[] idBytes;
-        idBytes = MySQLBuffers.decodeHex(hexString.substring(2).getBytes(StandardCharsets.UTF_8));
+        idBytes = JdbdUtils.decodeHex(hexString.substring(2).getBytes(StandardCharsets.UTF_8));
 
         final String gtrid, bqual;
         if (gtridLength == 0) {
@@ -529,7 +533,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         }
 
         builder.append(" 0x")
-                .append(MySQLBuffers.hexEscapesText(true, gtridBytes, gtridBytes.length));
+                .append(JdbdUtils.hexEscapesText(true, gtridBytes, gtridBytes.length));
 
         builder.append(Constants.COMMA);
         if (bqual != null) {
@@ -537,7 +541,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 return MySQLExceptions.xaBqualBeyond64Bytes();
             }
             builder.append("0x")
-                    .append(MySQLBuffers.hexEscapesText(true, bqualBytes, bqualBytes.length));
+                    .append(JdbdUtils.hexEscapesText(true, bqualBytes, bqualBytes.length));
         }
         final int formatId;
         formatId = xid.getFormatId();
@@ -553,7 +557,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                     break;
                 }
             }
-            builder.append(MySQLBuffers.hexEscapesText(true, formatIdBytes, offset, formatIdBytes.length));
+            builder.append(JdbdUtils.hexEscapesText(true, formatIdBytes, offset, formatIdBytes.length));
         }
         return null;
     }

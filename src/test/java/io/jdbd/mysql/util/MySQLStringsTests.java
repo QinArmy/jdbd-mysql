@@ -1,6 +1,7 @@
 package io.jdbd.mysql.util;
 
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.util.JdbdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -49,7 +50,7 @@ public class MySQLStringsTests {
 
         builder.setLength(0);
         MySQLStrings.appendLiteral(text, false, builder);
-        Assert.assertEquals(builder.toString(), "_utf8mb4 0x" + MySQLBuffers.hexEscapesText(true, text.getBytes(StandardCharsets.UTF_8)));
+        Assert.assertEquals(builder.toString(), "_utf8mb4 0x" + JdbdUtils.hexEscapesText(true, text.getBytes(StandardCharsets.UTF_8)));
 
         builder.setLength(0);
         MySQLStrings.appendLiteral("中国QinArmy's army \0 \b \n \r \t \" ", false, builder);

@@ -3,9 +3,13 @@ package io.jdbd.mysql.protocol.client;
 import io.jdbd.JdbdException;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
-import io.jdbd.mysql.util.*;
+import io.jdbd.mysql.util.MySQLBinds;
+import io.jdbd.mysql.util.MySQLExceptions;
+import io.jdbd.mysql.util.MySQLStrings;
+import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.type.LongParameter;
 import io.jdbd.type.Point;
+import io.jdbd.util.JdbdUtils;
 import io.jdbd.vendor.stmt.*;
 import io.jdbd.vendor.util.JdbdExceptions;
 import io.jdbd.vendor.util.JdbdSpatials;
@@ -509,7 +513,7 @@ final class QueryCommandWriter extends BinaryWriter {
         if (this.hexEscape) {
             valueBytes = value.getBytes(StandardCharsets.UTF_8); // here, use UTF-8
             packet.writeBytes(" _utf8mb4 0x".getBytes(this.clientCharset));
-            packet.writeBytes(MySQLBuffers.hexEscapes(true, valueBytes, valueBytes.length));
+            packet.writeBytes(JdbdUtils.hexEscapes(true, valueBytes, valueBytes.length));
         } else {
             valueBytes = value.getBytes(this.clientCharset);
             packet.writeByte(Constants.QUOTE);
@@ -521,7 +525,7 @@ final class QueryCommandWriter extends BinaryWriter {
     private void writeHexEscape(final ByteBuf packet, final byte[] value) {
         packet.writeByte('0');
         packet.writeByte('x');
-        packet.writeBytes(MySQLBuffers.hexEscapes(true, value, value.length));
+        packet.writeBytes(JdbdUtils.hexEscapes(true, value, value.length));
     }
 
 

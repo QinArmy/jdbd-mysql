@@ -288,7 +288,7 @@ public abstract class SessionTestSupport {
 
 
     public static Clob wrapToClob(final Path path, final Charset charset) {
-        final Flux<CharSequence> flux;
+        final Flux<String> flux;
         flux = Flux.create(sink -> EXECUTOR.execute(() -> publishTextFile(sink, path, charset)));
         return Clob.from(flux);
     }
@@ -329,7 +329,7 @@ public abstract class SessionTestSupport {
         }
     }
 
-    private static void publishTextFile(final FluxSink<CharSequence> sink, final Path path, final Charset charset) {
+    private static void publishTextFile(final FluxSink<String> sink, final Path path, final Charset charset) {
         try (BufferedReader reader = JdbdUtils.newBufferedReader(TextPath.from(false, charset, path), 8192)) {
             final CharBuffer charBuffer = CharBuffer.allocate(4096);
 
