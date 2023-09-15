@@ -856,7 +856,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         }
 
         /**
-         * @see ClientProtocolFactory#updateSessionEnvIfNeed(SessionEnv, ZoneOffset, Charset, Charset)
+         * @see ClientProtocolFactory#updateSessionEnvIfNeed(SessionEnv, ZoneOffset, Charset, Charset, String)
          */
         private DefaultSessionEnv(DefaultSessionEnv oldEnv, @Nullable ZoneOffset serverZone,
                                   @Nullable Charset resultCharset,
