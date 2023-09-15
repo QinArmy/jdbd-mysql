@@ -13,6 +13,14 @@ import java.util.*;
 
 public abstract class MySQLStrings extends JdbdStrings {
 
+    private static final byte SIMPLE = 1;
+
+    private static final byte QUOTE = 2;
+
+    private static final byte HAVE_NO_TEXT = 4;
+
+    private static final byte ERROR = 8;
+
 
     /**
      * This method don't append space before identifier.
@@ -20,16 +28,28 @@ public abstract class MySQLStrings extends JdbdStrings {
      * @return true : contain backtick
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
      */
-    public static boolean appendMySqlIdentifier(final String text, final StringBuilder builder) {
-        boolean error = false;
-        if (isMySqlSimpleIdentifier(text)) {
-            builder.append(text);
-        } else if (text.indexOf(Constants.BACKTICK) > -1) {
-            error = true;
-        } else {
-            builder.append(Constants.BACKTICK)
-                    .append(text)
-                    .append(Constants.BACKTICK);
+    @Nullable
+    public static RuntimeException appendMySqlIdentifier(final String text, final StringBuilder builder) {
+        RuntimeException error = null;
+        switch (mySqlIdentifierHandleMode(text)) {
+            case SIMPLE:
+                builder.append(text);
+                break;
+            case QUOTE:
+                builder.append(Constants.BACKTICK)
+                        .append(text)
+                        .append(Constants.BACKTICK);
+                break;
+            case ERROR:
+                error = MySQLExceptions.mysqlIdentifierContainBacktickError(text);
+                break;
+            case HAVE_NO_TEXT:
+                error = MySQLExceptions.identifierNoText();
+                break;
+            default:
+                //no bug,never here
+                error = unknownHandleMode();
+
         }
         return error;
     }
@@ -43,28 +63,38 @@ public abstract class MySQLStrings extends JdbdStrings {
      */
     public static void appendTableNameOrColumnName(final String objectName, final NameMode mode, final StringBuilder builder)
             throws JdbdException {
-        if (isMySqlSimpleIdentifier(objectName)) {
-            switch (mode) {
-                case LOWER_CASE:
-                    builder.append(objectName.toLowerCase(Locale.ROOT));
-                    break;
-                case UPPER_CASE:
-                    builder.append(objectName.toUpperCase(Locale.ROOT));
-                    break;
-                case DEFAULT:
-                    builder.append(objectName);
-                    break;
-                default:
-                    throw MySQLExceptions.unexpectedEnum(mode);
+        switch (mySqlIdentifierHandleMode(objectName)) {
+            case SIMPLE: {
+                switch (mode) {
+                    case LOWER_CASE:
+                        builder.append(objectName.toLowerCase(Locale.ROOT));
+                        break;
+                    case UPPER_CASE:
+                        builder.append(objectName.toUpperCase(Locale.ROOT));
+                        break;
+                    case DEFAULT:
+                        builder.append(objectName);
+                        break;
+                    default:
+                        throw MySQLExceptions.unexpectedEnum(mode);
+                }
             }
-        } else if (objectName.indexOf(Constants.BACKTICK) > -1) {
-            throw MySQLExceptions.mysqlIdentifierContainBacktickError(objectName);
-        } else if (objectName.endsWith(" ")) {
-            throw new JdbdException("In MySQL,database, table, and column names cannot end with space characters");
-        } else {
-            builder.append(Constants.BACKTICK)
-                    .append(objectName)
-                    .append(Constants.BACKTICK);
+            break;
+            case QUOTE: {
+                if (objectName.endsWith(" ")) {
+                    throw new JdbdException("In MySQL,database, table, and column names cannot end with space characters");
+                }
+                builder.append(Constants.BACKTICK)
+                        .append(objectName)
+                        .append(Constants.BACKTICK);
+            }
+            break;
+            case ERROR:
+                throw MySQLExceptions.mysqlIdentifierContainBacktickError(objectName);
+            default:
+                // no bug,never here
+                throw unknownHandleMode();
+
         }
     }
 
@@ -277,29 +307,51 @@ public abstract class MySQLStrings extends JdbdStrings {
     }
 
     /**
+     * @return one of following <ul>
+     * <li>{@link #SIMPLE} ,simple identifier</li>
+     * <li>{@link #QUOTE}, need to quote</li>
+     * <li>{@link #HAVE_NO_TEXT}, text text</li>
+     * <li>{@link #ERROR}, contain {@link Constants#BACKTICK}</li>
+     * </ul>
      * @see #appendMySqlIdentifier(String, StringBuilder)
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/identifiers.html">Schema Object Names</a>
      */
-    private static boolean isMySqlSimpleIdentifier(final @Nullable String text) {
-        if (text == null) {
-            return false;
-        }
+    private static int mySqlIdentifierHandleMode(final String text) {
         final int length = text.length();
+        int resultCode = SIMPLE;
         char ch;
-        boolean match = true;
+        int charCount = 0;
         for (int i = 0; i < length; i++) {
             ch = text.charAt(i);
+
+            if (ch == Constants.BACKTICK) {
+                resultCode = ERROR;
+                charCount++;
+                break;
+            }
             if (ch > '\u0080' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' || ch == '$') {
+                charCount++;
                 continue;
             }
 
-            if ((ch < '0' || ch > '9') || i == 0) {
-                match = false;
-                break;
+            if (ch >= '0' && ch <= '9') {
+                charCount++;
+                if (i == 0) {
+                    resultCode = QUOTE;
+                    break;
+                }
+            } else {
+                if (!Character.isWhitespace(ch)) {
+                    charCount++;
+                }
+                resultCode = QUOTE;
             }
-
         }
-        return match;
+
+        if (charCount == 0) {
+            resultCode = HAVE_NO_TEXT;
+        }
+        return resultCode;
     }
 
 
@@ -377,6 +429,11 @@ public abstract class MySQLStrings extends JdbdStrings {
         }
 
         builder.append(Constants.QUOTE);
+    }
+
+
+    private static IllegalStateException unknownHandleMode() {
+        return new IllegalStateException("unknown handle mode");
     }
 
 

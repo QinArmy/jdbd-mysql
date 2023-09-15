@@ -279,8 +279,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final StringBuilder builder = new StringBuilder(12 + name.length());
         builder.append("SAVEPOINT ");
 
-        if (MySQLStrings.appendMySqlIdentifier(name, builder)) {
-            return Mono.error(MySQLExceptions.mysqlIdentifierContainBacktickError(name));
+        final RuntimeException error;
+        if ((error = MySQLStrings.appendMySqlIdentifier(name, builder)) != null) {
+            return Mono.error(error);
         }
         return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn(NamedSavePoint.fromName(name));
@@ -309,8 +310,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final StringBuilder builder = new StringBuilder(22 + name.length());
         builder.append("RELEASE SAVEPOINT ");
 
-        if (MySQLStrings.appendMySqlIdentifier(name, builder)) {
-            return Mono.error(MySQLExceptions.mysqlIdentifierContainBacktickError(name));
+        final RuntimeException error;
+        if ((error = MySQLStrings.appendMySqlIdentifier(name, builder)) != null) {
+            return Mono.error(error);
         }
         return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn((S) this);
@@ -339,8 +341,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final StringBuilder builder = new StringBuilder(25 + name.length());
         builder.append("ROLLBACK TO SAVEPOINT ");
 
-        if (MySQLStrings.appendMySqlIdentifier(name, builder)) {
-            return Mono.error(MySQLExceptions.mysqlIdentifierContainBacktickError(name));
+        final RuntimeException error;
+        if ((error = MySQLStrings.appendMySqlIdentifier(name, builder)) != null) {
+            return Mono.error(error);
         }
         return this.protocol.update(Stmts.stmt(builder.toString()))
                 .thenReturn((S) this);
@@ -377,8 +380,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @SuppressWarnings("unchecked")
     @Override
     public final S appendIdentifier(String identifier, StringBuilder builder) throws JdbdException {
-        if (MySQLStrings.appendMySqlIdentifier(identifier, builder)) {
-            throw MySQLExceptions.mysqlIdentifierContainBacktickError(identifier);
+        final RuntimeException error;
+        if ((error = MySQLStrings.appendMySqlIdentifier(identifier, builder)) != null) {
+            throw error;
         }
         return (S) this;
     }

@@ -4,6 +4,7 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.env.MySQLKey;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.BigColumnValue;
@@ -13,7 +14,6 @@ import io.jdbd.result.ResultRowMeta;
 import io.jdbd.session.Isolation;
 import io.jdbd.type.BlobPath;
 import io.jdbd.type.TextPath;
-import io.jdbd.util.JdbdUtils;
 import io.jdbd.vendor.env.Environment;
 import io.jdbd.vendor.result.ColumnConverts;
 import io.jdbd.vendor.result.ColumnMeta;
@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -595,87 +594,48 @@ abstract class MySQLResultSetReader implements ResultSetReader {
     }
 
 
-    @SuppressWarnings("all")
-    private static Flux<String> toStringFlux(final MySQLColumnMeta meta, final TextPath path) {
-        return Flux.create(sink -> {
-            final Charset charset;
-            charset = path.charset();
-            try (FileChannel channel = FileChannel.open(path.value(), JdbdUtils.openOptionSet(path))) {
-                final ByteBuffer buffer = ByteBuffer.allocate(2048);
+    private static <T> Flux<T> setTypeToFlux(final ColumnMeta meta, final String source, final Class<T> elementClass) {
 
-                for (int i = 0; channel.read(buffer) > 0; i++) {
-                    buffer.flip();
-                    sink.next(charset.decode(buffer).toString());
-                    buffer.clear();
+        Flux<T> flux;
+        try {
+            final Collection<T> collection;
+            collection = parseSetString(meta, source, elementClass, MySQLCollections::arrayList);
+            flux = Flux.fromIterable(collection);
+        } catch (Throwable e) {
+            flux = Flux.error(MySQLExceptions.wrap(e));
+        }
 
-                    if ((i & 31) == 0 && sink.isCancelled()) {
-                        break;
-                    }
-                }
-
-                sink.complete();
-            } catch (Throwable e) {
-                sink.error(MySQLExceptions.wrap(e));
-            }
-
-        });
+        return flux;
     }
 
-    @SuppressWarnings("all")
-    private static Flux<byte[]> toBinaryFlux(final MySQLColumnMeta meta, final BlobPath path) {
-        return Flux.create(sink -> {
-            try (FileChannel channel = FileChannel.open(path.value(), JdbdUtils.openOptionSet(path))) {
-
-                final ByteBuffer buffer = ByteBuffer.allocate(2048);
-                byte[] dataBytes;
-                for (int i = 0; channel.read(buffer) > 0; i++) {
-                    buffer.flip();
-                    dataBytes = new byte[buffer.remaining()];
-                    buffer.get(dataBytes);
-                    sink.next(dataBytes);
-                    buffer.clear();
-
-                    if ((i & 31) == 0 && sink.isCancelled()) {
-                        break;
-                    }
-                }
-
-                sink.complete();
-            } catch (Throwable e) {
-                sink.error(MySQLExceptions.wrap(e));
-            }
-
-        });
-    }
-
+    /**
+     * @throws IllegalArgumentException throw when {@link Enum#valueOf(Class, String)} throw
+     */
     @SuppressWarnings("unchecked")
-    private static <T> Flux<T> setTypeToFlux(final String source, final Class<T> elementClass) {
-        return Flux.create(sink -> {
-            final Class<?> actualClass;
-            if (Enum.class.isAssignableFrom(elementClass) && elementClass.isAnonymousClass()) {
-                actualClass = elementClass.getSuperclass();
+    private static <T, S extends Collection<T>> S parseSetString(final ColumnMeta meta, final String source,
+                                                                 final Class<T> elementClass,
+                                                                 final IntFunction<S> constructor)
+            throws IllegalArgumentException {
+        final Class<?> actualClass;
+        if (Enum.class.isAssignableFrom(elementClass) && elementClass.isAnonymousClass()) {
+            actualClass = elementClass.getSuperclass();
+        } else {
+            actualClass = elementClass;
+        }
+        final String[] elementArray;
+        elementArray = source.split(",");
+        final S collection = constructor.apply(elementArray.length);
+
+        Enum<?> enumValue;
+        for (String e : elementArray) {
+            if (actualClass == String.class) {
+                collection.add((T) e);
             } else {
-                actualClass = elementClass;
+                enumValue = ColumnConverts.convertToEnum(meta, actualClass, e);
+                collection.add((T) enumValue);
             }
-            try {
-
-                final String[] elementArray;
-                elementArray = source.split(",");
-                Enum<?> enumValue;
-                for (String e : elementArray) {
-                    if (actualClass == String.class) {
-                        sink.next((T) e);
-                    } else {
-                        enumValue = ColumnConverts.convertToEnum(actualClass, e);
-                        sink.next((T) enumValue);
-                    }
-                }
-                sink.complete();
-            } catch (Throwable e) {
-                sink.error(MySQLExceptions.wrap(e));
-            }
-
-        });
+        }
+        return collection;
     }
 
 
@@ -807,33 +767,10 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             }
 
             final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
-            final T value;
-            if (columnClass == Isolation.class) {
-                value = (T) toIsolation(meta, source);
-            } else if (!(source instanceof Duration)) {
-                value = ColumnConverts.convertToTarget(meta, source, columnClass, rowMeta.serverZone);
-            } else if (columnClass == String.class) {
-                value = (T) MySQLTimes.durationToTimeText((Duration) source);
-            } else {
-                throw JdbdExceptions.cannotConvertColumnValue(meta, source, columnClass, null);
-            }
-            return value;
-        }
-
-        @Override
-        public final String getString(final int indexBasedZero) throws JdbdException {
-            final MySQLRowMeta rowMeta = this.rowMeta;
-            final Object source;
-            source = this.columnArray[rowMeta.checkIndex(indexBasedZero)];
-            if (source == null) {
-                return null;
-            }
-
-            final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
-            final String value;
-            if (source instanceof byte[]) {
+            final Object value;
+            if (columnClass == String.class && source instanceof byte[]) {
                 value = new String((byte[]) source, rowMeta.columnCharset(meta.columnCharset));
-            } else if (source instanceof BlobPath) {
+            } else if (columnClass == String.class && source instanceof BlobPath) {
                 try {
                     if (Files.size(((BlobPath) source).value()) > (Integer.MAX_VALUE - 128)) {
                         throw JdbdExceptions.cannotConvertColumnValue(meta, source, String.class, null);
@@ -844,12 +781,16 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 } catch (Throwable e) {
                     throw JdbdExceptions.cannotConvertColumnValue(meta, source, String.class, e);
                 }
-            } else if (source instanceof Duration) {
+            } else if (columnClass == Isolation.class) {
+                value = toIsolation(meta, source);
+            } else if (!(source instanceof Duration)) {
+                value = ColumnConverts.convertToTarget(meta, source, columnClass, rowMeta.serverZone);
+            } else if (columnClass == String.class) {
                 value = MySQLTimes.durationToTimeText((Duration) source);
             } else {
-                value = ColumnConverts.convertToTarget(meta, source, String.class, rowMeta.serverZone);
+                throw JdbdExceptions.cannotConvertColumnValue(meta, source, columnClass, null);
             }
-            return value;
+            return (T) value;
         }
 
 
@@ -865,7 +806,6 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             throw JdbdExceptions.cannotConvertColumnValue(meta, source, List.class, null);
         }
 
-        @SuppressWarnings("unchecked")
         @Override
         public final <T> Set<T> getSet(int indexBasedZero, Class<T> elementClass, IntFunction<Set<T>> constructor)
                 throws JdbdException {
@@ -877,40 +817,16 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
             if (meta.sqlType != MySQLType.SET) {
                 throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, null);
+            } else if (elementClass != String.class && !Enum.class.isAssignableFrom(elementClass)) {
+                throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, null);
             }
 
             if (source == null) {
-                return Collections.emptySet();
-            }
-
-            final Class<?> actualClass;
-            if (elementClass == String.class) {
-                actualClass = elementClass;
-            } else if (!Enum.class.isAssignableFrom(elementClass)) {
-                throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, null);
-            } else if (elementClass.isAnonymousClass()) {
-                actualClass = elementClass.getSuperclass();
-            } else {
-                actualClass = elementClass;
+                return constructor.apply(0);
             }
 
             try {
-
-                final String[] elementArray;
-                elementArray = ((String) source).split(",");
-
-                final Set<T> set = constructor.apply((int) (elementArray.length / 0.75f));
-                Enum<?> enumValue;
-                for (String e : elementArray) {
-                    if (actualClass == String.class) {
-                        set.add((T) e);
-                    } else {
-                        enumValue = ColumnConverts.convertToEnum(actualClass, e);
-                        set.add((T) enumValue);
-                    }
-                }
-
-                return set;
+                return parseSetString(meta, (String) source, elementClass, constructor);
             } catch (Throwable e) {
                 throw JdbdExceptions.cannotConvertElementColumnValue(meta, source, Set.class, elementClass, e);
             }
@@ -946,26 +862,17 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 case VARCHAR:
                 case TINYTEXT:
                 case TEXT:
-                case MEDIUMTEXT: {
-                    if (source == null) {
-                        publisher = Flux.empty();
-                    } else if (valueClass == String.class && source instanceof String) {
-                        publisher = Flux.just((T) source);
-                    } else {
-                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
-                    }
-                }
-                break;
+                case MEDIUMTEXT:
                 case LONGTEXT:
                 case JSON: {
-                    if (source == null) {
-                        publisher = Flux.empty();
-                    } else if (valueClass != String.class) {
+                    if (valueClass != String.class) {
                         throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    } else if (source == null) {
+                        publisher = Flux.empty();
                     } else if (source instanceof String) {
                         publisher = Flux.just((T) source);
                     } else if (source instanceof TextPath) {
-                        publisher = (Flux<T>) toStringFlux(meta, (TextPath) source);
+                        publisher = (Flux<T>) ColumnConverts.convertToClobPublisher(meta, (TextPath) source, 2048);
                     } else {
                         // no bug,never here
                         throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
@@ -976,26 +883,17 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                 case VARBINARY:
                 case TINYBLOB:
                 case BLOB:
-                case MEDIUMBLOB: {
-                    if (source == null) {
-                        publisher = Flux.empty();
-                    } else if (valueClass == byte[].class && source instanceof byte[]) {
-                        publisher = Flux.just((T) source);
-                    } else {
-                        throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
-                    }
-                }
-                break;
+                case MEDIUMBLOB:
                 case GEOMETRY:
                 case LONGBLOB: {
-                    if (source == null) {
-                        publisher = Flux.empty();
-                    } else if (valueClass != byte[].class) {
+                    if (valueClass != byte[].class) {
                         throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
+                    } else if (source == null) {
+                        publisher = Flux.empty();
                     } else if (source instanceof byte[]) {
                         publisher = Flux.just((T) source);
                     } else if (source instanceof BlobPath) {
-                        publisher = (Flux<T>) toBinaryFlux(meta, (BlobPath) source);
+                        publisher = (Flux<T>) ColumnConverts.convertToBlobPublisher(meta, (BlobPath) source, 2048);
                     } else {
                         // no bug,never here
                         throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
@@ -1006,7 +904,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                     if (valueClass != String.class && !Enum.class.isAssignableFrom(valueClass)) {
                         throw MySQLExceptions.cannotConvertElementColumnValue(meta, source, Publisher.class, valueClass, null);
                     }
-                    publisher = setTypeToFlux((String) source, valueClass);
+                    publisher = setTypeToFlux(meta, (String) source, valueClass);
                 }
                 break;
                 default:

@@ -99,7 +99,7 @@ public class MySQLStringsTests {
      */
     @Test
     public void appendMySqlIdentifierError() {
-        Assert.assertTrue(MySQLStrings.appendMySqlIdentifier("There is ` ", new StringBuilder()));
+        Assert.assertNotNull(MySQLStrings.appendMySqlIdentifier("There is ` ", new StringBuilder()));
     }
 
 

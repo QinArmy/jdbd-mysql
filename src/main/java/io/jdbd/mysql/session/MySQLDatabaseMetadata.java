@@ -82,23 +82,21 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      */
     @Override
     public Publisher<SchemaMeta> schemas(final Function<Option<?>, ?> optionFunc) {
+        final Object nameValue, catalogValue;
+        catalogValue = optionFunc.apply(DatabaseMetaData.CATALOG);
+        if (catalogValue instanceof String && !catalogValue.equals("def")) {
+            return Flux.empty();
+        }
+
         final StringBuilder builder = new StringBuilder(30);
         builder.append("SHOW DATABASES");
 
-        final Object nameValue;
         nameValue = optionFunc.apply(Option.NAME);
 
         if (nameValue instanceof String) {
             final boolean backslashEscapes;
             backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
-
-            if (((String) nameValue).indexOf(Constants.COMMA) < 0) {
-                builder.append(" LIKE ");
-                MySQLStrings.appendLiteral((String) nameValue, backslashEscapes, builder);
-            } else {
-                builder.append(" WHERE `Database` ");
-                appendInPredicate((String) nameValue, backslashEscapes, builder, UnaryOperator.identity());
-            }
+            appendNamePredicate((String) nameValue, backslashEscapes, builder, UnaryOperator.identity());
         }
         return this.protocol.query(Stmts.stmt(builder.toString()), this::mapSchema, ResultStates.IGNORE_STATES);
     }
