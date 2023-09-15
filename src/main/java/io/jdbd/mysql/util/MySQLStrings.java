@@ -89,6 +89,8 @@ public abstract class MySQLStrings extends JdbdStrings {
                         .append(Constants.BACKTICK);
             }
             break;
+            case HAVE_NO_TEXT:
+                throw MySQLExceptions.identifierNoText();
             case ERROR:
                 throw MySQLExceptions.mysqlIdentifierContainBacktickError(objectName);
             default:
