@@ -20,6 +20,7 @@ public class ReportBugTests {
     @Test
     public void reportBug() {
         final Consumer<FluxSink<Integer>> consumer = sink -> EXECUTOR.execute(() -> {
+            
             for (int i = 255; i < 300; i++) {
                 sink.next(i);
             }

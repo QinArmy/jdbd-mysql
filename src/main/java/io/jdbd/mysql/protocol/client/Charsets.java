@@ -344,7 +344,7 @@ public abstract class Charsets {
     }
 
     private static List<Collation> createCollationList() {
-        final List<Collation> list = MySQLCollections.arrayList(300);
+        final List<Collation> list = MySQLCollections.arrayList(303);
 
         // complete list of mysql collations and their corresponding character sets each element of collation[1]..collation[MAP_SIZE-1] must not be null
         list.add(new Collation(1, "big5_chinese_ci", 1, "big5"));
@@ -687,28 +687,44 @@ public abstract class Charsets {
         list.add(new Collation(308, "utf8mb4_zh_0900_as_cs", 0, "utf8mb4"));
         list.add(new Collation(309, "utf8mb4_0900_bin", 0, "utf8mb4"));
 
+        list.add(new Collation(310, "utf8mb4_nb_0900_ai_ci", 0, "utf8mb4"));
+        list.add(new Collation(311, "utf8mb4_nb_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(312, "utf8mb4_nn_0900_ai_ci", 0, "utf8mb4"));
+        list.add(new Collation(313, "utf8mb4_nn_0900_as_cs", 0, "utf8mb4"));
+
+        list.add(new Collation(314, "utf8mb4_sr_latn_0900_ai_ci", 0, "utf8mb4"));
+        list.add(new Collation(315, "utf8mb4_sr_latn_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(316, "utf8mb4_bs_0900_ai_ci", 0, "utf8mb4"));
+        list.add(new Collation(317, "utf8mb4_bs_0900_as_cs", 0, "utf8mb4"));
+
         list.add(new Collation(318, "utf8mb4_bg_0900_ai_ci", 0, "utf8mb4"));
-        list.add(new Collation(326, "utf8mb4_test_ci", 0, "utf8mb4")); // 326 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(327, "utf16_test_ci", 0, "utf16")); // 327 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(328, "utf8mb4_test_400_ci", 0, "utf8mb4")); // 328 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(319, "utf8mb4_bg_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(320, "utf8mb4_gl_0900_ai_ci", 0, "utf8mb4"));
+        list.add(new Collation(321, "utf8mb4_gl_0900_as_cs", 0, "utf8mb4"));
 
-        list.add(new Collation(336, "utf8_bengali_standard_ci", 0, "utf8")); // 336 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(337, "utf8_bengali_traditional_ci", 0, "utf8")); // 337 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(352, "utf8_phone_ci", 0, "utf8")); // 352 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(353, "utf8_test_ci", 0, "utf8")); // 353 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(322, "utf8mb4_mn_cyrl_0900_ai_ci", 0, "utf8mb4"));
+        list.add(new Collation(323, "utf8mb4_mn_cyrl_0900_as_cs", 0, "utf8mb4"));
+        list.add(new Collation(326, "utf8mb4_test_ci", 0, "utf8mb4", false)); // 326 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(327, "utf16_test_ci", 0, "utf16", false)); // 327 don't exists in database, MySQL 8.1.0 mac
 
-        list.add(new Collation(354, "utf8_5624_1", 0, "utf8")); // 354 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(355, "utf8_5624_2", 0, "utf8")); // 355 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(356, "utf8_5624_3", 0, "utf8")); // 356 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(357, "utf8_5624_4", 0, "utf8")); // 357 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(328, "utf8mb4_test_400_ci", 0, "utf8mb4", false)); // 328 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(336, "utf8_bengali_standard_ci", 0, "utf8", false)); // 336 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(337, "utf8_bengali_traditional_ci", 0, "utf8", false)); // 337 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(352, "utf8_phone_ci", 0, "utf8", false)); // 352 don't exists in database, MySQL 8.1.0 mac
 
-        list.add(new Collation(358, "ucs2_test_ci", 0, "ucs2")); // 358 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(359, "ucs2_vn_ci", 0, "ucs2")); // 359 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(360, "ucs2_5624_1", 0, "ucs2")); // 360 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(368, "utf8_5624_5", 0, "utf8")); // 368 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(353, "utf8_test_ci", 0, "utf8", false)); // 353 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(354, "utf8_5624_1", 0, "utf8", false)); // 354 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(355, "utf8_5624_2", 0, "utf8", false)); // 355 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(356, "utf8_5624_3", 0, "utf8", false)); // 356 don't exists in database, MySQL 8.1.0 mac
 
-        list.add(new Collation(391, "utf32_test_ci", 0, "utf32")); // 391 don't exists in database, MySQL 8.1.0 mac
-        list.add(new Collation(2047, "utf8_maxuserid_ci", 0, "utf8")); // 2047 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(357, "utf8_5624_4", 0, "utf8", false)); // 357 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(358, "ucs2_test_ci", 0, "ucs2", false)); // 358 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(359, "ucs2_vn_ci", 0, "ucs2", false)); // 359 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(360, "ucs2_5624_1", 0, "ucs2", false)); // 360 don't exists in database, MySQL 8.1.0 mac
+
+        list.add(new Collation(368, "utf8_5624_5", 0, "utf8", false)); // 368 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(391, "utf32_test_ci", 0, "utf32", false)); // 391 don't exists in database, MySQL 8.1.0 mac
+        list.add(new Collation(2047, "utf8_maxuserid_ci", 0, "utf8", false)); // 2047 don't exists in database, MySQL 8.1.0 mac
 
         return Collections.unmodifiableList(list);
     }
