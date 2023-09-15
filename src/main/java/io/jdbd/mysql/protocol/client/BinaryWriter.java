@@ -51,8 +51,6 @@ abstract class BinaryWriter {
 
     final int capability;
 
-    final int maxAllowedPacket;
-
     BinaryWriter(final TaskAdjutant adjutant) {
         this.adjutant = adjutant;
         this.clientCharset = adjutant.charsetClient();
@@ -62,7 +60,6 @@ abstract class BinaryWriter {
         serverVersion = adjutant.handshake10().serverVersion;
         this.supportZoneOffset = serverVersion.isSupportZoneOffset();
         this.capability = adjutant.capability();
-        this.maxAllowedPacket = adjutant.sessionMaxAllowedPacket();
     }
 
 

@@ -44,6 +44,9 @@
         <Logger name="io.jdbd.mysql.session.MySQLDatabaseSessionFactory" level="TRACE" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
+        <Logger name="io.jdbd.mysql.protocol.client.OkPacket" level="TRACE" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
         <!--        <Logger name="reactor.netty.tcp.ssl" level="INFO" additivity="false">-->
         <!--            <AppenderRef ref="Console"/>-->
         <!--        </Logger>-->

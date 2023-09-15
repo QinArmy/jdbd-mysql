@@ -4,8 +4,6 @@ import io.jdbd.meta.DataType;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.util.MySQLCollections;
-import io.jdbd.mysql.util.MySQLStrings;
-import io.jdbd.result.FieldType;
 import io.jdbd.vendor.result.ColumnMeta;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
@@ -75,8 +73,6 @@ final class MySQLColumnMeta implements ColumnMeta {
 
     final short decimals;
 
-    final FieldType fieldType;
-
     final MySQLType sqlType;
 
 
@@ -84,7 +80,7 @@ final class MySQLColumnMeta implements ColumnMeta {
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html">Protocol::ColumnDefinition41</a>
      */
     private MySQLColumnMeta(int columnIndex, final ByteBuf cumulateBuffer, final Charset metaCharset,
-                            final Map<Integer, CustomCollation> customCollationMap, final FixedEnv env) {
+                            final Map<Integer, CustomCollation> customCollationMap) {
 
         this.columnIndex = columnIndex;
         // 1. catalog
@@ -123,8 +119,7 @@ final class MySQLColumnMeta implements ColumnMeta {
         //0x00 to 0x51 for decimals
         this.decimals = (short) Packets.readInt1AsInt(cumulateBuffer);
 
-        this.fieldType = parseFieldType(this);
-        this.sqlType = parseSqlType(this, env);
+        this.sqlType = parseSqlType(this);
     }
 
 
@@ -418,7 +413,6 @@ final class MySQLColumnMeta implements ColumnMeta {
         final int columnCount = metaArray.length;
         final TaskAdjutant adjutant = metaAdjutant.adjutant();
         final Charset metaCharset = adjutant.obtainCharsetMeta();
-        final FixedEnv env = adjutant.getFactory();
 
         final Map<Integer, CustomCollation> customCollationMap = adjutant.obtainCustomCollationMap();
 
@@ -432,7 +426,7 @@ final class MySQLColumnMeta implements ColumnMeta {
 
             payloadIndex = cumulateBuffer.readerIndex();
 
-            columnMeta = new MySQLColumnMeta(i, cumulateBuffer, metaCharset, customCollationMap, env);
+            columnMeta = new MySQLColumnMeta(i, cumulateBuffer, metaCharset, customCollationMap);
             metaArray[i] = columnMeta;
             if (columnMeta.columnCharset == null) {
                 if (unknownCollationSet == null) {
@@ -458,31 +452,17 @@ final class MySQLColumnMeta implements ColumnMeta {
     }
 
 
-    private static FieldType parseFieldType(final MySQLColumnMeta columnMeta) {
-        final String tableName = columnMeta.tableName;
-        final FieldType fieldType;
-        if (!MySQLStrings.hasText(tableName)) {
-            fieldType = FieldType.EXPRESSION;
-        } else if (tableName.startsWith("#sql_")) {// TODO zoro complete
-            fieldType = FieldType.PHYSICAL_FILED;
-        } else {
-            fieldType = FieldType.FIELD;
-        }
-        return fieldType;
-    }
-
-
     @SuppressWarnings("deprecation")
-    private static MySQLType parseSqlType(final MySQLColumnMeta columnMeta, final FixedEnv env) {
+    private static MySQLType parseSqlType(final MySQLColumnMeta meta) {
         final MySQLType type;
-        switch (columnMeta.typeFlag) {
+        switch (meta.typeFlag) {
             case Constants.TYPE_DECIMAL:
             case Constants.TYPE_NEWDECIMAL:
-                type = columnMeta.isUnsigned() ? MySQLType.DECIMAL_UNSIGNED : MySQLType.DECIMAL;
+                type = meta.isUnsigned() ? MySQLType.DECIMAL_UNSIGNED : MySQLType.DECIMAL;
                 break;
             case Constants.TYPE_TINY: {
-                final boolean unsigned = columnMeta.isUnsigned();
-                if (columnMeta.length == 1) {
+                final boolean unsigned = meta.isUnsigned();
+                if (meta.length == 1 && !unsigned) {
                     type = MySQLType.BOOLEAN;
                 } else {
                     type = unsigned ? MySQLType.TINYINT_UNSIGNED : MySQLType.TINYINT;
@@ -490,16 +470,16 @@ final class MySQLColumnMeta implements ColumnMeta {
             }
             break;
             case Constants.TYPE_LONG:
-                type = columnMeta.isUnsigned() ? MySQLType.INT_UNSIGNED : MySQLType.INT;
+                type = meta.isUnsigned() ? MySQLType.INT_UNSIGNED : MySQLType.INT;
                 break;
             case Constants.TYPE_LONGLONG:
-                type = columnMeta.isUnsigned() ? MySQLType.BIGINT_UNSIGNED : MySQLType.BIGINT;
+                type = meta.isUnsigned() ? MySQLType.BIGINT_UNSIGNED : MySQLType.BIGINT;
                 break;
             case Constants.TYPE_TIMESTAMP:
                 type = MySQLType.TIMESTAMP;
                 break;
             case Constants.TYPE_INT24:
-                type = columnMeta.isUnsigned() ? MySQLType.MEDIUMINT_UNSIGNED : MySQLType.MEDIUMINT;
+                type = meta.isUnsigned() ? MySQLType.MEDIUMINT_UNSIGNED : MySQLType.MEDIUMINT;
                 break;
             case Constants.TYPE_DATE:
                 type = MySQLType.DATE;
@@ -514,14 +494,34 @@ final class MySQLColumnMeta implements ColumnMeta {
                 type = MySQLType.YEAR;
                 break;
             case Constants.TYPE_VARCHAR:
-            case Constants.TYPE_VAR_STRING:
-                type = fromVarcharOrVarString(columnMeta, env);
-                break;
-            case Constants.TYPE_STRING:
-                type = fromString(columnMeta);
-                break;
+            case Constants.TYPE_VAR_STRING: {
+                if (meta.isEnum()) {
+                    type = MySQLType.ENUM;
+                } else if (meta.isSetType()) {
+                    type = MySQLType.SET;
+                } else if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    // https://dev.mysql.com/doc/refman/5.7/en/binary-varbinary.html , VARBINARY have the binary character set and collation
+                    type = MySQLType.VARBINARY;
+                } else {
+                    type = MySQLType.VARCHAR;
+                }
+            }
+            break;
+            case Constants.TYPE_STRING: {
+                if (meta.isEnum()) {
+                    type = MySQLType.ENUM;
+                } else if (meta.isSetType()) {
+                    type = MySQLType.SET;
+                } else if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    // https://dev.mysql.com/doc/refman/5.7/en/binary-varbinary.html , VARBINARY have the binary character set and collation
+                    type = MySQLType.BINARY;
+                } else {
+                    type = MySQLType.CHAR;
+                }
+            }
+            break;
             case Constants.TYPE_SHORT:
-                type = columnMeta.isUnsigned() ? MySQLType.SMALLINT_UNSIGNED : MySQLType.SMALLINT;
+                type = meta.isUnsigned() ? MySQLType.SMALLINT_UNSIGNED : MySQLType.SMALLINT;
                 break;
             case Constants.TYPE_BIT:
                 type = MySQLType.BIT;
@@ -539,26 +539,66 @@ final class MySQLColumnMeta implements ColumnMeta {
                 type = MySQLType.NULL;
                 break;
             case Constants.TYPE_FLOAT:
-                type = columnMeta.isUnsigned() ? MySQLType.FLOAT_UNSIGNED : MySQLType.FLOAT;
+                type = meta.isUnsigned() ? MySQLType.FLOAT_UNSIGNED : MySQLType.FLOAT;
                 break;
             case Constants.TYPE_DOUBLE:
-                type = columnMeta.isUnsigned() ? MySQLType.DOUBLE_UNSIGNED : MySQLType.DOUBLE;
+                type = meta.isUnsigned() ? MySQLType.DOUBLE_UNSIGNED : MySQLType.DOUBLE;
                 break;
             case Constants.TYPE_TINY_BLOB: {
-                type = fromTinyBlob(columnMeta, env);
+                // https://dev.mysql.com/doc/refman/5.7/en/blob.html , blob have binary character set
+                if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    type = MySQLType.TINYBLOB;
+                } else {
+                    type = MySQLType.TINYTEXT;
+                }
             }
             break;
             case Constants.TYPE_MEDIUM_BLOB: {
-                type = fromMediumBlob(columnMeta, env);
+                // https://dev.mysql.com/doc/refman/5.7/en/blob.html , blob have binary character set
+                if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    type = MySQLType.MEDIUMBLOB;
+                } else {
+                    type = MySQLType.MEDIUMTEXT;
+                }
             }
             break;
             case Constants.TYPE_LONG_BLOB: {
-                type = fromLongBlob(columnMeta, env);
+                // https://dev.mysql.com/doc/refman/5.7/en/blob.html , blob have binary character set
+                if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    type = MySQLType.LONGBLOB;
+                } else {
+                    type = MySQLType.LONGTEXT;
+                }
             }
             break;
-            case Constants.TYPE_BLOB:
-                type = fromBlob(columnMeta, env);
-                break;
+            case Constants.TYPE_BLOB: {
+                final long maxLength = meta.length;
+                // https://dev.mysql.com/doc/refman/5.7/en/blob.html , blob have binary character set
+                if (maxLength < (1 << 8)) {
+                    if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                        type = MySQLType.TINYBLOB;
+                    } else {
+                        type = MySQLType.TINYTEXT;
+                    }
+                } else if (meta.length < (1 << 16)) {
+                    if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                        type = MySQLType.BLOB;
+                    } else {
+                        type = MySQLType.TEXT;
+                    }
+                } else if (maxLength < (1 << 24)) {
+                    if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                        type = MySQLType.MEDIUMBLOB;
+                    } else {
+                        type = MySQLType.MEDIUMTEXT;
+                    }
+                } else if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    type = MySQLType.LONGBLOB;
+                } else {
+                    type = MySQLType.LONGTEXT;
+                }
+            }
+            break;
             case Constants.TYPE_BOOL:
                 type = MySQLType.BOOLEAN;
                 break;
@@ -569,117 +609,6 @@ final class MySQLColumnMeta implements ColumnMeta {
                 type = MySQLType.UNKNOWN;
         }
         return type;
-    }
-
-
-    private static MySQLType fromVarcharOrVarString(final MySQLColumnMeta meta, final FixedEnv env) {
-        final MySQLType type;
-        if (meta.isEnum()) {
-            type = MySQLType.ENUM;
-        } else if (meta.isSetType()) {
-            type = MySQLType.SET;
-        } else if (isOpaqueBinary(meta) && !isFunctionsNeverReturnBlobs(meta, env)) {
-            type = MySQLType.VARBINARY;
-        } else {
-            type = MySQLType.VARCHAR;
-        }
-        return type;
-    }
-
-    private static MySQLType fromBlob(final MySQLColumnMeta meta, final FixedEnv env) {
-        // Sometimes MySQL uses this protocol-level type for all possible BLOB variants,
-        // we can divine what the actual type is by the length reported
-
-        final MySQLType type;
-
-        final long maxLength = meta.length;
-        // fixing initial type according to length
-        if (maxLength <= 255L) {
-            type = fromTinyBlob(meta, env);
-        } else if (meta.length <= (1 << 16) - 1) {
-            if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
-                type = MySQLType.TEXT;
-            } else {
-                type = MySQLType.BLOB;
-            }
-        } else if (maxLength <= (1 << 24) - 1) {
-            type = fromMediumBlob(meta, env);
-        } else {
-            type = fromLongBlob(meta, env);
-        }
-        return type;
-    }
-
-    private static MySQLType fromTinyBlob(final MySQLColumnMeta meta, final FixedEnv env) {
-        final MySQLType type;
-        if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
-            type = MySQLType.TINYTEXT;
-        } else {
-            type = MySQLType.TINYBLOB;
-        }
-        return type;
-    }
-
-    private static MySQLType fromMediumBlob(final MySQLColumnMeta meta, final FixedEnv env) {
-        final MySQLType type;
-        if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
-            type = MySQLType.MEDIUMTEXT;
-        } else {
-            type = MySQLType.MEDIUMBLOB;
-        }
-        return type;
-    }
-
-    private static MySQLType fromLongBlob(final MySQLColumnMeta meta, final FixedEnv env) {
-        final MySQLType type;
-        if (meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary) {
-            type = MySQLType.LONGTEXT;
-        } else {
-            type = MySQLType.LONGBLOB;
-        }
-        return type;
-    }
-
-    private static MySQLType fromString(MySQLColumnMeta columnMeta) {
-        final MySQLType mySQLType;
-        if (columnMeta.isEnum()) {
-            mySQLType = MySQLType.ENUM;
-        } else if (columnMeta.isSetType()) {
-            mySQLType = MySQLType.SET;
-        } else if (columnMeta.isBinary() || isOpaqueBinary(columnMeta)) {
-            mySQLType = MySQLType.BINARY;
-        } else {
-            mySQLType = MySQLType.CHAR;
-        }
-        return mySQLType;
-    }
-
-    private static boolean isOpaqueBinary(MySQLColumnMeta columnMeta) {
-
-        boolean isImplicitTemporaryTable = columnMeta.tableName != null
-                && columnMeta.tableName.startsWith("#sql_"); //TODO check tableName or tableAlias
-
-        boolean isBinaryString = columnMeta.isBinary()
-                && columnMeta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary
-                && (columnMeta.typeFlag == Constants.TYPE_STRING
-                || columnMeta.typeFlag == Constants.TYPE_VAR_STRING
-                || columnMeta.typeFlag == Constants.TYPE_VARCHAR);
-
-        return isBinaryString
-                // queries resolved by temp tables also have this 'signature', check for that
-                ? !isImplicitTemporaryTable : columnMeta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary;
-
-    }
-
-    private static boolean isFunctionsNeverReturnBlobs(final MySQLColumnMeta meta, final FixedEnv env) {
-        return MySQLStrings.isEmpty(meta.tableName) && env.functionsNeverReturnBlobs;
-    }
-
-    private static boolean isBlobTypeReturnText(final MySQLColumnMeta meta, final FixedEnv env) {
-        return !meta.isBinary()
-                || meta.collationIndex != Charsets.MYSQL_COLLATION_INDEX_binary
-                || env.blobsAreStrings
-                || isFunctionsNeverReturnBlobs(meta, env);
     }
 
 

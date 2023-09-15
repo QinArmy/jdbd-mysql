@@ -17,13 +17,9 @@ public interface SessionEnv {
     @Nullable
     ZoneOffset connZone();
 
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/time-zone-support.html#time-zone-variables">Time Zone Variables</a>
+     */
     ZoneOffset serverZone();
-
-    boolean isSupportLocalInfile();
-
-
-    int globalMaxAllowedPacket();
-
-    int sessionMaxAllowedPacket();
 
 }

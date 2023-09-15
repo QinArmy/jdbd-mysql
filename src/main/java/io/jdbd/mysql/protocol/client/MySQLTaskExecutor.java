@@ -5,6 +5,7 @@ import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHostInfo;
+import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;
@@ -14,6 +15,7 @@ import io.jdbd.vendor.env.JdbdHost;
 import io.jdbd.vendor.task.CommunicationTask;
 import io.jdbd.vendor.task.CommunicationTaskExecutor;
 import io.jdbd.vendor.util.JdbdSoftReference;
+import io.jdbd.vendor.util.Pair;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,11 +24,10 @@ import reactor.netty.Connection;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.function.BiFunction;
@@ -344,14 +345,6 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
             return map;
         }
 
-        @Override
-        public int sessionMaxAllowedPacket() {
-            final SessionEnv server = this.sessionEnv;
-            if (server == null) {
-                throw new IllegalStateException("Cannot access server now.");
-            }
-            return server.sessionMaxAllowedPacket();
-        }
 
         @Override
         public SessionEnv sessionEnv() {
@@ -439,7 +432,79 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
                 }
             }
             SERVER_STATUS.set(this, terminator.statusFags);
+
+            final OkPacket.StateOption stateOption;
+            if (this.sessionEnv != null
+                    && terminator instanceof OkPacket
+                    && (stateOption = ((OkPacket) terminator).stateOption) != null
+                    && stateOption.variablePairList.size() > 0) {
+                handleSessionVariableChanged(stateOption.variablePairList);
+            }
+
         }
+
+        private void handleSessionVariableChanged(final List<Pair<String, String>> list) {
+            final int varPairSize;
+            varPairSize = list.size();
+
+            Pair<String, String> pair;
+            ZoneOffset serverZone = null;
+            Charset resultCharset = null;
+            Charset clientCharset = null;
+            String sqlModeStr = null;
+            boolean serverZoneChanged = false;
+            for (int i = 0; i < varPairSize; i++) {
+                pair = list.get(i);
+                switch (pair.getFirst().toLowerCase(Locale.ROOT)) {
+                    case "time_zone":
+                        serverZoneChanged = true;
+                        serverZone = parseServerZone(pair.getSecond());
+                        break;
+                    case "character_set_results":
+                        resultCharset = Charsets.getJavaCharsetByCharsetName(pair.getSecond());
+                        break;
+                    case "character_set_client":
+                        clientCharset = Charsets.getJavaCharsetByCharsetName(pair.getSecond());
+                        break;
+                    case "sql_mode":
+                        sqlModeStr = pair.getSecond();
+                        break;
+                    default:
+                        // no-op
+                }
+            }// for loop
+
+            final SessionEnv sessionEnv = this.sessionEnv;
+            if (sessionEnv != null) {
+                LOG.debug("update sessionEnv ,serverZone {} ,resultCharset : {} ,clientCharset : {} ,sqlModeStr : {}",
+                        serverZone, resultCharset, clientCharset, sqlModeStr);
+                this.sessionEnv = ClientProtocolFactory.updateSessionEnvIfNeed(sessionEnv, serverZone, resultCharset, clientCharset, sqlModeStr);
+            }
+
+            if (serverZoneChanged && serverZone == null) {
+                // TODO add  urgency task
+            }
+
+        }
+
+        @Nullable
+        private static ZoneOffset parseServerZone(final String zoneStr) {
+            if (Constants.SERVER.equals(zoneStr)) {
+                return null;
+            }
+            ZoneOffset serverZone;
+            try {
+                serverZone = ZoneOffset.of(zoneStr);
+            } catch (Throwable e) {
+                try {
+                    serverZone = ZoneId.of(zoneStr, ZoneId.SHORT_IDS).getRules().getOffset(Instant.EPOCH);
+                } catch (Throwable ex) {
+                    serverZone = null;
+                }
+            }
+            return serverZone;
+        }
+
 
         /**
          * @see MySQLTaskExecutor#onChannelClosed()

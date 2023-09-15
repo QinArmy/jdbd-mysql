@@ -262,6 +262,20 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     /*-------------------below static method -------------------*/
 
+    static SessionEnv updateSessionEnvIfNeed(SessionEnv sessionEnv,
+                                             @Nullable ZoneOffset serverZone,
+                                             @Nullable Charset resultCharset,
+                                             @Nullable Charset clientCharset,
+                                             @Nullable String sqlMode) {
+        SessionEnv newSessionEnv;
+        if (serverZone != null || clientCharset != null || resultCharset != null) {
+            newSessionEnv = new DefaultSessionEnv((DefaultSessionEnv) sessionEnv, serverZone, resultCharset, clientCharset, sqlMode);
+        } else {
+            newSessionEnv = sessionEnv;
+        }
+        return newSessionEnv;
+    }
+
     private static JdbdException mapConnectionError(final Throwable cause) {
         final JdbdException error;
         if (cause instanceof JdbdException) {
@@ -823,12 +837,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
         private final Set<String> sqlModeSet;
 
-        private final boolean localInfile;
-
-        private final int globalMaxPacket;
-
-        private final int sessionMaxPacket;
-
 
         private DefaultSessionEnv(Charset clientCharset, @Nullable Charset resultsCharset, @Nullable ZoneOffset connZone,
                                   ResultRow row, long utcEpochSecond, Environment env) {
@@ -845,9 +853,40 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             }
             this.sqlModeSet = MySQLStrings.spitAsSet(row.get("sqlMode", String.class), ",", true);
 
-            this.localInfile = row.getNonNull("localInfile", Boolean.class);
-            this.globalMaxPacket = row.getNonNull("globalMaxPacket", Integer.class);
-            this.sessionMaxPacket = row.getNonNull("sessionMaxPacket", Integer.class);
+        }
+
+        /**
+         * @see ClientProtocolFactory#updateSessionEnvIfNeed(SessionEnv, ZoneOffset, Charset, Charset)
+         */
+        private DefaultSessionEnv(DefaultSessionEnv oldEnv, @Nullable ZoneOffset serverZone,
+                                  @Nullable Charset resultCharset,
+                                  @Nullable Charset clientCharset,
+                                  @Nullable String sqlModeStr) {
+
+            this.connZone = oldEnv.connZone;
+            if (serverZone == null) {
+                this.serverZone = oldEnv.serverZone;
+            } else {
+                this.serverZone = serverZone;
+            }
+
+            if (resultCharset == null) {
+                this.resultsCharset = oldEnv.resultsCharset;
+            } else {
+                this.resultsCharset = resultCharset;
+            }
+
+            if (clientCharset == null) {
+                this.clientCharset = oldEnv.clientCharset;
+            } else {
+                this.clientCharset = clientCharset;
+            }
+
+            if (sqlModeStr == null) {
+                this.sqlModeSet = oldEnv.sqlModeSet;
+            } else {
+                this.sqlModeSet = MySQLStrings.spitAsSet(sqlModeStr, ",", true);
+            }
         }
 
 
@@ -876,20 +915,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
             return this.serverZone;
         }
 
-        @Override
-        public boolean isSupportLocalInfile() {
-            return this.localInfile;
-        }
-
-        @Override
-        public int globalMaxAllowedPacket() {
-            return this.globalMaxPacket;
-        }
-
-        @Override
-        public int sessionMaxAllowedPacket() {
-            return this.sessionMaxPacket;
-        }
 
         @Override
         public String toString() {
@@ -905,12 +930,8 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
                     .append(this.connZone)
                     .append(" , serverZone : ")
                     .append(this.serverZone)
-                    .append(" , localInfile : ")
-                    .append(this.localInfile)
-                    .append(" , globalMaxAllowedPacket : ")
-                    .append(this.globalMaxPacket)
-                    .append(" , sessionMaxAllowedPacket : ")
-                    .append(this.sessionMaxPacket)
+                    .append(" , hash : ")
+                    .append(System.identityHashCode(this))
                     .append(" ]")
                     .toString();
         }

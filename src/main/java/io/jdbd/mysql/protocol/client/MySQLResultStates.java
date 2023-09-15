@@ -42,44 +42,23 @@ abstract class MySQLResultStates implements ResultStates {
 
     private final int resultNo;
 
-    final int serverStatus;
-
-    private final long affectedRows;
-
-    private final long insertedId;
-
-    private final String message;
+    private final Terminator terminator;
 
     private final Warning warning;
 
 
     private MySQLResultStates(final int resultNo, final Terminator terminator) {
         this.resultNo = resultNo;
-        if (terminator instanceof OkPacket) {
-            final OkPacket ok = (OkPacket) terminator;
-            this.serverStatus = ok.getStatusFags();
-            this.affectedRows = ok.getAffectedRows();
-            this.insertedId = ok.getLastInsertId();
-            this.message = ok.getInfo();
+        this.terminator = terminator;
 
-            final int count;
-            count = ok.getWarnings();
-            if (count > 0) {
-                this.warning = new WarningCount(count);
-            } else {
-                this.warning = null;
-            }
-        } else if (terminator instanceof EofPacket) {
-            final EofPacket eof = (EofPacket) terminator;
-
-            this.serverStatus = eof.getStatusFags();
-            this.affectedRows = 0L;
-            this.insertedId = 0L;
-            this.message = "";
-            this.warning = null;
-        } else {
+        final int count;
+        if (!(terminator instanceof OkPacket || terminator instanceof EofPacket)) {
             throw new IllegalArgumentException(String.format("terminator isn't %s or %s",
                     OkPacket.class.getName(), EofPacket.class.getName()));
+        } else if ((count = terminator.getWarnings()) > 0) {
+            this.warning = new WarningCount(count);
+        } else {
+            this.warning = null;
         }
     }
 
@@ -96,33 +75,54 @@ abstract class MySQLResultStates implements ResultStates {
 
     @Override
     public final boolean inTransaction() {
-        return Terminator.inTransaction(this.serverStatus);
+        return Terminator.inTransaction(this.terminator.statusFags);
     }
 
     @Override
     public final long affectedRows() {
-        return this.affectedRows;
+        final Terminator t = this.terminator;
+        final long rows;
+        if (t instanceof OkPacket) {
+            rows = ((OkPacket) t).affectedRows;
+        } else {
+            rows = 0L;
+        }
+        return rows;
     }
 
     @Override
     public final long lastInsertedId() {
-        return this.insertedId;
+        final Terminator t = this.terminator;
+        final long lastInsertId;
+        if (t instanceof OkPacket) {
+            lastInsertId = ((OkPacket) t).lastInsertId;
+        } else {
+            lastInsertId = 0L;
+        }
+        return lastInsertId;
     }
 
     @Override
     public final String message() {
-        return this.message;
+        final Terminator t = this.terminator;
+        final String info;
+        if (t instanceof OkPacket) {
+            info = ((OkPacket) t).info;
+        } else {
+            info = "";
+        }
+        return info;
     }
 
 
     @Override
     public final boolean hasMoreResult() {
-        return (this.serverStatus & Terminator.SERVER_MORE_RESULTS_EXISTS) != 0;
+        return (this.terminator.statusFags & Terminator.SERVER_MORE_RESULTS_EXISTS) != 0;
     }
 
     @Override
     public final boolean hasMoreFetch() {
-        final int serverStatus = this.serverStatus;
+        final int serverStatus = this.terminator.statusFags;
         return (serverStatus & Terminator.SERVER_STATUS_CURSOR_EXISTS) != 0
                 && (serverStatus & Terminator.SERVER_STATUS_LAST_ROW_SENT) == 0;
     }
@@ -154,37 +154,38 @@ abstract class MySQLResultStates implements ResultStates {
     @SuppressWarnings("unchecked")
     @Override
     public final <T> T valueOf(final @Nullable Option<T> option) {
+        final int serverStatus = this.terminator.statusFags;
         final Boolean value;
         if (option == null) {
             value = null;
         } else if (option == Option.AUTO_COMMIT) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_AUTOCOMMIT) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_AUTOCOMMIT) != 0;
         } else if (option == Option.IN_TRANSACTION) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_IN_TRANS) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_IN_TRANS) != 0;
         } else if (option == Option.READ_ONLY) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_IN_TRANS_READONLY) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_IN_TRANS_READONLY) != 0;
         } else if (option.equals(SERVER_MORE_QUERY_EXISTS)) {
-            value = (this.serverStatus & Terminator.SERVER_MORE_QUERY_EXISTS) != 0;
+            value = (serverStatus & Terminator.SERVER_MORE_QUERY_EXISTS) != 0;
         } else if (option.equals(SERVER_MORE_RESULTS_EXISTS)) {
-            value = (this.serverStatus & Terminator.SERVER_MORE_RESULTS_EXISTS) != 0;
+            value = (serverStatus & Terminator.SERVER_MORE_RESULTS_EXISTS) != 0;
         } else if (option.equals(SERVER_QUERY_NO_GOOD_INDEX_USED)) {
-            value = (this.serverStatus & Terminator.SERVER_QUERY_NO_GOOD_INDEX_USED) != 0;
+            value = (serverStatus & Terminator.SERVER_QUERY_NO_GOOD_INDEX_USED) != 0;
         } else if (option.equals(SERVER_QUERY_NO_INDEX_USED)) {
-            value = (this.serverStatus & Terminator.SERVER_QUERY_NO_INDEX_USED) != 0;
+            value = (serverStatus & Terminator.SERVER_QUERY_NO_INDEX_USED) != 0;
         } else if (option.equals(SERVER_STATUS_CURSOR_EXISTS)) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_CURSOR_EXISTS) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_CURSOR_EXISTS) != 0;
         } else if (option.equals(SERVER_STATUS_LAST_ROW_SENT)) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_LAST_ROW_SENT) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_LAST_ROW_SENT) != 0;
         } else if (option.equals(SERVER_STATUS_DB_DROPPED)) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_DB_DROPPED) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_DB_DROPPED) != 0;
         } else if (option.equals(SERVER_STATUS_METADATA_CHANGED)) {
-            value = (this.serverStatus & Terminator.SERVER_STATUS_METADATA_CHANGED) != 0;
+            value = (serverStatus & Terminator.SERVER_STATUS_METADATA_CHANGED) != 0;
         } else if (option.equals(SERVER_QUERY_WAS_SLOW)) {
-            value = (this.serverStatus & Terminator.SERVER_QUERY_WAS_SLOW) != 0;
+            value = (serverStatus & Terminator.SERVER_QUERY_WAS_SLOW) != 0;
         } else if (option.equals(SERVER_PS_OUT_PARAMS)) {
-            value = (this.serverStatus & Terminator.SERVER_PS_OUT_PARAMS) != 0;
+            value = (serverStatus & Terminator.SERVER_PS_OUT_PARAMS) != 0;
         } else if (option.equals(SERVER_SESSION_STATE_CHANGED)) {
-            value = (this.serverStatus & Terminator.SERVER_SESSION_STATE_CHANGED) != 0;
+            value = (serverStatus & Terminator.SERVER_SESSION_STATE_CHANGED) != 0;
         } else {
             value = null;
         }

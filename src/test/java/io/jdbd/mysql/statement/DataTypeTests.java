@@ -487,7 +487,7 @@ public class DataTypeTests extends SessionTestSupport {
             switch ((int) row.rowNumber()) {
                 case 1:
                     Assert.assertNull(row.get(1, String.class));
-                    Assert.assertSame(row.getSet(1, City.class), Collections.emptySet());
+                    Assert.assertEquals(row.getSet(1, City.class), Collections.emptySet());
                     break;
                 case 2:
                     Assert.assertEquals(row.getSet(1, City.class), citySet);

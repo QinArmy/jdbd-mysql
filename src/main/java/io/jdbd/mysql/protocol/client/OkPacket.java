@@ -185,15 +185,17 @@ final class OkPacket extends Terminator {
                     if (variablePairList == null) {
                         variablePairList = MySQLCollections.arrayList();
                     }
+
                     final int dataEnd = dataIndex + dataLength;
                     while (payload.readerIndex() < dataEnd) {
                         String name = Packets.readStringLenEnc(payload, StandardCharsets.UTF_8);
                         String value = Packets.readStringLenEnc(payload, StandardCharsets.UTF_8);
                         if (name != null && value != null) {
                             variablePairList.add(Pair.create(name, value));
+                            LOG.debug("SESSION variables '{}' change to '{}'", name, value);
                         } else if (LOG.isDebugEnabled()) {
-                            LOG.warn("MySQL server response SESSION_TRACK_SYSTEM_VARIABLES name:{} , value:{} error."
-                                    , name, value);
+                            LOG.warn("MySQL server response SESSION_TRACK_SYSTEM_VARIABLES name:{} , value:{} error.",
+                                    name, value);
                         }
                     }
                 }
@@ -245,28 +247,30 @@ final class OkPacket extends Terminator {
 
     }
 
-    private static final class StateOption {
+    static final class StateOption {
 
-        private final List<Pair<String, String>> variablePairList;
+        final List<Pair<String, String>> variablePairList;
 
-        private final String schema;
+        final String schema;
 
-        private final String txCharacteristics;
+        final String txCharacteristics;
 
-        private final String txState;
+        final String txState;
 
-        private final String gtids;
+        final String gtids;
 
-        private final String stateChange;
+        final String stateChange;
 
-        private final String unknown;
+        final String unknown;
 
         private StateOption(@Nullable List<Pair<String, String>> variablePairList, @Nullable String schema,
                             @Nullable String txCharacteristics, @Nullable String txState,
                             @Nullable String gtids, @Nullable String stateChange, @Nullable String unknown) {
-            this.variablePairList = variablePairList == null
-                    ? Collections.emptyList()
-                    : Collections.unmodifiableList(variablePairList);
+            if (variablePairList == null) {
+                this.variablePairList = Collections.emptyList();
+            } else {
+                this.variablePairList = Collections.unmodifiableList(variablePairList);
+            }
             this.schema = schema;
             this.txCharacteristics = txCharacteristics;
             this.txState = txState;

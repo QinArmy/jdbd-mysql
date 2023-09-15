@@ -180,10 +180,6 @@ public class LoadDataLocalSuiteTests extends AbstractStmtTaskSuiteTests {
             fail(String.format("client no support Load data local statement,please config property[%s]",
                     MySQLKey.ALLOW_LOAD_LOCAL_INFILE));
         }
-        if (!adjutant.sessionEnv().isSupportLocalInfile()) {
-            LOG.warn("Server no support Local infile ,please config system variables[@@GLOBAL.local_infile]");
-            return;
-        }
 
 
         final String sql = String.format("LOAD DATA LOCAL INFILE '%s' REPLACE INTO TABLE mysql_load_data (create_time,name)"
