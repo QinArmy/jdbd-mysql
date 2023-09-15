@@ -74,11 +74,14 @@ public abstract class Charsets {
     static {
         // 1. below initialize fore: NUMBER_OF_ENCODINGS_CONFIGURED,CHARSET_NAME_TO_CHARSET ,JAVA_ENCODING_UC_TO_MYSQL_CHARSET,MULTIBYTE_ENCODINGS
         final List<MyCharset> myCharsetList = createMySQLCharsetList();
+        final int charsetCapacity = (int) (myCharsetList.size() / 0.75f);
 
-        Map<String, MyCharset> charsetNameToMysqlCharsetMap = MySQLCollections.hashMap();
-        Map<String, List<MyCharset>> javaUcToMysqlCharsetMap = MySQLCollections.hashMap();
+        final Map<String, MyCharset> charsetNameToMysqlCharsetMap;
+        charsetNameToMysqlCharsetMap = MySQLCollections.hashMap(charsetCapacity);
 
-        Set<String> tempMultibyteEncodings = new HashSet<>(); // Character sets that we can't convert ourselves.
+        final Map<String, List<MyCharset>> javaUcToMysqlCharsetMap = MySQLCollections.hashMap((int) (210 / 0.75f));
+
+        final Set<String> tempMultibyteEncodings = MySQLCollections.hashSet((int) (70 / 0.75f)); // Character sets that we can't convert ourselves.
 
         int numberOfEncodingsConfigured = 0;
         for (MyCharset myCharset : myCharsetList) {
@@ -86,53 +89,56 @@ public abstract class Charsets {
             numberOfEncodingsConfigured += myCharset.javaEncodingsUcList.size();
 
             for (String encUC : myCharset.javaEncodingsUcList) {
-                List<MyCharset> charsetList = javaUcToMysqlCharsetMap.computeIfAbsent(encUC, k -> new ArrayList<>());
+                List<MyCharset> charsetList = javaUcToMysqlCharsetMap.computeIfAbsent(encUC, k -> MySQLCollections.arrayList());
                 charsetList.add(myCharset);
                 if (myCharset.mblen > 1) {
                     tempMultibyteEncodings.add(encUC);
                 }
             }
         }
+
         NUMBER_OF_ENCODINGS_CONFIGURED = numberOfEncodingsConfigured;
         NAME_TO_CHARSET = Collections.unmodifiableMap(charsetNameToMysqlCharsetMap);
         JAVA_ENCODING_UC_TO_MYSQL_CHARSET = Collections.unmodifiableMap(javaUcToMysqlCharsetMap);
         MULTIBYTE_ENCODINGS = Collections.unmodifiableSet(tempMultibyteEncodings);
 
         // 2. below initialize four : CHARSET_NAME_TO_COLLATION_INDEX,UTF8MB4_INDEXES,INDEX_TO_COLLATION,NAME_TO_COLLATION
-        final int maxSize = 2048;
+
 
         //final Collation notUsedCollation = new Collation(0, COLLATION_NOT_DEFINED, 0, NOT_USED);
-        final Map<Integer, Collation> indexToCollationMap = MySQLCollections.hashMap((int) (maxSize / 0.75f));
+        final List<Collation> collationList;
+        collationList = createCollationList();
+        final int collationCapacity = (int) (collationList.size() / 0.75f);
 
-        Map<String, Integer> charsetNameToCollationIndexMap = new TreeMap<>();
-        Map<String, Integer> charsetNameToCollationPriorityMap = new TreeMap<>();
-        Set<Integer> tempUTF8MB4Indexes = MySQLCollections.hashSet();
+        final Map<Integer, Collation> indexToCollationMap = MySQLCollections.hashMap(collationCapacity);
+        final Map<String, Collation> nameToCollation = MySQLCollections.hashMap(collationCapacity);
 
-        Map<String, Collation> nameToCollation = MySQLCollections.hashMap();
+        final Map<String, Integer> charsetNameToCollationIndexMap, charsetNameToCollationPriorityMap;
+        charsetNameToCollationIndexMap = MySQLCollections.hashMap(charsetCapacity);
+        charsetNameToCollationPriorityMap = MySQLCollections.hashMap(charsetCapacity);
+        final Set<Integer> tempUTF8MB4Indexes = MySQLCollections.hashSet(104);
 
-        for (Map.Entry<Integer, Collation> e : createCollationMap().entrySet()) {
-            Integer i = e.getKey();
-            Collation collation = e.getValue();
-
-            indexToCollationMap.put(i, collation);
+        String charsetName;
+        for (final Collation collation : collationList) {
+            indexToCollationMap.put(collation.index, collation);
             nameToCollation.put(collation.name, collation);
 
-            String charsetName = collation.myCharset.name;
+            charsetName = collation.myCharset.name;
             if (!charsetNameToCollationIndexMap.containsKey(charsetName)
                     || charsetNameToCollationPriorityMap.get(charsetName) < collation.priority) {
-                charsetNameToCollationIndexMap.put(charsetName, i);
+                charsetNameToCollationIndexMap.put(charsetName, collation.index);
                 charsetNameToCollationPriorityMap.put(charsetName, collation.priority);
             }
             // Filling indexes of utf8mb4 collations
             if (charsetName.equals(utf8mb4)) {
-                tempUTF8MB4Indexes.add(i);
+                tempUTF8MB4Indexes.add(collation.index);
             }
         }
 
         CHARSET_NAME_TO_COLLATION_INDEX = Collections.unmodifiableMap(charsetNameToCollationIndexMap);
         UTF8MB4_INDEXES = Collections.unmodifiableSet(tempUTF8MB4Indexes);
-        INDEX_TO_COLLATION = Collections.unmodifiableMap(indexToCollationMap);
         NAME_TO_COLLATION = Collections.unmodifiableMap(nameToCollation);
+        INDEX_TO_COLLATION = Collections.unmodifiableMap(indexToCollationMap);
 
     }
 
@@ -141,14 +147,6 @@ public abstract class Charsets {
         return NUMBER_OF_ENCODINGS_CONFIGURED;
     }
 
-    @Nullable
-    public static String getJavaCharsetByIndex(int collationIndex) {
-        Collation collation = INDEX_TO_COLLATION.get(collationIndex);
-        if (collation == null) {
-            return null;
-        }
-        return collation.myCharset.javaEncodingsUcList.get(0);
-    }
 
     public static int getMblen(int collationIndex) {
         Collation collation = INDEX_TO_COLLATION.get(collationIndex);
@@ -197,7 +195,6 @@ public abstract class Charsets {
         }
         return Charset.forName(collation.myCharset.javaEncodingsUcList.get(0));
     }
-
 
 
     @Nullable
