@@ -36,10 +36,10 @@ import java.util.function.Function;
  *         <li>{@link io.jdbd.statement.BindStatement}</li>
  *         <li>{@link io.jdbd.statement.PreparedStatement}</li>
  *     </ul>
- * </p>
+ * <br/>
  * <p>
  * All test method's session of  statement parameter  is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
- * </p>
+ * <br/>
  */
 
 public class BindSingleStatementTests extends SessionTestSupport {
@@ -53,7 +53,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeUpdate()
      */
@@ -115,7 +115,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeQuery(Function, Consumer)
      */
@@ -152,7 +152,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeUpdate()
      */
@@ -185,7 +185,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeUpdate()
      */
@@ -224,7 +224,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeBatchQuery()
      */
@@ -287,7 +287,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeBatchAsMulti()
      */
@@ -353,7 +353,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#bindStatement(String, boolean)}</li>
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see BindSingleStatement#executeBatchAsMulti()
      */

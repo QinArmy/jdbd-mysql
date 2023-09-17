@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * <p>
  * This class is the implementation of {@link DatabaseSessionFactory} with MySQL protocol.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */
@@ -79,7 +79,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     /**
      * <p>
      * private constructor
-     * </p>
+     * <br/>
      */
     private MySQLDatabaseSessionFactory(MySQLProtocolFactory protocolFactory, boolean forPoolVendor) {
         this.protocolFactory = protocolFactory;

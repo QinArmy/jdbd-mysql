@@ -11,7 +11,7 @@ import java.nio.charset.Charset;
 /**
  * <p>
  * see  {@code com.mysql.cj.protocol.a.authentication.MysqlOldPasswordPlugin}
- * </p>
+ * <br/>
  */
 public class MySQLOldPasswordPlugin implements AuthenticationPlugin {
 

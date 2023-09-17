@@ -35,7 +35,7 @@ import static io.jdbd.mysql.MySQLDriver.MY_SQL;
 /**
  * <p>
  * This interface is a implementation of {@link Statement} with MySQL client protocol.
- * </p>
+ * <br/>
  * <p>
  * This class is base class of following :
  *     <ul>
@@ -44,7 +44,7 @@ import static io.jdbd.mysql.MySQLDriver.MY_SQL;
  *         <li>{@link MySQLBindStatement}</li>
  *         <li>{@link MySQLMultiStatement}</li>
  *     </ul>
- * </p>
+ * <br/>
  *
  * @since 1.0
  */
@@ -242,7 +242,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
      *         <li>{@link Option#BACKSLASH_ESCAPES}</li>
      *         <li>{@link Option#BINARY_HEX_ESCAPES}</li>
      *     </ul>
-     * </p>
+     * <br/>
      */
     @Override
     public final <T> T valueOf(Option<T> option) {

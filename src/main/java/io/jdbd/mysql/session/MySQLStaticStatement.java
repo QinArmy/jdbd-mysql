@@ -19,7 +19,7 @@ import java.util.function.Function;
 /**
  * <p>
  * This interface is a implementation of {@link StaticStatement} with MySQL protocol.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */

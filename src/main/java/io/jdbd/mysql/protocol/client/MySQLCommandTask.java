@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  *         <li>{@link ComQueryTask}</li>
  *         <li>{@link ComPreparedTask}</li>
  *     </ul>
- * </p>
+ * <br/>
  *
  * @see ComQueryTask
  * @see ComPreparedTask

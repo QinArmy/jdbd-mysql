@@ -51,10 +51,10 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is responsible for test data type bind and get.
- * </p>
+ * <br/>
  * <p>
  * All test method's session parameter is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
- * </p>
+ * <br/>
  */
 public class DataTypeTests extends SessionTestSupport {
 
@@ -178,7 +178,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#BOOLEAN}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#BOOLEAN
      * @see MySQLType#BOOLEAN
@@ -234,7 +234,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#YEAR}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#YEAR
      * @see MySQLType#YEAR
@@ -290,7 +290,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#DATETIME}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#TIMESTAMP
      * @see JdbdType#TIMESTAMP_WITH_TIMEZONE
@@ -374,7 +374,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#TEXT} , {@link MySQLType#BLOB}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#TEXT
      * @see JdbdType#BLOB
@@ -458,7 +458,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#SET}
-     * </p>
+     * <br/>
      *
      * @see MySQLType#SET
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
@@ -530,7 +530,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#MEDIUMINT} and {@link MySQLType#MEDIUMINT_UNSIGNED}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#MEDIUMINT
      * @see JdbdType#MEDIUMINT_UNSIGNED
@@ -621,7 +621,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#BIT}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#BIT
      * @see JdbdType#VARBIT
@@ -702,7 +702,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#GEOMETRY}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#GEOMETRY
      * @see MySQLType#GEOMETRY
@@ -788,7 +788,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#GEOMETRY}
-     * </p>
+     * <br/>
      *
      * @see JdbdType#GEOMETRY
      * @see MySQLType#GEOMETRY
@@ -865,7 +865,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#GEOMETRY} wkb
-     * </p>
+     * <br/>
      *
      * @see JdbdType#GEOMETRY
      * @see MySQLType#GEOMETRY
@@ -934,7 +934,7 @@ public class DataTypeTests extends SessionTestSupport {
      *         <li>{@link io.jdbd.session.DatabaseSession#prepareStatement(String)}</li>
      *     </ul>
      *     bind {@link MySQLType#GEOMETRY} wkb
-     * </p>
+     * <br/>
      *
      * @see JdbdType#GEOMETRY
      * @see MySQLType#GEOMETRY

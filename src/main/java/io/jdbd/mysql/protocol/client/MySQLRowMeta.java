@@ -57,7 +57,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     /**
      * <p>
      * Read column metadata from text protocol.
-     * </p>
+     * <br/>
      */
     static MySQLRowMeta readForRows(final ByteBuf cumulateBuffer, final StmtTask stmtTask) {
 
@@ -247,7 +247,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
      *         <li>{@link #FLAGS}</li>
      *         <li>{@link #TABLE_LABEL}</li>
      *     </ul>
-     * </p>
+     * <br/>
      */
     @SuppressWarnings("unchecked")
     @Override

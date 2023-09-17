@@ -7,7 +7,7 @@ import org.reactivestreams.Publisher;
 /**
  * <p>
  * This interface representing COM_STMT_EXECUTE writer.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */

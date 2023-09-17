@@ -12,7 +12,7 @@ import java.nio.charset.Charset;
 /**
  * <p>
  * This class representing server error message.
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html">Protocol::ERR_Packet</a>
  * @since 1.0

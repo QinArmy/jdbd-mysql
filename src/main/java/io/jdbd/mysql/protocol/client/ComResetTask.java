@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 /**
  * <p>
  * This class send reset packet.
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_reset_connection.html">Protocol::COM_RESET_CONNECTION</a>
  */

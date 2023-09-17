@@ -45,11 +45,11 @@ import java.util.function.IntFunction;
  *         <li>{@link TextResultSetReader}</li>
  *         <li>{@link BinaryResultSetReader}</li>
  *     </ul>
- * </p>
+ * <br/>
  * <p>
  * following is chinese signature:<br/>
  * 当你在阅读这段代码时,我才真正在写这段代码,你阅读到哪里,我便写到哪里.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */
@@ -695,7 +695,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
      *         <li>{@link MySQLCurrentRow}</li>
      *         <li>{@link MySQLResultRow}</li>
      *     </ul>
-     * </p>
+     * <br/>
      */
     abstract static class MySQLDataRow extends VendorDataRow {
 
@@ -930,7 +930,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
      *         <li>{@link MySQLMutableCurrentRow}</li>
      *         <li>{@link MySQLImmutableCurrentRow}</li>
      *     </ul>
-     * </p>
+     * <br/>
      */
     private static abstract class MySQLCurrentRow extends MySQLDataRow implements CurrentRow {
 
@@ -971,7 +971,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
          *         <li>{@link TextResultSetReader.TextMutableCurrentRow}</li>
          *         <li>{@link BinaryResultSetReader.BinaryMutableCurrentRow}</li>
          *     </ul>
-         * </p>
+         * <br/>
          */
         MySQLMutableCurrentRow(MySQLRowMeta rowMeta) {
             super(rowMeta);

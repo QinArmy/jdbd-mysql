@@ -35,7 +35,7 @@ import static io.jdbd.mysql.MySQLDriver.MY_SQL;
 /**
  * <p>
  * This interface is a implementation of {@link PreparedStatement} with MySQL client protocol.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */

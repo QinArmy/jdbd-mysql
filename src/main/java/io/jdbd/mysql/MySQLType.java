@@ -154,7 +154,7 @@ public enum MySQLType implements SQLType {
      * FLOAT[(M,D)] UNSIGNED [ZEROFILL]
      * <p>
      * UNSIGNED,disallows negative values. As of MySQL 8.0.17, the UNSIGNED attribute is deprecated
-     * </p>
+     * <br/>
      *
      * @see #FLOAT
      * @deprecated use {@link #FLOAT}, As of MySQL 8.0.17, the UNSIGNED attribute is deprecated for columns of type FLOAT
@@ -183,7 +183,7 @@ public enum MySQLType implements SQLType {
      * DOUBLE[(M,D)] UNSIGNED [ZEROFILL]
      * <p>
      * UNSIGNED, disallows negative values. As of MySQL 8.0.17, the UNSIGNED attribute is deprecated
-     * </p>
+     * <br/>
      *
      * @see #DOUBLE
      * @deprecated use {@link #DOUBLE}, As of MySQL 8.0.17, this syntax is deprecated and you should expect support
@@ -201,8 +201,8 @@ public enum MySQLType implements SQLType {
      * of 0 signifies that there is no fractional part. If omitted, the default precision is 0.
      * <p>
      * Protocol: TYPE_TIME = 11, support bind(or get)  {@link LocalTime} or {@link java.time.Duration}
-     *
-     * </p>
+     * <p>
+     * <br/>
      */
     TIME(Constants.TYPE_TIME, JdbdType.TIME, Object.class),
 
@@ -238,7 +238,7 @@ public enum MySQLType implements SQLType {
      *     <li>{@link java.time.ZonedDateTime},As of MySQL 8.0.19.</li>
      * </ul>
      * Only support get {@link LocalDateTime}.
-     * </p>
+     * <br/>
      */
     DATETIME(Constants.TYPE_DATETIME, JdbdType.TIMESTAMP, LocalDateTime.class),
 
@@ -258,7 +258,7 @@ public enum MySQLType implements SQLType {
      *     <li>{@link java.time.ZonedDateTime},As of MySQL 8.0.19.</li>
      * </ul>
      * Only support get {@link LocalDateTime}.
-     * </p>
+     * <br/>
      */
     // TODO If MySQL server run with the MAXDB SQL mode enabled, TIMESTAMP is identical with DATETIME. If this mode is enabled at the time that a table is created, TIMESTAMP columns are created as DATETIME columns.
     // As a result, such columns use DATETIME display format, have the same range of values, and there is no automatic initialization or updating to the current date and time
@@ -333,7 +333,7 @@ public enum MySQLType implements SQLType {
      * Protocol: TYPE_SET = 248
      * <p>
      * a unmodifiable {@link Set} ,the type of elements is {@link String} or {@link Enum}
-     * </p>
+     * <br/>
      */
     SET(Constants.TYPE_SET, JdbdType.VARCHAR, String.class),
 

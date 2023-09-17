@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * <p>
  * This class is the test class of {@link MySQLStrings}
- * </p>
+ * <br/>
  */
 public class MySQLStringsTests {
 

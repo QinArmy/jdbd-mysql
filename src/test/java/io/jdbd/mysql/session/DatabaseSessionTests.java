@@ -26,11 +26,11 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is the test class of {@link MySQLDatabaseSession}
- * </p>
+ * <br/>
  * <p>
  * All test method's session parameter is created by {@link #createLocalSession(ITestNGMethod, ITestContext)},
  * and is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
- * </p>
+ * <br/>
  */
 @Test(dataProvider = "localSessionProvider")
 public class DatabaseSessionTests extends SessionTestSupport {

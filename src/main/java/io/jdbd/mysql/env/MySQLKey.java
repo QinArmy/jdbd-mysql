@@ -125,14 +125,13 @@ public final class MySQLKey<T> extends Key<T> {
     public static final MySQLKey<String> USE_CONFIGS = new MySQLKey<>("useConfigs", String.class, null);
 
     /**
-     * <p>
-     * {@link java.util.function.Supplier} function reference. For example : MyClass::clientInoMap
+     * <p>{@link java.util.function.Supplier} function reference. For example : MyClass::clientInoMap
      * <pre><br/>
      *   public static Map&lt;String,String> clientInoMap() {
      *       return Collections.emptyMap();
      *   }
      * </pre>
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-connection.html">clientInfoSupplier</a>
      */
@@ -172,7 +171,7 @@ public final class MySQLKey<T> extends Key<T> {
      *       return map;
      *   }
      * </pre>
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-connection.html">propertiesTransform</a>
      */
@@ -244,11 +243,11 @@ public final class MySQLKey<T> extends Key<T> {
      *         <li>reactor.netty.resources.ConnectionProvider::newConnection , see  {@link ConnectionProvider#newConnection()}</li>
      *     </ul>
      *     The default default is {@link ConnectionProvider#newConnection()} , see {@link io.jdbd.vendor.env.Environment#get(Key, Supplier)} .
-     * </p>
+     * <br/>
      * <p>
      *     <strong>NOTE</strong> : if {@link ConnectionProvider} is pool ,then netty possibly throw {@link ClosedChannelException} when open new session.
      *     so {@link ConnectionProvider} should(not must) return new connection not pool connection.
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-networking.html">socketFactory</a>
      */
@@ -266,7 +265,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      * {@link DatabaseSessionFactory#close()}  shutdown quiet period milliseconds .
-     * </p>
+     * <br/>
      *
      * @see reactor.netty.resources.LoopResources#disposeLater(Duration, Duration)
      */
@@ -275,7 +274,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      * {@link DatabaseSessionFactory#close()}  shutdown timeout milliseconds .
-     * </p>
+     * <br/>
      *
      * @see reactor.netty.resources.LoopResources#disposeLater(Duration, Duration)
      */
@@ -594,7 +593,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      * Jdbd throw {@link io.jdbd.JdbdException} not {@code java.sql.DataTruncation}
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-result-sets.html">jdbcCompliantTruncation</a>
      * @since MySQL Driver  3.1.2
@@ -700,21 +699,17 @@ public final class MySQLKey<T> extends Key<T> {
 //    public static final MySQLKey<Boolean> AUTO_DESERIALIZE = new MySQLKey<>("autoDeserialize", Boolean.class, Boolean.FALSE);
 
     /**
-     * <p>
-     * jdbd-mysql redefine this property ,this property representing following parameter send chunk size,
-     *    <ul>
+     * <p>jdbd-mysql redefine this property ,this property representing following parameter send chunk size,
+     * <ul>
      *        <li> {@link io.jdbd.type.LongParameter}</li>
      *        <li>big {@link String} (greater than 16 MB)</li>
      *        <li>big byte[] (greater than 16 MB)</li>
-     *    </ul>
-     * </p>
-     * <p>
-     *     <ul>
-     *         <li>default: 1 << 20</li>
+     * </ul>
+     * <ul>
+     *         <li>default: 1 &lt;&lt; 20</li>
      *         <li>min : 1024</li>
      *         <li>max : 0xff_ff_ff -1 (16 MB)</li>
-     *     </ul>
-     * </p>
+     * </ul>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-blob-clob-processing.html">blobSendChunkSize</a>
      * @since jdbd-mysql 1.0
@@ -861,7 +856,6 @@ public final class MySQLKey<T> extends Key<T> {
 
     /**
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-high-availability-and-clustering.html">maxReconnects</a>
-     * @see #AUTO_RECONNECT
      * @since MySQL Driver  1.1
      */
     public static final MySQLKey<Integer> MAX_RECONNECTS = new MySQLKey<>("maxReconnects", Integer.class, 3);
@@ -1173,7 +1167,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      *     TODO support ?   jdbd must escape
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-connp-props-performance-extensions.html">enableEscapeProcessing</a>
      * @since MySQL Driver 6.0.1
@@ -1214,7 +1208,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      * jdbd-mysql defined. min value is (0xFFFF_FF * 10) bytes .
-     * </p>
+     * <br/>
      *
      * @since jdbd-mysql 1.0
      */
@@ -1300,7 +1294,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      * worker count
-     * </p>
+     * <br/>
      *
      * @see reactor.netty.resources.LoopResources#create(String, int, int, boolean)
      */
@@ -1309,7 +1303,7 @@ public final class MySQLKey<T> extends Key<T> {
     /**
      * <p>
      * select count , default value is same with {@link #FACTORY_WORKER_COUNT}.
-     * </p>
+     * <br/>
      *
      * @see reactor.netty.resources.LoopResources#create(String, int, int, boolean)
      */
@@ -1319,7 +1313,7 @@ public final class MySQLKey<T> extends Key<T> {
      * The task queue size of each session.
      * <p>
      * see {@code io.jdbd.mysql.protocol.client.MySQLTaskExecutor#taskQueue}
-     * </p>
+     * <br/>
      */
     public static final MySQLKey<Integer> FACTORY_TASK_QUEUE_SIZE = new MySQLKey<>("factoryTaskQueueSize", Integer.class, 18);
 

@@ -6,7 +6,7 @@ import reactor.util.annotation.Nullable;
 /**
  * <p>
  * see {@code com.mysql.cj.conf.ConnectionUrl.Type}
- * </p>
+ * <br/>
  */
 public enum Protocol {
 

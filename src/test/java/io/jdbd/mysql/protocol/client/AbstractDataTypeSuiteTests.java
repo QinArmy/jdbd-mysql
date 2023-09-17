@@ -45,7 +45,7 @@ import static org.testng.Assert.*;
  *     <ul>
  *         <li>{@link ComQueryDataTypeSuiteTests}</li>
  *     </ul>
- * </p>
+ * <br/>
  */
 @Deprecated
 abstract class AbstractDataTypeSuiteTests extends AbstractTaskSuiteTests {

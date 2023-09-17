@@ -14,11 +14,11 @@ import java.util.function.Consumer;
 /**
  * <p>
  * This class is the implementation reader of MySQL binary ResultSet .
- * </p>
+ * <br/>
  * <p>
  * following is chinese signature:<br/>
  * 当你在阅读这段代码时,我才真正在写这段代码,你阅读到哪里,我便写到哪里.
- * </p>
+ * <br/>
  *
  * @see ComPreparedTask
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html">Binary Protocol Resultset</a>

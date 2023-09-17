@@ -7,7 +7,7 @@ import io.jdbd.vendor.protocol.DatabaseProtocol;
 /**
  * <p>
  * This interface provide the ability that use postgre protocol for MySQL {@link DatabaseSession}.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */

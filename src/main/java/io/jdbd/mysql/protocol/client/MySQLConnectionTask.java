@@ -40,7 +40,7 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is the implementation of MySQL connection protocol.
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase.html">Connection Phase</a>
  * @since 1.0

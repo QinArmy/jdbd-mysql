@@ -10,7 +10,7 @@ import java.security.NoSuchAlgorithmException;
 /**
  * <p>
  * see {@code com.mysql.cj.protocol.Security}
- * </p>
+ * <br/>
  */
 abstract class AuthenticateUtils {
 

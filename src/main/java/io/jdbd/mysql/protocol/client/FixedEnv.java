@@ -22,7 +22,7 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is base class of {@link ClientProtocolFactory}.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */

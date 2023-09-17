@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * <p>
  * This class is protocol(connection) factory.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */
@@ -223,7 +223,7 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     /**
      * <p>
      * create new connection
-     * </p>
+     * <br/>
      *
      * @see #createProtocol()
      */

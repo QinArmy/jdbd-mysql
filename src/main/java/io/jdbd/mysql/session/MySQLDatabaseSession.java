@@ -40,8 +40,8 @@ import java.util.function.Function;
  *     <li>{@link MySQLLocalDatabaseSession}</li>
  *     <li>{@link MySQLRmDatabaseSession}</li>
  * </ul>
- *
- * </p>
+ * <p>
+ * <br/>
  */
 abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSessionMetaSpec implements DatabaseSession {
 

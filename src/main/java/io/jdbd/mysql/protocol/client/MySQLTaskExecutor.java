@@ -420,7 +420,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         /**
          * <p>
          * This method always run in {@link io.netty.channel.EventLoop}
-         * </p>
+         * <br/>
          *
          * @see MySQLTaskExecutor#updateServerStatus(Object)
          */
@@ -518,7 +518,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
         /**
          * <p>
          * Just for {@link #stmtParser}
-         * </p>
+         * <br/>
          */
         private boolean containSQLMode(final SQLMode mode) {
             boolean match;

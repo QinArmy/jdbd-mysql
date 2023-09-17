@@ -14,7 +14,7 @@ import java.net.URLEncoder;
 /**
  * <p>
  * This class is test class of {@link MySQLDatabaseSessionFactory}.
- * </p>
+ * <br/>
  */
 @Test
 public class SessionFactoryTests extends SessionTestSupport {

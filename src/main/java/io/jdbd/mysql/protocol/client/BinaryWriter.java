@@ -26,14 +26,14 @@ import java.util.List;
 /**
  * <p>
  * This class provider method that write MySQL Binary Protocol.
- * </p>
+ * <br/>
  * <p>
  * This class is base class of following :
  *     <ul>
  *         <li>{@link QueryCommandWriter}</li>
  *         <li>{@link ExecuteCommandWriter}</li>
  *     </ul>
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html">Binary Protocol Resultset</a>
  * @since 1.0
@@ -66,7 +66,7 @@ abstract class BinaryWriter {
     /**
      * <p>
      * Bind non-null and simple(no {@link org.reactivestreams.Publisher} or {@link java.nio.file.Path}) value with MySQL binary protocol.
-     * </p>
+     * <br/>
      *
      * @param scale negative if dont' need to truncate micro seconds.
      * @see #decideActualType(Value)
@@ -373,7 +373,7 @@ abstract class BinaryWriter {
      *         <li>{@link OffsetTime}</li>
      *     </ul>
      *     to {@link MySQLType#TIME}
-     * </p>
+     * <br/>
      *
      * @param precision negative if dont' need to truncate micro seconds.
      * @see #writeBinary(ByteBuf, int, Value, int)
@@ -417,7 +417,7 @@ abstract class BinaryWriter {
      *         <li>{@link ZonedDateTime}</li>
      *     </ul>
      *     to {@link MySQLType#DATETIME} or {@link MySQLType#TIMESTAMP}
-     * </p>
+     * <br/>
      *
      * @param scale negative if dont' need to truncate micro seconds.
      * @see #writeBinary(ByteBuf, int, Value, int)
@@ -457,7 +457,7 @@ abstract class BinaryWriter {
     /**
      * <p>
      * write {@link Duration} with MySQL binary MYSQL_TYPE_TIME protocol.
-     * </p>
+     * <br/>
      *
      * @see #writeTime(ByteBuf, int, Value, int)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_time">MYSQL_TYPE_TIME</a>
@@ -497,7 +497,7 @@ abstract class BinaryWriter {
     /**
      * <p>
      * write {@link LocalTime} with MySQL binary MYSQL_TYPE_TIME protocol.
-     * </p>
+     * <br/>
      *
      * @see #writeTime(ByteBuf, int, Value, int)
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_time">MYSQL_TYPE_TIME</a>
@@ -523,7 +523,7 @@ abstract class BinaryWriter {
     /**
      * <p>
      * write {@link LocalDateTime} with MySQL binary MYSQL_TYPE_DATETIME protocol.
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html#sect_protocol_binary_resultset_row_value_date">MYSQL_TYPE_DATETIME</a>
      */

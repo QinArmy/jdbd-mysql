@@ -28,7 +28,7 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is implementation of {@link LocalDatabaseSession} with MySQL client protocol.
- * </p>
+ * <br/>
  */
 class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSession> implements LocalDatabaseSession {
 
@@ -313,7 +313,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     /**
      * <p>
      * This class is implementation of {@link PoolLocalDatabaseSession} with MySQL client protocol.
-     * </p>
+     * <br/>
      *
      * @since 1.0
      */

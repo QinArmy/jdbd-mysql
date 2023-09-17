@@ -147,7 +147,7 @@ abstract class MySQLResultStates implements ResultStates {
      *         <li>{@link #SERVER_PS_OUT_PARAMS}</li>
      *         <li>{@link #SERVER_SESSION_STATE_CHANGED}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/mysql__com_8h.html#a1d854e841086925be1883e4d7b4e8cad">SERVER_STATUS_flags_enum</a>
      */

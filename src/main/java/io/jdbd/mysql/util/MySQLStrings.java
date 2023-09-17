@@ -175,7 +175,7 @@ public abstract class MySQLStrings extends JdbdStrings {
      * Splits input into a list, using the given delimiter and skipping all between the given markers.
      * <p>
      * note:openMarker[i] and openMarker[i] is match.
-     * </p>
+     * <br/>
      *
      * @param input       the string to split
      * @param openMarker  the string to split on

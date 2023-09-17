@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 /**
  * <p>
  * close MySQL session task
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_quit.html">Protocol::COM_QUIT</a>
  */

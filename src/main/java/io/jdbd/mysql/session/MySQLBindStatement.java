@@ -32,7 +32,7 @@ import static io.jdbd.mysql.MySQLDriver.MY_SQL;
 /**
  * <p>
  * This interface is a implementation of {@link BindStatement} with MySQL client protocol.
- * </p>
+ * <br/>
  */
 final class MySQLBindStatement extends MySQLStatement<BindStatement> implements BindStatement {
 

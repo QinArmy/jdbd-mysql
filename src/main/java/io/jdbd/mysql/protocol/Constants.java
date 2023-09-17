@@ -7,7 +7,7 @@ import java.time.Duration;
  * Represents various constants used in the driver.
  * <p>
  * see {@code com.mysql.cj.Constants}
- * </p>
+ * <br/>
  */
 public interface Constants {
 

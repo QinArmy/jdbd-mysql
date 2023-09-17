@@ -200,7 +200,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      *     <ul>
      *         <li>{@link VendorOptions#INDEX_TYPE}</li>
      *     </ul>
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/information-schema-statistics-table.html"> The INFORMATION_SCHEMA STATISTICS Table</a>
      */

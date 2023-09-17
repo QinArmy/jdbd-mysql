@@ -38,11 +38,11 @@ import java.util.function.LongConsumer;
 /**
  * <p>
  * This class is the implementation of MySQL Prepared protocol.
- * </p>
+ * <br/>
  * <p>
  * following is chinese signature:<br/>
  * 当你在阅读这段代码时,我才真正在写这段代码,你阅读到哪里,我便写到哪里.
- * </p>
+ * <br/>
  *
  * @see ExecuteCommandWriter
  * @see LongParameterWriter
@@ -55,7 +55,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * This method is one of underlying api of {@link BindStatement#executeUpdate()} method:
-     * </p>
+     * <br/>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramUpdate(ParamStmt, TaskAdjutant)
@@ -79,7 +79,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      *     <li>{@link BindStatement#executeQuery(Function)}</li>
      *     <li>{@link BindStatement#executeQuery(Function, Consumer)}</li>
      * </ul>
-     * </p>
+     * <br/>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramQuery(ParamStmt, Function, Consumer, TaskAdjutant)
@@ -99,7 +99,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * This method is one of underlying api of {@link BindSingleStatement#executeAsFlux()}.
-     * </p>
+     * <br/>
      *
      * @see io.jdbd.mysql.protocol.MySQLProtocol#paramAsFlux(ParamStmt, boolean)
      */
@@ -117,7 +117,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * This method is one of underlying api of {@link BindStatement#executeBatchUpdate()} method.
-     * </p>
+     * <br/>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
@@ -137,7 +137,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * This method is one of underlying api of {@link BindSingleStatement#executeBatchQuery()}.
-     * </p>
+     * <br/>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
@@ -158,7 +158,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * This method is one of underlying api of {@link BindStatement#executeBatchAsMulti()} method.
-     * </p>
+     * <br/>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramBatchAsMulti(ParamBatchStmt, TaskAdjutant)
@@ -177,7 +177,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * This method is one of underlying api of {@link BindStatement#executeBatchAsFlux()} method.
-     * </p>
+     * <br/>
      *
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
      * @see ComQueryTask#paramBatchAsFlux(ParamBatchStmt, TaskAdjutant)
@@ -200,7 +200,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
      * <ul>
      *     <li>{@link DatabaseSession#prepareStatement(String)}</li>
      * </ul>
-     * </p>
+     * <br/>
      *
      * @see DatabaseSession#prepareStatement(String)
      * @see #ComPreparedTask(ParamSingleStmt, ResultSink, TaskAdjutant)
@@ -1087,7 +1087,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * this method will update {@link #taskPhase}.
-     * </p>
+     * <br/>
      *
      * @return true : task end.
      * @see #readPrepareResponse(ByteBuf, Consumer)
@@ -1179,7 +1179,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     /**
      * <p>
      * modify {@link #taskPhase}
-     * </p>
+     * <br/>
      *
      * @return true: task end.
      * @see #decode(ByteBuf, Consumer)

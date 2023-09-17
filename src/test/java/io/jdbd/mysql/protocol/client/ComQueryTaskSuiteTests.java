@@ -299,7 +299,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use cate.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#batchUpdate(StaticBatchStmt, TaskAdjutant)
      */
@@ -374,7 +374,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use cate.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#batchUpdate(StaticBatchStmt, TaskAdjutant)
      */
@@ -447,7 +447,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use cate.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#batchUpdate(StaticBatchStmt, TaskAdjutant)
      */
@@ -535,7 +535,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use cate.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#batchUpdate(StaticBatchStmt, TaskAdjutant)
      */
@@ -705,7 +705,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use case.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
      */
@@ -749,7 +749,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use case.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
      */
@@ -795,7 +795,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use case.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
      */
@@ -833,7 +833,7 @@ public class ComQueryTaskSuiteTests extends AbstractStmtTaskSuiteTests {
     /**
      * <p>
      * test error use case.
-     * </p>
+     * <br/>
      *
      * @see ComQueryTask#paramBatchUpdate(ParamBatchStmt, TaskAdjutant)
      */

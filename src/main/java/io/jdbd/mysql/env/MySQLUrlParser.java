@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * <p>
  * This class is responsible for parsing MySQL url.
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-jdbc-url-format.html">Connection URL Syntax</a>
  * @see <a href="https://dev.mysql.com/doc/connector-j/8.1/en/connector-j-unix-socket.html">Connecting Using Unix Domain Sockets</a>

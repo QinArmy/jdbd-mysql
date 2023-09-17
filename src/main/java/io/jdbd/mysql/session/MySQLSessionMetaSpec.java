@@ -14,7 +14,7 @@ import io.jdbd.session.ServerVersion;
  *         <li>{@link MySQLDatabaseSession}</li>
  *         <li>{@link MySQLDatabaseMetadata}</li>
  *     </ul>
- * </p>
+ * <br/>
  *
  * @since 1.0
  */

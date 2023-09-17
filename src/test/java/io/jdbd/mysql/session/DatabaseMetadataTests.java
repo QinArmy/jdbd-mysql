@@ -25,7 +25,7 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is the test class of {@link MySQLDatabaseMetadata}
- * </p>
+ * <br/>
  */
 @Test(dataProvider = "databaseMetadataProvider")
 public class DatabaseMetadataTests extends SessionTestSupport {

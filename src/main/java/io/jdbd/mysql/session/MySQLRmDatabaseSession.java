@@ -37,7 +37,7 @@ import java.util.function.Function;
 /**
  * <p>
  * This class is implementation of {@link RmDatabaseSession} with MySQL client protocol.
- * </p>
+ * <br/>
  */
 class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> implements RmDatabaseSession {
 
@@ -84,7 +84,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * the conversion process of xid is same with MySQL Connector/J .
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
@@ -161,7 +161,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * the conversion process of xid is same with MySQL Connector/J .
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
@@ -202,7 +202,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * the conversion process of xid is same with MySQL Connector/J .
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
@@ -248,7 +248,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * the conversion process of xid is same with MySQL Connector/J .
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
@@ -302,7 +302,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * the conversion process of xid is same with MySQL Connector/J .
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
@@ -349,7 +349,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * the conversion process of xid is same with MySQL Connector/J .
-     * </p>
+     * <br/>
      *
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
@@ -566,7 +566,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * <p>
      * This class is implementation of {@link PoolRmDatabaseSession} with MySQL client protocol.
-     * </p>
+     * <br/>
      */
     private static final class MySQLPoolRmDatabaseSession extends MySQLRmDatabaseSession
             implements PoolRmDatabaseSession {

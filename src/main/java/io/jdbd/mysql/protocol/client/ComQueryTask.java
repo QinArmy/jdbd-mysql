@@ -35,7 +35,7 @@ import java.util.function.IntSupplier;
  * <p>
  * This class is a implementation of {@link io.jdbd.vendor.task.CommunicationTask}.
  * This task is responsible for the communication about MySQL client COM_QUERY protocol .
- * </p>
+ * <br/>
  * <p>
  *     <ul>
  *         <li>{@link QueryCommandWriter} write  COM_QUERY packet</li>
@@ -43,11 +43,11 @@ import java.util.function.IntSupplier;
  *         <li>{@link #readResultSet(ByteBuf, Consumer)} read result with return column</li>
  *         <li>{@link #sendLocalFile(ByteBuf)} response LOCAL INFILE Data packet</li>
  *     </ul>
- * </p>
+ * <br/>
  * <p>
  * following is chinese signature:<br/>
  * 当你在阅读这段代码时,我才真正在写这段代码,你阅读到哪里,我便写到哪里.
- * </p>
+ * <br/>
  *
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html">Protocol::COM_QUERY</a>
  * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response.html">Protocol::COM_QUERY Response</a>
@@ -59,7 +59,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying method of {@link StaticStatementSpec#executeUpdate(String)} spi method.
-     * </p>
+     * <br/>
      *
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
      * @see ClientProtocol#update(StaticStmt)
@@ -84,7 +84,7 @@ final class ComQueryTask extends MySQLCommandTask {
      *     <li>{@link StaticStatementSpec#executeQuery(String, Function)}</li>
      *     <li>{@link StaticStatementSpec#executeQuery(String, Function, Consumer)}</li>
      * </ul>
-     * </p>
+     * <br/>
      *
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
      * @see ClientProtocol#query(StaticStmt, Function, Consumer)
@@ -106,7 +106,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link StaticStatement#executeBatchUpdate(List)} method.
-     * </p>
+     * <br/>
      *
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
      * @see ClientProtocol#batchUpdate(StaticBatchStmt)
@@ -126,7 +126,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link StaticStatement#executeBatchQuery(List)} method.
-     * </p>
+     * <br/>
      *
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
      * @see MySQLProtocol#batchQuery(StaticBatchStmt)
@@ -146,7 +146,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link StaticStatement#executeBatchAsMulti(List)} method.
-     * </p>
+     * <br/>
      *
      * @see ClientProtocol#batchAsMulti(StaticBatchStmt)
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
@@ -165,7 +165,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link StaticStatement#executeBatchAsFlux(List)} method.
-     * </p>
+     * <br/>
      *
      * @see ClientProtocol#batchAsFlux(StaticBatchStmt)
      * @see #ComQueryTask(Stmt, ResultSink, TaskAdjutant)
@@ -184,7 +184,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link StaticStatementSpec#executeMultiStmt(String)} method.
-     * </p>
+     * <br/>
      */
     static OrderedFlux staticMultiStmt(final StaticMultiStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.asFlux(sink -> {
@@ -203,7 +203,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is one of underlying api of {@link BindStatement#executeUpdate()} method.
-     * </p>
+     * <br/>
      *
      * @see ComPreparedTask#update(ParamStmt, TaskAdjutant)
      * @see ClientProtocol#paramUpdate(ParamStmt, boolean)
@@ -228,7 +228,7 @@ final class ComQueryTask extends MySQLCommandTask {
      *     <li>{@link BindStatement#executeQuery(Function)}</li>
      *     <li>{@link BindStatement#executeQuery(Function, Consumer)}</li>
      * </ul>
-     * </p>
+     * <br/>
      *
      * @see ClientProtocol#paramQuery(ParamStmt, boolean, Function, Consumer)
      */
@@ -248,7 +248,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is one of underlying api of {@link BindSingleStatement#executeAsFlux()}.
-     * </p>
+     * <br/>
      *
      * @see io.jdbd.mysql.protocol.MySQLProtocol#paramAsFlux(ParamStmt, boolean)
      */
@@ -266,7 +266,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is one of underlying api of {@link BindStatement#executeBatchUpdate()} method.
-     * </p>
+     * <br/>
      *
      * @see ClientProtocol#paramBatchUpdate(ParamBatchStmt, boolean)
      */
@@ -289,7 +289,7 @@ final class ComQueryTask extends MySQLCommandTask {
      *     <li>{@link BindStatement#executeQuery(Function)}}</li>
      *     <li>{@link BindStatement#executeQuery(Function, Consumer)}</li>
      * </ul>
-     * </p>
+     * <br/>
      */
     static QueryResults paramBatchQuery(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchQuery(adjutant, sink -> {
@@ -307,7 +307,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is one of underlying api of below methods {@link BindStatement#executeBatchAsMulti()}.
-     * </p>
+     * <br/>
      */
     static MultiResult paramBatchAsMulti(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.asMulti(adjutant, sink -> {
@@ -323,7 +323,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is one of underlying api of below methods {@link BindStatement#executeBatchAsFlux()}.
-     * </p>
+     * <br/>
      */
     static OrderedFlux paramBatchAsFlux(final ParamBatchStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.asFlux(sink -> {
@@ -341,7 +341,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is the underlying api of below methods {@link MultiStatement#executeBatchUpdate()}.
-     * </p>
+     * <br/>
      */
     static Flux<ResultStates> multiStmtBatchUpdate(final ParamMultiStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchUpdate(sink -> {
@@ -357,7 +357,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is the underlying api of below methods {@link MultiStatement#executeBatchQuery()}.
-     * </p>
+     * <br/>
      */
     static QueryResults multiStmtBatchQuery(final ParamMultiStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.batchQuery(adjutant, sink -> {
@@ -373,7 +373,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link MultiStatement#executeBatchAsMulti()} method.
-     * </p>
+     * <br/>
      *
      * @see ClientProtocol#multiStmtAsMulti(ParamMultiStmt)
      */
@@ -391,7 +391,7 @@ final class ComQueryTask extends MySQLCommandTask {
     /**
      * <p>
      * This method is underlying api of {@link MultiStatement#executeBatchAsFlux()} method.
-     * </p>
+     * <br/>
      */
     static OrderedFlux multiStmtAsFlux(final ParamMultiStmt stmt, final TaskAdjutant adjutant) {
         return MultiResults.asFlux(sink -> {

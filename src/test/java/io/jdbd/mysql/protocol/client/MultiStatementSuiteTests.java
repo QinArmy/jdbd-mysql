@@ -7,7 +7,7 @@ import org.testng.annotations.Test;
 /**
  * <p>
  * id range [260,299]
- * </p>
+ * <br/>
  */
 @Deprecated
 @Test(enabled = false, groups = {Groups.MULTI_STMT}, dependsOnGroups = {Groups.COM_QUERY, Groups.DATA_PREPARE})

@@ -31,7 +31,7 @@ import java.util.Objects;
 /**
  * <p>
  * see {@code com.mysql.cj.protocol.a.authentication.Sha256PasswordPlugin}
- * </p>
+ * <br/>
  */
 public class Sha256PasswordPlugin implements AuthenticationPlugin {
 

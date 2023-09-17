@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * <p>
  * This class is a implementation of {@link Driver} with MySQL.
- * </p>
+ * <br/>
  *
  * @since 1.0
  */
