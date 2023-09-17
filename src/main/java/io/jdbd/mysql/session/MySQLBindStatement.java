@@ -395,11 +395,6 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         return flux;
     }
 
-    @Override
-    public <F extends Publisher<ResultItem>> F executeBatchAsFlux(Function<OrderedFlux, F> fluxFunc) {
-        return fluxFunc.apply(executeBatchAsFlux());
-    }
-
 
     @Override
     public String toString() {

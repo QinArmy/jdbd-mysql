@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 
 /**
  * <p>
@@ -1355,15 +1356,22 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
 
         private ResultSink sink;
 
+        private LongConsumer consumer;
+
         private PrepareSink(MonoSink<PrepareTask> statementSink) {
             this.statementSink = statementSink;
         }
 
-        private void setSink(ResultSink sink) {
+        private void setSink(final ResultSink sink) {
             if (this.sink != null) {
                 throw new IllegalStateException("this.sink is non-null.");
             }
             this.sink = sink;
+            final LongConsumer consumer = this.consumer;
+            if (consumer != null) {
+                sink.onRequest(consumer);
+            }
+
         }
 
         @Override
@@ -1374,6 +1382,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
             } else {
                 sink.error(e);
             }
+        }
+
+        @Override
+        public void onRequest(LongConsumer consumer) {
+            this.consumer = consumer;
         }
 
         @Override

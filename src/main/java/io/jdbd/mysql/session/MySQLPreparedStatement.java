@@ -444,17 +444,6 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
-    public <F extends Publisher<ResultItem>> F executeBatchAsFlux(@Nullable Function<OrderedFlux, F> fluxFunc) {
-        if (fluxFunc == null) {
-            final NullPointerException error;
-            error = MySQLExceptions.fluxFuncIsNull();
-            this.stmtTask.closeOnBindError(error); // close prepare statement.
-            throw error;
-        }
-        return fluxFunc.apply(executeBatchAsFlux());
-    }
-
-    @Override
     public DatabaseSession abandonBind() {
         clearStatementToAvoidReuse();
         this.stmtTask.abandonBind();

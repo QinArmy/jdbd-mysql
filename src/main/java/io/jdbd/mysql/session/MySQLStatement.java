@@ -149,6 +149,18 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
         return this instanceof BindSingleStatement;
     }
 
+    @Override
+    public final boolean isSupportImportPublisher() {
+        // always false ,MySQL don't support
+        return false;
+    }
+
+    @Override
+    public final boolean isSupportExportSubscriber() {
+        // always false ,MySQL don't support
+        return false;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public final S setTimeout(final int millSeconds) {

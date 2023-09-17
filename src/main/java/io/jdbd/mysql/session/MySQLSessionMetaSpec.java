@@ -82,6 +82,18 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
     }
 
     @Override
+    public final boolean isSupportImportPublisher() throws JdbdException {
+        //always false,MySQL don't support
+        return false;
+    }
+
+    @Override
+    public final boolean isSupportExportSubscriber() throws JdbdException {
+        //always false,MySQL don't support
+        return false;
+    }
+
+    @Override
     public final String factoryVendor() {
         return MySQLDriver.DRIVER_VENDOR;
     }

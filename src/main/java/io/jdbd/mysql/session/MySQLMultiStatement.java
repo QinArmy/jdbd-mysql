@@ -9,7 +9,10 @@ import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLStrings;
-import io.jdbd.result.*;
+import io.jdbd.result.MultiResult;
+import io.jdbd.result.OrderedFlux;
+import io.jdbd.result.QueryResults;
+import io.jdbd.result.ResultStates;
 import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.Parameter;
 import io.jdbd.vendor.result.MultiResults;
@@ -22,7 +25,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
-import java.util.function.Function;
 
 import static io.jdbd.mysql.MySQLDriver.MY_SQL;
 
@@ -200,10 +202,6 @@ final class MySQLMultiStatement extends MySQLStatement<MultiStatement> implement
         return flux;
     }
 
-    @Override
-    public <F extends Publisher<ResultItem>> F executeBatchAsFlux(Function<OrderedFlux, F> fluxFunc) {
-        return fluxFunc.apply(executeBatchAsFlux());
-    }
 
     /*################################## blow Statement method ##################################*/
 
