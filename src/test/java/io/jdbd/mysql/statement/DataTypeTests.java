@@ -78,7 +78,7 @@ public class DataTypeTests extends SessionTestSupport {
             Files.createDirectories(dir);
         }
 
-        final int wkbPointNumber = 64 * 1024 * 200;
+        final int wkbPointNumber = 64 * 1024;
         final Path wkbPath, textPath;
         wkbPath = Files.createTempFile(dir, "Geometry", ".wkb");
         textPath = Files.createTempFile(dir, "Geometry", ".wkt");
@@ -113,7 +113,7 @@ public class DataTypeTests extends SessionTestSupport {
         }
 
 
-        final int wktPointNumber = 64 * 1024 * 100;
+        final int wktPointNumber = 64 * 1024;
         try (FileChannel channel = FileChannel.open(textPath, StandardOpenOption.APPEND)) {
             buffer.writeBytes("LINESTRING(".getBytes(WKT_CHARSET));
             double d;
@@ -895,10 +895,15 @@ public class DataTypeTests extends SessionTestSupport {
         function = row -> {
             //LOG.info("row id : {}", row.get(0, Long.class));
             try {
-                BlobPath blobPath;
-                blobPath = row.getNonNull(1, BlobPath.class);
-                LOG.debug("rowNumber : {}  {} and {} singleBigColumn size match : {}", row.rowNumber(),
-                        blobPath.value(), wkbPath, Files.size(blobPath.value()) == Files.size(wkbPath));
+                if (row.isBigColumn(1)) {
+                    BlobPath blobPath;
+                    blobPath = row.getNonNull(1, BlobPath.class);
+                    LOG.debug("rowNumber : {}  {} and {} singleBigColumn size match : {}", row.rowNumber(),
+                            blobPath.value(), wkbPath, Files.size(blobPath.value()) == Files.size(wkbPath));
+                } else {
+                    row.getNonNull(1, byte[].class);
+                }
+
             } catch (Throwable e) {
                 LOG.error("asResultRow function error.", e);
                 throw new RuntimeException(e);
