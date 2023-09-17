@@ -13,7 +13,7 @@
         This implementation is not intended to be used directly, but rather to be used as the backing implementation
         for a humane client library to delegate to.
     </description>
-    <url>>https://github.com/QinArmy/jdbd-mysql</url>
+    <url>https://github.com/QinArmy/jdbd-mysql</url>
 
     <organization>
         <name>jdbd</name>
@@ -21,7 +21,7 @@
     </organization>
 
     <scm>
-        <connection>scm:git:https://github.com/QinArmy/jdbd-mysql</connection>
+        <connection>scm:git:https://github.com/QinArmy/jdbd-mysql.git</connection>
         <url>https://github.com/QinArmy/jdbd-mysql</url>
     </scm>
 
