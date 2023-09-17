@@ -166,6 +166,7 @@
             <groupId>io.r2dbc</groupId>
             <artifactId>r2dbc-spi</artifactId>
             <version>1.0.0.RELEASE</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.r2dbc</groupId>
