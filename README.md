@@ -28,7 +28,7 @@ a humane client library to delegate to.
 <dependency>
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.8.0</version>
+    <version>0.8.1</version>
 </dependency>
 ```
 
