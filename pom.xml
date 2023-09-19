@@ -9,28 +9,25 @@
     <version>0.8.0</version>
 
     <name>jdbd-mysql</name>
-    <description>This project contains the MySQL client protocol implementation of the JDBD SPI.
-        This implementation is not intended to be used directly, but rather to be used as the backing implementation
-        for a humane client library to delegate to.
-    </description>
+    <description>jdbd-mysql is a implementation of the JDBD SPI with MySQL client protocol.</description>
     <url>https://github.com/QinArmy/jdbd-mysql</url>
 
     <organization>
-        <name>jdbd</name>
+        <name>jdbd-mysql</name>
         <url>https://jdbd.io/</url>
     </organization>
-
-    <scm>
-        <connection>scm:git:https://github.com/QinArmy/jdbd-mysql.git</connection>
-        <url>https://github.com/QinArmy/jdbd-mysql</url>
-    </scm>
 
     <developers>
         <developer>
             <name>zoro</name>
-            <email>zoro@qinarmy.io</email>
+            <email>zoro&#64;qinarmy.io</email>
         </developer>
     </developers>
+
+    <scm><!-- see https://maven.apache.org/scm/git.html  -->
+        <connection>scm:git:git://github.com/QinArmy/jdbd-mysql</connection>
+        <url>https://github.com/QinArmy/jdbd-mysql</url>
+    </scm>
 
     <licenses>
         <license>
@@ -46,7 +43,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jdbd.spi.version>0.8.0</jdbd.spi.version>
+        <jdbd.spi.version>0.8.1</jdbd.spi.version>
     </properties>
 
 
@@ -260,7 +257,7 @@
                 <version>3.2.0</version>
                 <configuration>
                     <archive>
-                        <manifest>
+                        <manifest>  <!-- https://maven.apache.org/shared/maven-archiver/ -->
                             <addBuildEnvironmentEntries>true</addBuildEnvironmentEntries>
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                             <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>

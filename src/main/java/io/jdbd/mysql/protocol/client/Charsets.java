@@ -24,9 +24,9 @@ public abstract class Charsets {
     public static final String NOT_USED = latin1; // punting for not-used character sets
     public static final String COLLATION_NOT_DEFINED = "none";
 
-    public static final int MYSQL_COLLATION_INDEX_utf8 = 33;
-    public static final int MYSQL_COLLATION_INDEX_binary = 63;
-    public static final int MYSQL_COLLATION_INDEX_utf8mb4 = 255;
+    public static final byte MYSQL_COLLATION_INDEX_utf8 = 33;
+    public static final byte MYSQL_COLLATION_INDEX_binary = 63;
+    public static final short MYSQL_COLLATION_INDEX_utf8mb4 = 255;
 
     private static final int NUMBER_OF_ENCODINGS_CONFIGURED;
 

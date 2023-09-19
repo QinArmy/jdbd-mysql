@@ -1,4 +1,4 @@
-# Reactive Relational Database Driver MySQL Implementation
+# Reactive Relational Database Driver MySQL Implementation [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.jdbd.mysql/jdbd-mysql/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.jdbd.mysql/jdbd-mysql)
 
 This project contains the [MySQL client protocol][m] implementation of the [JDBD SPI][j].
 This implementation is not intended to be used directly, but rather to be used as the backing implementation for
