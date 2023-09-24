@@ -1025,7 +1025,7 @@ public class DataTypeTests extends SessionTestSupport {
         final String insertSql, querySql;
 
         insertSql = "INSERT mysql_types(my_boolean) VALUES (?),(?),(?)";
-        querySql = "SELECT t.id,t.my_boolean FROM mysql_types AS t WHERE t.id IN (?,?,?) ORDER BY t.id";
+        querySql = "SELECT t.id,t.my_boolean,TRUE AS myTrue,FALSE AS myFalse,1 AS myNumber FROM mysql_types AS t WHERE t.id IN (?,?,?) ORDER BY t.id";
 
         final BindSingleStatement insertStmt, queryInsert;
         insertStmt = createSingleStatement(targetMethod, context, insertSql);
