@@ -248,16 +248,23 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
      */
-
     @Override
     public final Publisher<SavePoint> setSavePoint() {
+        return setSavePoint(Option.EMPTY_OPTION_FUNC);
+    }
+
+    /**
+     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/savepoint.html">SAVEPOINT</a>
+     */
+    @Override
+    public final Publisher<SavePoint> setSavePoint(Function<Option<?>, ?> optionFunc) {
         final StringBuilder builder;
         builder = MySQLStrings.builder()
                 .append("jdbd_")
                 .append(this.savePointIndex.getAndIncrement())
                 .append('_')
                 .append(ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE));
-        return this.setSavePoint(builder.toString(), Option.EMPTY_OPTION_FUNC);
+        return this.setSavePoint(builder.toString(), optionFunc);
     }
 
     /**

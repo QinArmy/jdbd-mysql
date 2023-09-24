@@ -307,6 +307,34 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         return flux;
     }
 
+    @Override
+    public <R> Publisher<R> executeBatchQueryAsFlux(Function<CurrentRow, R> rowFunc, Consumer<ResultStates> statesConsumer) {
+        this.endStmtOption(true);
+
+        final List<List<ParamValue>> paramGroupList = this.paramGroupList;
+        final List<ParamValue> paramGroup = this.paramGroup;
+
+        final RuntimeException error;
+        if (paramGroup == EMPTY_PARAM_GROUP) {
+            error = MySQLExceptions.cannotReuseStatement(BindStatement.class);
+        } else if (paramGroup != null) {
+            error = MySQLExceptions.noInvokeAddBatch();
+        } else if (paramGroupList == null) {
+            error = MySQLExceptions.noAnyParamGroupError();
+        } else {
+            error = null;
+        }
+        final Flux<R> flux;
+        if (error == null) {
+            final ParamBatchStmt stmt;
+            stmt = Stmts.paramBatch(this.sql, paramGroupList, this);
+            flux = this.session.protocol.paramBatchQueryAsFlux(stmt, isUsePrepare(), rowFunc, statesConsumer);
+        } else {
+            flux = Flux.error(MySQLExceptions.wrap(error));
+        }
+        clearStatementToAvoidReuse();
+        return flux;
+    }
 
     @Override
     public QueryResults executeBatchQuery() {

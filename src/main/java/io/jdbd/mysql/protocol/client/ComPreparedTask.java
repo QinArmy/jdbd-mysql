@@ -134,6 +134,18 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         });
     }
 
+    static <R> Flux<R> batchQueryAsFlux(final ParamBatchStmt stmt, final Function<CurrentRow, R> function,
+                                        final Consumer<ResultStates> consumer, final TaskAdjutant adjutant) {
+        return MultiResults.batchQueryAsFlux(function, consumer, sink -> {
+            try {
+                ComPreparedTask task = new ComPreparedTask(stmt, sink, adjutant);
+                task.submit(sink::error);
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrapIfNonJvmFatal(e));
+            }
+        });
+    }
+
     /**
      * <p>
      * This method is one of underlying api of {@link BindSingleStatement#executeBatchQuery()}.
@@ -344,6 +356,10 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         return MultiResults.batchUpdate(sink -> executeAfterBinding(sink, stmt));
     }
 
+    @Override
+    public <R> Flux<R> executeBatchQueryAsFlux(ParamBatchStmt stmt, Function<CurrentRow, R> function, Consumer<ResultStates> consumer) {
+        return MultiResults.batchQueryAsFlux(function, consumer, sink -> executeAfterBinding(sink, stmt));
+    }
 
     @Override
     public QueryResults executeBatchQuery(ParamBatchStmt stmt) {

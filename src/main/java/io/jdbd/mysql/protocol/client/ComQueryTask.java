@@ -281,6 +281,18 @@ final class ComQueryTask extends MySQLCommandTask {
         });
     }
 
+    static <R> Flux<R> paramBatchQueryAsFlux(final ParamBatchStmt stmt, final Function<CurrentRow, R> function,
+                                             final Consumer<ResultStates> consumer, final TaskAdjutant adjutant) {
+        return MultiResults.batchQueryAsFlux(function, consumer, sink -> {
+            try {
+                ComQueryTask task = new ComQueryTask(stmt, sink, adjutant);
+                task.submit(sink::error);
+            } catch (Throwable e) {
+                sink.error(MySQLExceptions.wrapIfNonJvmFatal(e));
+            }
+        });
+    }
+
     /**
      * <p>
      * This method is one of underlying api of following :

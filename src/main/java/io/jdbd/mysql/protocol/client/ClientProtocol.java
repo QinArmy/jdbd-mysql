@@ -125,6 +125,18 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
+    public <R> Flux<R> paramBatchQueryAsFlux(ParamBatchStmt stmt, boolean usePrepare, Function<CurrentRow, R> function,
+                                             Consumer<ResultStates> consumer) {
+        final Flux<R> flux;
+        if (usePrepare) {
+            flux = ComPreparedTask.batchQueryAsFlux(stmt, function, consumer, this.adjutant);
+        } else {
+            flux = ComQueryTask.paramBatchQueryAsFlux(stmt, function, consumer, this.adjutant);
+        }
+        return flux;
+    }
+
+    @Override
     public QueryResults paramBatchQuery(ParamBatchStmt stmt, boolean usePrepare) {
         final QueryResults batchQuery;
         if (usePrepare) {

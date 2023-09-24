@@ -18,6 +18,7 @@ import io.jdbd.vendor.ResultType;
 import io.jdbd.vendor.SubscribeException;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.stmt.JdbdValues;
+import io.jdbd.vendor.stmt.ParamBatchStmt;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.task.PrepareTask;
@@ -344,6 +345,39 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
         final Flux<ResultStates> flux;
         if (error == null) {
             flux = this.stmtTask.executeBatchUpdate(Stmts.paramBatch(this.sql, paramGroupList, this));
+        } else {
+            this.stmtTask.closeOnBindError(error); // close prepare statement.
+            flux = Flux.error(MySQLExceptions.wrap(error));
+        }
+        clearStatementToAvoidReuse();
+        return flux;
+    }
+
+    @Override
+    public <R> Publisher<R> executeBatchQueryAsFlux(Function<CurrentRow, R> rowFunc, Consumer<ResultStates> statesConsumer) {
+        this.endStmtOption(true);
+
+        final List<List<ParamValue>> paramGroupList = this.paramGroupList;
+        final List<ParamValue> paramGroup = this.paramGroup;
+
+        final RuntimeException error;
+        if (paramGroup == EMPTY_PARAM_GROUP) {
+            error = MySQLExceptions.cannotReuseStatement(PreparedStatement.class);
+        } else if (paramGroup != null) {
+            error = MySQLExceptions.noInvokeAddBatch();
+        } else if (paramGroupList == null || paramGroupList.size() == 0) {
+            error = MySQLExceptions.noAnyParamGroupError();
+        } else if (this.rowMeta.getColumnCount() == 0) {
+            error = new SubscribeException(ResultType.BATCH_QUERY, ResultType.UPDATE);
+        } else {
+            error = null;
+        }
+
+        final Flux<R> flux;
+        if (error == null) {
+            final ParamBatchStmt stmt;
+            stmt = Stmts.paramBatch(this.sql, paramGroupList, this);
+            flux = this.stmtTask.executeBatchQueryAsFlux(stmt, rowFunc, statesConsumer);
         } else {
             this.stmtTask.closeOnBindError(error); // close prepare statement.
             flux = Flux.error(MySQLExceptions.wrap(error));
