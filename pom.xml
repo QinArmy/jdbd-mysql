@@ -6,7 +6,7 @@
 
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.8.2</version>
+    <version>0.8.2</version><!-- jdbd-mysql version find and replace-->
 
     <name>jdbd-mysql</name>
     <description>jdbd-mysql is a implementation of the JDBD SPI with MySQL client protocol.</description>
