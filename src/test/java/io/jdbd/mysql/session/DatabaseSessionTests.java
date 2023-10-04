@@ -319,20 +319,20 @@ public class DatabaseSessionTests extends SessionTestSupport {
     }
 
     /**
-     * @see DatabaseSession#transactionStatus()
+     * @see DatabaseSession#transactionInfo()
      */
     @Test
     public void transactionStatus(final LocalDatabaseSession session, final String methodName) {
 
         Mono.from(session.startTransaction(TransactionOption.option(Isolation.READ_COMMITTED, false)))
-                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .flatMap(s -> Mono.from(s.transactionInfo()))
                 .doOnSuccess(status -> {
                     Assert.assertTrue(status.inTransaction());
                     Assert.assertFalse(status.isReadOnly());
                     Assert.assertEquals(status.isolation(), Isolation.READ_COMMITTED);
                 })
                 .then(Mono.from(session.commit())) // driver don't send message to database server before subscribing.
-                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .flatMap(s -> Mono.from(s.transactionInfo()))
                 .doOnSuccess(status -> {
                     Assert.assertFalse(status.inTransaction());
                     LOG.debug("{} session isolation : {} , session read only : {}", methodName, status.isolation().name(), status.isReadOnly());
@@ -348,11 +348,11 @@ public class DatabaseSessionTests extends SessionTestSupport {
     public void setTransactionCharacteristics(final DatabaseSession session) {
         TransactionOption txOption;
 
-        TransactionStatus txStatus;
+        TransactionInfo txStatus;
 
         txOption = TransactionOption.option(Isolation.READ_COMMITTED, true);
         txStatus = Mono.from(session.setTransactionCharacteristics(txOption))
-                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .flatMap(s -> Mono.from(s.transactionInfo()))
                 .block();
 
         Assert.assertNotNull(txStatus);
@@ -363,7 +363,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
         txOption = TransactionOption.option(null, true);
         txStatus = Mono.from(session.setTransactionCharacteristics(txOption))
-                .flatMap(s -> Mono.from(s.transactionStatus()))
+                .flatMap(s -> Mono.from(s.transactionInfo()))
                 .block();
 
         Assert.assertNotNull(txStatus);

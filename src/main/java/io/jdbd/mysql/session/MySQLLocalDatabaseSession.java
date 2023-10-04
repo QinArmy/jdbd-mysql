@@ -11,7 +11,7 @@ import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
-import io.jdbd.vendor.session.JdbdTransactionStatus;
+import io.jdbd.vendor.session.JdbdTransactionInfo;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -150,9 +150,9 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     /**
-     * @see #transactionStatus()
+     * @see #transactionInfo()
      */
-    final Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list) {
+    final Mono<TransactionInfo> mapTransactionStatus(final List<ResultItem> list) {
         final ResultRow row;
         final ResultStates states;
         row = (ResultRow) list.get(0);
@@ -162,7 +162,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         final Boolean readOnly;
         final LocalTxOption localTxOption;
 
-        final Mono<TransactionStatus> mono;
+        final Mono<TransactionInfo> mono;
         if ((readOnly = states.valueOf(Option.READ_ONLY)) == null) {
             // no bug,never here
             mono = Mono.error(new JdbdException("result status no read only"));
@@ -170,7 +170,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(JdbdTransactionStatus.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
+            mono = Mono.just(JdbdTransactionInfo.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
         } else if ((localTxOption = CURRENT_TX_OPTION.get(this)) == null) {
             String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new JdbdException(m));
@@ -182,7 +182,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             map.put(Option.READ_ONLY, readOnly);
             map.put(Option.WITH_CONSISTENT_SNAPSHOT, localTxOption.consistentSnapshot);
 
-            mono = Mono.just(JdbdTransactionStatus.fromMap(map));
+            mono = Mono.just(JdbdTransactionInfo.fromMap(map));
         }
         return mono;
     }

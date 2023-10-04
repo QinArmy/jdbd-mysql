@@ -177,7 +177,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
 
     @Override
-    public final Publisher<TransactionStatus> transactionStatus() {
+    public final Publisher<TransactionInfo> transactionInfo() {
         final ServerVersion version = this.protocol.serverVersion();
         final StringBuilder builder = new StringBuilder(139);
         if (version.meetsMinimum(8, 0, 3)
@@ -478,9 +478,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
     /**
-     * @see #transactionStatus()
+     * @see #transactionInfo()
      */
-    abstract Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list);
+    abstract Mono<TransactionInfo> mapTransactionStatus(final List<ResultItem> list);
 
     /**
      * @see #toString()

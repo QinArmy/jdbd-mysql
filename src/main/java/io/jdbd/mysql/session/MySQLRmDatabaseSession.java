@@ -16,7 +16,7 @@ import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.util.JdbdUtils;
-import io.jdbd.vendor.session.JdbdTransactionStatus;
+import io.jdbd.vendor.session.JdbdTransactionInfo;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
 import org.reactivestreams.Publisher;
@@ -393,10 +393,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     /**
-     * @see #transactionStatus()
+     * @see #transactionInfo()
      */
     @Override
-    final Mono<TransactionStatus> mapTransactionStatus(final List<ResultItem> list) {
+    final Mono<TransactionInfo> mapTransactionStatus(final List<ResultItem> list) {
         final ResultRow row;
         final ResultStates states;
         row = (ResultRow) list.get(0);
@@ -406,7 +406,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final Boolean readOnly;
         final XaTxOption xaTxOption;
 
-        final Mono<TransactionStatus> mono;
+        final Mono<TransactionInfo> mono;
         if ((readOnly = states.valueOf(Option.READ_ONLY)) == null) {
             // no bug,never here
             mono = Mono.error(new JdbdException("result status no read only"));
@@ -414,7 +414,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(JdbdTransactionStatus.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
+            mono = Mono.just(JdbdTransactionInfo.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
         } else if ((xaTxOption = this.currentTxOption) == null) {
             String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new XaException(m, null, 0, XaException.XAER_PROTO));
@@ -428,7 +428,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
             map.put(Option.XA_STATES, xaTxOption.xaStates);
             map.put(Option.XA_FLAGS, xaTxOption.flags);
-            mono = Mono.just(JdbdTransactionStatus.fromMap(map));
+            mono = Mono.just(JdbdTransactionInfo.fromMap(map));
         }
         return mono;
     }
