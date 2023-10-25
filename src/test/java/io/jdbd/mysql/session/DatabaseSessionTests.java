@@ -18,7 +18,7 @@ import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -293,29 +293,27 @@ public class DatabaseSessionTests extends SessionTestSupport {
      */
     @Test
     public void inTransaction(final LocalDatabaseSession session) {
-        final Boolean match;
-        match = Mono.from(session.startTransaction(TransactionOption.option(Isolation.READ_COMMITTED, false)))
+        Mono.from(session.startTransaction(TransactionOption.option(Isolation.READ_COMMITTED, false)))
                 .flatMap(s -> {
-                    Mono<LocalDatabaseSession> mono;
+                    Mono<Optional<TransactionInfo>> mono;
                     if (s.inTransaction()) {
                         mono = Mono.from(session.commit());
                     } else {
                         mono = Mono.error(new RuntimeException("transaction start bug"));
                     }
                     return mono;
-                }).flatMap(s -> Mono.from(s.commit()))
-                .flatMap(s -> {
-                    Mono<LocalDatabaseSession> mono;
-                    if (s.inTransaction()) {
+                }).flatMap(s -> Mono.from(session.commit()))
+                .flatMap(o -> {
+                    Mono<Optional<TransactionInfo>> mono;
+                    if (o.isPresent() && o.get().inTransaction()) {
                         mono = Mono.error(new RuntimeException("transaction commit bug"));
                     } else {
-                        mono = Mono.just(s);
+                        mono = Mono.just(o);
                     }
                     return mono;
-                }).map(s -> Objects.equals(s, session))
+                })
                 .block();
 
-        Assert.assertEquals(match, Boolean.TRUE);
     }
 
     /**
@@ -332,7 +330,12 @@ public class DatabaseSessionTests extends SessionTestSupport {
                     Assert.assertEquals(status.isolation(), Isolation.READ_COMMITTED);
                 })
                 .then(Mono.from(session.commit())) // driver don't send message to database server before subscribing.
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(o -> {
+                    if (o.isPresent()) {
+                        return Mono.just(o.get());
+                    }
+                    return Mono.from(session.transactionInfo());
+                })
                 .doOnSuccess(status -> {
                     Assert.assertFalse(status.inTransaction());
                     LOG.debug("{} session isolation : {} , session read only : {}", methodName, status.isolation().name(), status.isReadOnly());

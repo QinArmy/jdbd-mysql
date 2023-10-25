@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -54,9 +55,9 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.commit()))
-                .doOnSuccess(s -> Assert.assertFalse(s.inTransaction()))
+                .doOnSuccess(this::assertNotInTransaction)
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
                     Assert.assertNotNull(s.isolation());
@@ -74,7 +75,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.commit(optionMap::get)))  // COMMIT AND CHAIN
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());  // due to COMMIT AND CHAIN, so session still in transaction block.
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -83,8 +84,8 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.commit()))
-                .doOnSuccess(s -> Assert.assertFalse(s.inTransaction()))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .doOnSuccess(this::assertNotInTransaction)
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
                     Assert.assertNotNull(s.isolation());
@@ -121,9 +122,9 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.rollback()))
-                .doOnSuccess(s -> Assert.assertFalse(s.inTransaction()))
+                .doOnSuccess(this::assertNotInTransaction)
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
                     Assert.assertNotNull(s.isolation());
@@ -141,7 +142,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.rollback(optionMap::get)))  // ROLLBACK AND CHAIN
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());  // due to ROLLBACK AND CHAIN, so session still in transaction block.
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -150,9 +151,9 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.rollback()))
-                .doOnSuccess(s -> Assert.assertFalse(s.inTransaction()))
+                .doOnSuccess(this::assertNotInTransaction)
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
                     Assert.assertNotNull(s.isolation());
@@ -226,6 +227,13 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
 
         Assert.assertTrue(session.isClosed());
 
+    }
+
+
+    private void assertNotInTransaction(Optional<TransactionInfo> optional) {
+        if (optional.isPresent()) {
+            Assert.assertFalse(optional.get().inTransaction());
+        }
     }
 
 

@@ -21,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
@@ -126,7 +127,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     @Override
-    public final Publisher<LocalDatabaseSession> commit() {
+    public final Publisher<Optional<TransactionInfo>> commit() {
         return this.commit(Option.EMPTY_OPTION_FUNC);
     }
 
@@ -134,17 +135,17 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">COMMIT</a>
      */
     @Override
-    public final Publisher<LocalDatabaseSession> commit(final @Nullable Function<Option<?>, ?> optionFunc) {
+    public final Publisher<Optional<TransactionInfo>> commit(final @Nullable Function<Option<?>, ?> optionFunc) {
         return commitOrRollback(true, optionFunc);
     }
 
     @Override
-    public final Publisher<LocalDatabaseSession> rollback() {
+    public final Publisher<Optional<TransactionInfo>> rollback() {
         return this.rollback(Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
-    public final Publisher<LocalDatabaseSession> rollback(Function<Option<?>, ?> optionFunc) {
+    public final Publisher<Optional<TransactionInfo>> rollback(Function<Option<?>, ?> optionFunc) {
         return commitOrRollback(false, optionFunc);
     }
 
@@ -192,8 +193,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
      * @see #rollback(Function)
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">COMMIT</a>
      */
-    private Mono<LocalDatabaseSession> commitOrRollback(final boolean commit,
-                                                        final @Nullable Function<Option<?>, ?> optionFunc) {
+    private Mono<Optional<TransactionInfo>> commitOrRollback(final boolean commit,
+                                                             final @Nullable Function<Option<?>, ?> optionFunc) {
         if (optionFunc == null) {
             return Mono.error(new NullPointerException());
         }
@@ -228,15 +229,18 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         }
         final TransactionInfo info = this.transactionInfo;
         return this.protocol.update(Stmts.stmt(builder.toString()))
-                .doOnSuccess(states -> {
+                .flatMap(states -> {
+                    final Optional<TransactionInfo> optional;
                     if (states.inTransaction()) {
                         assert Boolean.TRUE.equals(chain) : "ResultStates bug";
                         TRANSACTION_INFO.set(this, info); // record old value. NOTE : this occur after this.onTransactionEnd().
+                        optional = Optional.of(info);
                     } else {
                         TRANSACTION_INFO.set(this, null);
+                        optional = Optional.empty();
                     }
-                })
-                .thenReturn(this);
+                    return Mono.just(optional);
+                });
     }
 
 
