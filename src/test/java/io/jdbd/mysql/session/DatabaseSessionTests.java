@@ -298,7 +298,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
                 .flatMap(s -> {
                     Mono<LocalDatabaseSession> mono;
                     if (s.inTransaction()) {
-                        mono = Mono.from(s.commit());
+                        mono = Mono.from(session.commit());
                     } else {
                         mono = Mono.error(new RuntimeException("transaction start bug"));
                     }
@@ -325,7 +325,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
     public void transactionStatus(final LocalDatabaseSession session, final String methodName) {
 
         Mono.from(session.startTransaction(TransactionOption.option(Isolation.READ_COMMITTED, false)))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(status -> {
                     Assert.assertTrue(status.inTransaction());
                     Assert.assertFalse(status.isReadOnly());
@@ -385,7 +385,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
 
 
         Mono.from(session.startTransaction())
-                .flatMap(s -> Mono.from(s.executeUpdate(updateSql)))
+                .flatMap(s -> Mono.from(session.executeUpdate(updateSql)))
 
                 .flatMap(s -> Mono.from(session.setSavePoint()))
                 .flatMap(s -> Mono.from(session.releaseSavePoint(s)))
@@ -420,7 +420,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
         updateSql = "UPDATE mysql_types AS t SET t.my_decimal = t.my_decimal + 888.66 WHERE t.my_datetime < current_timestamp LIMIT 1 ";
 
         Mono.from(session.startTransaction())
-                .flatMap(s -> Mono.from(s.executeUpdate(updateSql)))
+                .flatMap(s -> Mono.from(session.executeUpdate(updateSql)))
                 .onErrorMap(RuntimeException::new)
                 .flatMap(s -> Mono.from(session.setSavePoint("s1`", option -> null)))
                 .block();

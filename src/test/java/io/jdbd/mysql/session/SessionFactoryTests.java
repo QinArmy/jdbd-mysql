@@ -3,11 +3,11 @@ package io.jdbd.mysql.session;
 import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.pool.PoolRmDatabaseSession;
 import io.jdbd.session.DatabaseSession;
-import io.jdbd.session.LocalDatabaseSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 
@@ -41,13 +41,14 @@ public class SessionFactoryTests extends SessionTestSupport {
                 .doOnError(error -> LOG.error("", error))
                 // .repeat(10)
                 .doOnNext(session -> LOG.debug("{}", session))
-                .flatMap(LocalDatabaseSession::startTransaction)
-                .doOnNext(session -> LOG.info("session info {}", session))
-                .flatMap(LocalDatabaseSession::commit)
-                .map(PoolLocalDatabaseSession.class::cast)
-                .flatMap(PoolLocalDatabaseSession::reset)
-                .flatMap(PoolLocalDatabaseSession::ping)
-                .flatMap(DatabaseSession::close)
+                .flatMap(session -> Mono.from(session.startTransaction())
+                        .doOnNext(info -> LOG.info("session info {}", info))
+                        .then(Mono.from(session.commit()))
+                        .map(PoolLocalDatabaseSession.class::cast)
+                        .flatMap(s -> Mono.from(s.reset()))
+                        .flatMap(s -> Mono.from(s.ping()))
+                        .flatMap(s -> Mono.from(s.close()))
+                )
                 .then()
                 .block();
 

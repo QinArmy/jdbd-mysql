@@ -45,7 +45,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
 
         Mono.from(session.startTransaction(txOption))
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -65,7 +65,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.from(session.startTransaction(txOption)))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -112,7 +112,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
 
         Mono.from(session.startTransaction(txOption))
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -132,7 +132,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.from(session.startTransaction(txOption)))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -179,7 +179,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
 
         Mono.from(session.startTransaction(txOption))
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);
@@ -212,7 +212,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
 
         Mono.from(session.startTransaction(txOption))
 
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isolation(), Isolation.REPEATABLE_READ);

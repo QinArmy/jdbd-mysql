@@ -43,11 +43,11 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLLocalDatabaseSession.class);
 
-    private static final AtomicReferenceFieldUpdater<MySQLLocalDatabaseSession, LocalTxOption> CURRENT_TX_OPTION =
-            AtomicReferenceFieldUpdater.newUpdater(MySQLLocalDatabaseSession.class, LocalTxOption.class, "currentTxOption");
+    private static final AtomicReferenceFieldUpdater<MySQLLocalDatabaseSession, TransactionInfo> TRANSACTION_INFO =
+            AtomicReferenceFieldUpdater.newUpdater(MySQLLocalDatabaseSession.class, TransactionInfo.class, "transactionInfo");
 
 
-    private volatile LocalTxOption currentTxOption;
+    private volatile TransactionInfo transactionInfo;
 
 
     /**
@@ -60,12 +60,12 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     }
 
     @Override
-    public Publisher<LocalDatabaseSession> startTransaction() {
+    public Publisher<TransactionInfo> startTransaction() {
         return this.startTransaction(TransactionOption.option(null, false), HandleMode.ERROR_IF_EXISTS);
     }
 
     @Override
-    public final Publisher<LocalDatabaseSession> startTransaction(TransactionOption option) {
+    public final Publisher<TransactionInfo> startTransaction(TransactionOption option) {
         return this.startTransaction(option, HandleMode.ERROR_IF_EXISTS);
     }
 
@@ -73,16 +73,16 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">START TRANSACTION Statement</a>
      */
     @Override
-    public final Publisher<LocalDatabaseSession> startTransaction(final @Nullable TransactionOption option,
-                                                                  final @Nullable HandleMode mode) {
+    public final Publisher<TransactionInfo> startTransaction(final @Nullable TransactionOption option,
+                                                             final @Nullable HandleMode mode) {
         if (option == null || mode == null) {
             return Mono.error(new NullPointerException());
         }
 
         final StringBuilder builder = new StringBuilder(168);
-        final LocalTxOption currentTxOption = this.currentTxOption;
+        final TransactionInfo info = this.transactionInfo;
         final JdbdException error;
-        if ((currentTxOption != null || this.inTransaction())
+        if ((info != null || this.inTransaction())
                 && (error = handleInTransaction(mode, builder)) != null) {
             return Mono.error(error);
         }
@@ -120,8 +120,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
         return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(builder.toString())))
                 .doOnNext(item -> handleStartTransactionResult(item, isolationHolder, consistentSnapshot))
-                .doOnError(e -> CURRENT_TX_OPTION.set(this, null))
-                .then(Mono.just(this));
+                .then(Mono.defer(this::getTransactionInfoAfterStart))
+                .doOnError(e -> TRANSACTION_INFO.set(this, null));
     }
 
 
@@ -158,31 +158,19 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         row = (ResultRow) list.get(0);
         states = (ResultStates) list.get(1);
 
-
-        final Boolean readOnly;
-        final LocalTxOption localTxOption;
+        final TransactionInfo info;
 
         final Mono<TransactionInfo> mono;
-        if ((readOnly = states.valueOf(Option.READ_ONLY)) == null) {
-            // no bug,never here
-            mono = Mono.error(new JdbdException("result status no read only"));
-        } else if (!states.inTransaction()) {
+        if (!states.inTransaction()) {
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(JdbdTransactionInfo.txStatus(isolation, row.getNonNull(1, Boolean.class), false));
-        } else if ((localTxOption = CURRENT_TX_OPTION.get(this)) == null) {
+            mono = Mono.just(JdbdTransactionInfo.txInfo(isolation, row.getNonNull(1, Boolean.class), false));
+        } else if ((info = this.transactionInfo) == null) {
             String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new JdbdException(m));
         } else {
-            final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
-
-            map.put(Option.IN_TRANSACTION, Boolean.TRUE);
-            map.put(Option.ISOLATION, localTxOption.isolation); // MySQL don't support get current isolation level
-            map.put(Option.READ_ONLY, readOnly);
-            map.put(Option.WITH_CONSISTENT_SNAPSHOT, localTxOption.consistentSnapshot);
-
-            mono = Mono.just(JdbdTransactionInfo.fromMap(map));
+            mono = Mono.just(info);
         }
         return mono;
     }
@@ -190,12 +178,12 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
     @Override
     final void printTransactionInfo(final StringBuilder builder) {
-        final LocalTxOption localTxOption = this.currentTxOption;
-        if (localTxOption != null) {
+        final TransactionInfo info = this.transactionInfo;
+        if (info != null) {
             builder.append(" , currentTransactionIsolation : ")
-                    .append(localTxOption.isolation.name())
+                    .append(info.isolation().name())
                     .append(" , currentTransactionConsistentSnapshot : ")
-                    .append(localTxOption.consistentSnapshot);
+                    .append(info.valueOf(Option.WITH_CONSISTENT_SNAPSHOT));
         }
     }
 
@@ -238,14 +226,14 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             }
             builder.append(" RELEASE");
         }
-        final LocalTxOption currentTxOption = this.currentTxOption;
+        final TransactionInfo info = this.transactionInfo;
         return this.protocol.update(Stmts.stmt(builder.toString()))
                 .doOnSuccess(states -> {
                     if (states.inTransaction()) {
                         assert Boolean.TRUE.equals(chain) : "ResultStates bug";
-                        CURRENT_TX_OPTION.set(this, currentTxOption); // record old value. NOTE : this occur after this.onTransactionEnd().
+                        TRANSACTION_INFO.set(this, info); // record old value. NOTE : this occur after this.onTransactionEnd().
                     } else {
-                        CURRENT_TX_OPTION.set(this, null);
+                        TRANSACTION_INFO.set(this, null);
                     }
                 })
                 .thenReturn(this);
@@ -284,28 +272,67 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     private void handleStartTransactionResult(final ResultItem item, final AtomicReference<Isolation> isolationHolder,
                                               final @Nullable Boolean consistentSnapshot) {
         if (item instanceof ResultRow) {
-            isolationHolder.set(((ResultRow) item).getNonNull(0, Isolation.class));
+            isolationHolder.compareAndSet(null, ((ResultRow) item).getNonNull(0, Isolation.class));
         } else if (item instanceof ResultStates && !((ResultStates) item).hasMoreResult()) {
-            if (((ResultStates) item).inTransaction()) {
-                CURRENT_TX_OPTION.set(this, new LocalTxOption(isolationHolder.get(), consistentSnapshot));
+            final ResultStates states = (ResultStates) item;
+            if (states.inTransaction()) {
+                final boolean readOnly = states.nonNullOf(Option.READ_ONLY);
+                final TransactionInfo info;
+                info = createTransactionInfoAfterStart(isolationHolder, readOnly, consistentSnapshot);
+                TRANSACTION_INFO.set(this, info);
             } else {
-                CURRENT_TX_OPTION.set(this, null);
+                TRANSACTION_INFO.set(this, null);
                 throw new JdbdException("transaction start failure"); // no bug,never here
             }
         }
     }
 
+    /**
+     * @see #startTransaction(TransactionOption, HandleMode)
+     */
+    private Mono<TransactionInfo> getTransactionInfoAfterStart() {
+        final TransactionInfo info = TRANSACTION_INFO.get(this);
+        Mono<TransactionInfo> mono;
+        if (info == null) {
+            mono = Mono.error(MySQLExceptions.concurrentStartTransaction());
+        } else {
+            mono = Mono.just(info);
+        }
+        return mono;
+    }
+
+
+    /**
+     * @see #handleStartTransactionResult(ResultItem, AtomicReference, Boolean)
+     */
+    private TransactionInfo createTransactionInfoAfterStart(final AtomicReference<Isolation> isolationHolder,
+                                                            final boolean readOnly,
+                                                            final @Nullable Boolean consistentSnapshot) {
+        final TransactionInfo info;
+        if (consistentSnapshot == null) {
+            info = JdbdTransactionInfo.txInfo(isolationHolder.get(), readOnly, true);
+        } else {
+            final Map<Option<?>, Object> map = MySQLCollections.hashMap(7);
+            map.put(Option.ISOLATION, isolationHolder.get());
+            map.put(Option.READ_ONLY, readOnly);
+            map.put(Option.IN_TRANSACTION, Boolean.TRUE);
+            map.put(Option.WITH_CONSISTENT_SNAPSHOT, consistentSnapshot);
+            info = JdbdTransactionInfo.fromMap(map);
+        }
+        return info;
+    }
+
 
     final void onSessionClose() {
         super.onSessionClose();
-        CURRENT_TX_OPTION.set(this, null); // clear cache , avoid reconnect occur bug
+        TRANSACTION_INFO.set(this, null); // clear cache , avoid reconnect occur bug
         LOG.debug("session close event,clear current local transaction cache.");
         ;
 
     }
 
     private void onTransactionEnd() {
-        CURRENT_TX_OPTION.set(this, null); // clear cache,avoid bug
+        TRANSACTION_INFO.set(this, null); // clear cache,avoid bug
         LOG.debug("transaction end event,clear current local transaction cache.");
     }
 

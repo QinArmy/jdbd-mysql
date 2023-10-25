@@ -477,6 +477,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
                 .toString();
     }
 
+
     /**
      * @see #transactionInfo()
      */
