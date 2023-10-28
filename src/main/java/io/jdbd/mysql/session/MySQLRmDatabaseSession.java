@@ -220,7 +220,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         if (info == null || !info.xid.equals(xid)) {
             mono = Mono.error(MySQLExceptions.xaNonCurrentTransaction(xid)); // here use xid
         } else if (info.xaStates != XaStates.IDLE) {
-            mono = Mono.error(MySQLExceptions.xaTransactionDontSupportEndCommand(info.xid, info.xaStates));
+            mono = Mono.error(MySQLExceptions.xaStatesDontSupportPrepareCommand(info.xid, info.xaStates));
         } else if ((error = xidToString(builder, info.xid)) != null) { // here use xaTxOption.xid
             mono = Mono.error(error);
         } else {
