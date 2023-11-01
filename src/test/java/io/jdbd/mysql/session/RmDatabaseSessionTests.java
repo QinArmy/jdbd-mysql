@@ -66,7 +66,7 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.defer(() -> Mono.from(session.end(xid, RmDatabaseSession.TM_SUCCESS))))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isReadOnly(), readOnly);
@@ -131,7 +131,7 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.defer(() -> Mono.from(session.end(xid, RmDatabaseSession.TM_SUCCESS))))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isReadOnly(), readOnly);
@@ -182,7 +182,7 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.defer(() -> Mono.from(session.end(xid, RmDatabaseSession.TM_SUCCESS))))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isReadOnly(), readOnly);
@@ -254,7 +254,7 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.defer(() -> Mono.from(session.end(xid, RmDatabaseSession.TM_FAIL))))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isReadOnly(), readOnly);
@@ -303,7 +303,7 @@ public class RmDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .then(Mono.defer(() -> Mono.from(session.end(xid, RmDatabaseSession.TM_FAIL))))
-                .flatMap(s -> Mono.from(s.transactionInfo()))
+                .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertTrue(s.inTransaction());
                     Assert.assertEquals(s.isReadOnly(), readOnly);

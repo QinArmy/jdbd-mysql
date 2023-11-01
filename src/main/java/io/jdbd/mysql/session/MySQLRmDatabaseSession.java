@@ -150,12 +150,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
 
     @Override
-    public final Publisher<RmDatabaseSession> end(Xid xid) {
+    public final Publisher<TransactionInfo> end(Xid xid) {
         return this.end(xid, TM_SUCCESS, Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
-    public final Publisher<RmDatabaseSession> end(final Xid xid, final int flags) {
+    public final Publisher<TransactionInfo> end(final Xid xid, final int flags) {
         return this.end(xid, flags, Option.EMPTY_OPTION_FUNC);
     }
 
@@ -167,14 +167,14 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/xa-statements.html">XA Transaction SQL Statements</a>
      */
     @Override
-    public final Publisher<RmDatabaseSession> end(final Xid xid, final int flags, Function<Option<?>, ?> optionFunc) {
+    public final Publisher<TransactionInfo> end(final Xid xid, final int flags, Function<Option<?>, ?> optionFunc) {
 
         final XaTransactionInfo info = this.transactionInfo;
 
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA END");
 
-        final Mono<RmDatabaseSession> mono;
+        final Mono<TransactionInfo> mono;
         final XaException error;
         if (info == null || !info.xid.equals(xid)) {
             mono = Mono.error(MySQLExceptions.xaNonCurrentTransaction(xid)); // here use xid
@@ -189,8 +189,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 builder.append(" SUSPEND");
             }
             mono = this.protocol.update(Stmts.stmt(builder.toString()))
-                    .doOnSuccess(states -> TRANSACTION_INFO.set(this, new XaTransactionInfo(info, XaStates.IDLE, flags)))
-                    .thenReturn(this);
+                    .map(states -> {
+                        final XaTransactionInfo endInfo;
+                        endInfo = new XaTransactionInfo(info, XaStates.IDLE, flags);
+                        TRANSACTION_INFO.set(this, endInfo);
+                        return endInfo;
+                    });
         }
         return mono;
     }

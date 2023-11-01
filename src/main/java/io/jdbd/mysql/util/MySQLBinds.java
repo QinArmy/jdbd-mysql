@@ -2,7 +2,6 @@ package io.jdbd.mysql.util;
 
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
-import io.jdbd.meta.UserDefinedType;
 import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.vendor.stmt.Value;
@@ -33,11 +32,7 @@ public abstract class MySQLBinds extends JdbdBinds {
         if (dataType instanceof MySQLType) {
             type = (MySQLType) dataType;
         } else if (!(dataType instanceof JdbdType)) {
-            if (dataType instanceof UserDefinedType) { // mysql don't support user defined type.
-                type = MySQLType.UNKNOWN;
-            } else {
-                type = MYSQL_TYPE_MAP.getOrDefault(dataType.typeName().toUpperCase(Locale.ROOT), MySQLType.UNKNOWN);
-            }
+            type = MYSQL_TYPE_MAP.getOrDefault(dataType.typeName().toUpperCase(Locale.ROOT), MySQLType.UNKNOWN);
         } else switch ((JdbdType) dataType) {
             case NULL:
                 type = MySQLType.NULL;

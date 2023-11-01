@@ -1345,6 +1345,11 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         }
 
         @Override
+        public int getFrequency() {
+            return getStmt().getFrequency();
+        }
+
+        @Override
         public Function<ChunkOption, Publisher<byte[]>> getImportFunction() {
             return getStmt().getImportFunction();
         }

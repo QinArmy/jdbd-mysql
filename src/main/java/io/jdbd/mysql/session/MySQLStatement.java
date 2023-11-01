@@ -59,6 +59,8 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     int fetchSize;
 
+    int frequency;
+
     private Map<String, NamedValue> queryAttrMap;
 
 
@@ -163,7 +165,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     @SuppressWarnings("unchecked")
     @Override
-    public final S setTimeout(final int millSeconds) {
+    public final S setTimeout(final int millSeconds) throws IllegalArgumentException {
         if (millSeconds < 0) {
             final IllegalArgumentException error;
             error = MySQLExceptions.timeoutIsNegative(millSeconds);
@@ -178,7 +180,7 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
 
     @SuppressWarnings("unchecked")
     @Override
-    public final S setFetchSize(final int fetchSize) {
+    public final S setFetchSize(final int fetchSize) throws IllegalArgumentException {
         if (fetchSize < 0) {
             final IllegalArgumentException error;
             error = MySQLExceptions.fetchSizeIsNegative(fetchSize);
@@ -249,7 +251,6 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
         return this.session.protocol.valueOf(option);
     }
 
-
     @Override
     public final int getTimeout() {
         return this.timeoutMillSeconds;
@@ -258,6 +259,11 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     @Override
     public final int getFetchSize() {
         return this.fetchSize;
+    }
+
+    @Override
+    public final int getFrequency() {
+        return this.frequency;
     }
 
     @Override

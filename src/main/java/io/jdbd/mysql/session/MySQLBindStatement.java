@@ -423,6 +423,14 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         return flux;
     }
 
+    @Override
+    public BindStatement setFrequency(final int frequency) throws IllegalArgumentException {
+        if (frequency < 0) {
+            throw MySQLExceptions.frequencyIsNegative(frequency);
+        }
+        this.frequency = frequency;
+        return this;
+    }
 
     @Override
     public String toString() {

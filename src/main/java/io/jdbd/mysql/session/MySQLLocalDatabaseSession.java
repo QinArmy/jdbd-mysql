@@ -127,21 +127,23 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     @Override
-    public final Publisher<Optional<TransactionInfo>> commit() {
-        return this.commit(Option.EMPTY_OPTION_FUNC);
+    public final Publisher<LocalDatabaseSession> commit() {
+        return commitOrRollback(true, Option.EMPTY_OPTION_FUNC)
+                .thenReturn(this);
     }
 
     /**
      * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/commit.html">COMMIT</a>
      */
     @Override
-    public final Publisher<Optional<TransactionInfo>> commit(final @Nullable Function<Option<?>, ?> optionFunc) {
+    public final Publisher<Optional<TransactionInfo>> commit(final Function<Option<?>, ?> optionFunc) {
         return commitOrRollback(true, optionFunc);
     }
 
     @Override
-    public final Publisher<Optional<TransactionInfo>> rollback() {
-        return this.rollback(Option.EMPTY_OPTION_FUNC);
+    public final Publisher<LocalDatabaseSession> rollback() {
+        return commitOrRollback(false, Option.EMPTY_OPTION_FUNC)
+                .thenReturn(this);
     }
 
     @Override

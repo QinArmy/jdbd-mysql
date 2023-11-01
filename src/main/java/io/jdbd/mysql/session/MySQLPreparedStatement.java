@@ -485,6 +485,15 @@ final class MySQLPreparedStatement extends MySQLStatement<PreparedStatement> imp
     }
 
     @Override
+    public PreparedStatement setFrequency(final int frequency) throws IllegalArgumentException {
+        if (frequency < 0) {
+            throw MySQLExceptions.frequencyIsNegative(frequency);
+        }
+        this.frequency = frequency;
+        return this;
+    }
+
+    @Override
     public String toString() {
         return MySQLStrings.builder()
                 .append(getClass().getName())

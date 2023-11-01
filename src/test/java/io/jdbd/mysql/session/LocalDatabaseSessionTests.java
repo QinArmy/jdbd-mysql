@@ -55,7 +55,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.commit()))
-                .doOnSuccess(this::assertNotInTransaction)
+                .doOnSuccess(this::assertSessionNotInTransaction)
 
                 .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
@@ -84,7 +84,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.commit()))
-                .doOnSuccess(this::assertNotInTransaction)
+                .doOnSuccess(this::assertSessionNotInTransaction)
                 .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
                     Assert.assertFalse(s.inTransaction());
@@ -122,7 +122,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.rollback()))
-                .doOnSuccess(this::assertNotInTransaction)
+                .doOnSuccess(this::assertSessionNotInTransaction)
 
                 .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
@@ -151,7 +151,7 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
                 })
 
                 .flatMap(s -> Mono.from(session.rollback()))
-                .doOnSuccess(this::assertNotInTransaction)
+                .doOnSuccess(this::assertSessionNotInTransaction)
 
                 .flatMap(s -> Mono.from(session.transactionInfo()))
                 .doOnSuccess(s -> {
@@ -234,6 +234,10 @@ public class LocalDatabaseSessionTests extends SessionTestSupport {
         if (optional.isPresent()) {
             Assert.assertFalse(optional.get().inTransaction());
         }
+    }
+
+    private void assertSessionNotInTransaction(DatabaseSession session) {
+        Assert.assertFalse(session.inTransaction());
     }
 
 

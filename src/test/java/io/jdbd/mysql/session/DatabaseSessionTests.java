@@ -18,7 +18,6 @@ import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -295,7 +294,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
     public void inTransaction(final LocalDatabaseSession session) {
         Mono.from(session.startTransaction(TransactionOption.option(Isolation.READ_COMMITTED, false)))
                 .flatMap(s -> {
-                    Mono<Optional<TransactionInfo>> mono;
+                    final Mono<LocalDatabaseSession> mono;
                     if (s.inTransaction()) {
                         mono = Mono.from(session.commit());
                     } else {
@@ -303,12 +302,12 @@ public class DatabaseSessionTests extends SessionTestSupport {
                     }
                     return mono;
                 }).flatMap(s -> Mono.from(session.commit()))
-                .flatMap(o -> {
-                    Mono<Optional<TransactionInfo>> mono;
-                    if (o.isPresent() && o.get().inTransaction()) {
+                .flatMap(s -> {
+                    final Mono<LocalDatabaseSession> mono;
+                    if (s.inTransaction()) {
                         mono = Mono.error(new RuntimeException("transaction commit bug"));
                     } else {
-                        mono = Mono.just(o);
+                        mono = Mono.just(s);
                     }
                     return mono;
                 })
@@ -330,12 +329,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
                     Assert.assertEquals(status.isolation(), Isolation.READ_COMMITTED);
                 })
                 .then(Mono.from(session.commit())) // driver don't send message to database server before subscribing.
-                .flatMap(o -> {
-                    if (o.isPresent()) {
-                        return Mono.just(o.get());
-                    }
-                    return Mono.from(session.transactionInfo());
-                })
+                .flatMap(s -> Mono.from(s.transactionInfo()))
                 .doOnSuccess(status -> {
                     Assert.assertFalse(status.inTransaction());
                     LOG.debug("{} session isolation : {} , session read only : {}", methodName, status.isolation().name(), status.isReadOnly());
@@ -377,7 +371,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
     }
 
     /**
-     * @see DatabaseSession#setSavePoint(String, Function)
+     * @see DatabaseSession#setSavePoint(Function)
      * @see DatabaseSession#releaseSavePoint(SavePoint, Function)
      * @see DatabaseSession#rollbackToSavePoint(SavePoint, Function)
      */
@@ -385,7 +379,6 @@ public class DatabaseSessionTests extends SessionTestSupport {
     public void savePoint(final LocalDatabaseSession session) {
         final String updateSql;
         updateSql = "UPDATE mysql_types AS t SET t.my_decimal = t.my_decimal + 888.66 WHERE t.my_datetime < current_timestamp LIMIT 1 ";
-
 
         Mono.from(session.startTransaction())
                 .flatMap(s -> Mono.from(session.executeUpdate(updateSql)))
@@ -396,16 +389,16 @@ public class DatabaseSessionTests extends SessionTestSupport {
                 .flatMap(s -> Mono.from(session.setSavePoint()))
                 .flatMap(s -> Mono.from(session.rollbackToSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("s1")))
+                .flatMap(s -> Mono.from(session.setSavePoint()))
                 .flatMap(s -> Mono.from(session.releaseSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("s2")))
+                .flatMap(s -> Mono.from(session.setSavePoint()))
                 .flatMap(s -> Mono.from(session.rollbackToSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("army's point")))
+                .flatMap(s -> Mono.from(session.setSavePoint(Option.singleFunc(Option.NAME, "army's point"))))
                 .flatMap(s -> Mono.from(session.releaseSavePoint(s)))
 
-                .flatMap(s -> Mono.from(session.setSavePoint("888888886666666")))
+                .flatMap(s -> Mono.from(session.setSavePoint()))
                 .flatMap(s -> Mono.from(session.rollbackToSavePoint(s, option -> null)))
 
                 .flatMap(s -> Mono.from(s.commit()))
@@ -414,7 +407,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
     }
 
     /**
-     * @see DatabaseSession#setSavePoint(String, Function)
+     * @see DatabaseSession#setSavePoint()
      */
     @Test(dependsOnMethods = "executeUpdateInsert", expectedExceptions = JdbdException.class)
     public void savePointContainBacktick(final LocalDatabaseSession session) {
@@ -425,7 +418,7 @@ public class DatabaseSessionTests extends SessionTestSupport {
         Mono.from(session.startTransaction())
                 .flatMap(s -> Mono.from(session.executeUpdate(updateSql)))
                 .onErrorMap(RuntimeException::new)
-                .flatMap(s -> Mono.from(session.setSavePoint("s1`", option -> null)))
+                .flatMap(s -> Mono.from(session.setSavePoint(Option.singleFunc(Option.NAME, "s1`"))))
                 .block();
 
     }

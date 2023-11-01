@@ -1,12 +1,12 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.lang.Nullable;
-import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.ServerException;
 import io.jdbd.session.Option;
 import io.netty.buffer.ByteBuf;
 
 import java.nio.charset.Charset;
+import java.util.function.Function;
 
 
 /**
@@ -55,55 +55,28 @@ final class MySQLServerException extends ServerException {
         }
         cumulateBuffer.readerIndex(limitIndex); // avoid tailor filler
 
-        return new MySQLServerException(errorMessage, sqlState, errorCode, sqlStateMarker);
+
+        final Function<Option<?>, ?> optionFunc;
+        if (sqlStateMarker == null) {
+            optionFunc = Option.EMPTY_OPTION_FUNC;
+        } else {
+            final String finalSqlStateMarker = sqlStateMarker;
+            optionFunc = option -> {
+                if (SQL_STATE_MARKER.equals(option)) {
+                    return finalSqlStateMarker;
+                }
+                return null;
+            };
+        }
+        return new MySQLServerException(errorMessage, sqlState, errorCode, optionFunc);
     }
 
 
     private static final Option<String> SQL_STATE_MARKER = Option.from("SQL_STATE_MARKER", String.class);
 
-    private final String sqlStateMarker;
-
     private MySQLServerException(String message, @Nullable String sqlState, int vendorCode,
-                                 @Nullable String sqlStateMarker) {
-        super(message, sqlState, vendorCode);
-        this.sqlStateMarker = sqlStateMarker;
-    }
-
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> T valueOf(final Option<T> option) {
-        final Object value;
-        if (SQL_STATE_MARKER.equals(option)) {
-            value = this.sqlStateMarker;
-        } else if (option == Option.MESSAGE) {
-            value = getMessage();
-        } else if (option == Option.SQL_STATE) {
-            value = getSqlState();
-        } else if (option == Option.VENDOR_CODE) {
-            value = getVendorCode();
-        } else {
-            value = null;
-        }
-        return (T) value;
-    }
-
-    @Override
-    public String toString() {
-        return MySQLStrings.builder()
-                .append(getClass().getName())
-                .append("[ message : ")
-                .append(getMessage())
-                .append(" , sqlState : ")
-                .append(getSqlState())
-                .append(" , vendorCode : ")
-                .append(getVendorCode())
-                .append(" , sqlStateMarker : ")
-                .append(this.sqlStateMarker)
-                .append(" , hash : ")
-                .append(System.identityHashCode(this))
-                .append(" ]")
-                .toString();
+                                 Function<Option<?>, ?> optionFunc) {
+        super(message, sqlState, vendorCode, optionFunc);
     }
 
 
