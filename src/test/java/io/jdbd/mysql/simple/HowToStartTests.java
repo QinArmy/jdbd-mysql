@@ -6,6 +6,9 @@ import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.DatabaseSessionFactory;
+import io.jdbd.session.Isolation;
+import io.jdbd.session.Option;
+import io.jdbd.session.TransactionOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -64,6 +67,48 @@ public class HowToStartTests {
         Assert.assertNotNull(resultStates);
         Assert.assertEquals(resultStates.affectedRows(), 1);
         LOG.info("auto generate id : {}", resultStates.lastInsertedId());
+    }
+
+    @Test
+    public void localTransaction() {
+        final String sql;
+        sql = "INSERT INTO mysql_types(my_boolean,my_bigint,my_datetime,my_datetime6,my_var_char200) VALUES (?,?,?,?,?)";
+        Mono.from(sessionFactory.localSession())
+
+                .flatMap(session -> Mono.from(session.startTransaction(TransactionOption.option(Isolation.REPEATABLE_READ, false)))      // start new transaction
+                        .flatMap(t -> session.bindStatement(sql)
+                                .bind(0, JdbdType.BOOLEAN, true)
+                                .bind(1, JdbdType.BIGINT, null)
+                                .bind(2, JdbdType.TIMESTAMP, LocalDateTime.now())
+                                .bind(3, JdbdType.TIMESTAMP_WITH_TIMEZONE, OffsetDateTime.now(ZoneOffset.UTC))
+                                .bind(4, JdbdType.VARCHAR, "中国 QinArmy's jdbd \n \\ \t \" \032 \b \r '''  \\' ")
+                                .executeUpdate(Mono::from))
+                        .then(Mono.defer(() -> Mono.from(session.commit())))    // commit transaction
+                )
+                .block();
+    }
+
+    @Test
+    public void localTransactionAndCommitChain() {
+        final String sql;
+        sql = "INSERT INTO mysql_types(my_boolean,my_bigint,my_datetime,my_datetime6,my_var_char200) VALUES (?,?,?,?,?)";
+        Mono.from(sessionFactory.localSession())
+
+                .flatMap(session -> Mono.from(session.startTransaction(TransactionOption.option(Isolation.REPEATABLE_READ, false)))      // start new transaction
+                        .flatMap(t -> session.bindStatement(sql)
+                                .bind(0, JdbdType.BOOLEAN, true)
+                                .bind(1, JdbdType.BIGINT, null)
+                                .bind(2, JdbdType.TIMESTAMP, LocalDateTime.now())
+                                .bind(3, JdbdType.TIMESTAMP_WITH_TIMEZONE, OffsetDateTime.now(ZoneOffset.UTC))
+                                .bind(4, JdbdType.VARCHAR, "中国 QinArmy's jdbd \n \\ \t \" \032 \b \r '''  \\' ")
+                                .executeUpdate(Mono::from))
+                        .then(Mono.defer(() -> Mono.from(session.commit(Option.singleFunc(Option.CHAIN, Boolean.TRUE)))))    // commit chain transaction
+                        .doOnSuccess(o -> {
+                            Assert.assertTrue(o.isPresent());
+                            Assert.assertTrue(o.get().inTransaction()); // session in new transaction block
+                        }).then(Mono.defer(() -> Mono.from(session.commit())))                                              // commit
+                )
+                .block();
     }
 
     @Test
