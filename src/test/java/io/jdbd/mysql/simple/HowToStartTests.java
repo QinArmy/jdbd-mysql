@@ -114,7 +114,8 @@ public class HowToStartTests {
                                 .bind(2, JdbdType.TIMESTAMP, LocalDateTime.now())
                                 .bind(3, JdbdType.TIMESTAMP_WITH_TIMEZONE, OffsetDateTime.now(ZoneOffset.UTC))
                                 .bind(4, JdbdType.VARCHAR, "中国 QinArmy's jdbd \n \\ \t \" \032 \b \r '''  \\' ")
-                                .executeUpdate(Mono::from))
+                                .executeUpdate(Mono::from)
+                        )
                         .then(Mono.defer(() -> Mono.from(session.commit(Option.singleFunc(Option.CHAIN, Boolean.TRUE)))))    // commit chain transaction
                         .doOnSuccess(o -> {
                             Assert.assertTrue(o.isPresent());

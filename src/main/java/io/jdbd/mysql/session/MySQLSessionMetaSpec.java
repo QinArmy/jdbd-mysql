@@ -1,6 +1,7 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.JdbdException;
+import io.jdbd.meta.ServerMode;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.protocol.MySQLProtocol;
 import io.jdbd.mysql.util.MySQLExceptions;
@@ -103,5 +104,14 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
         return MySQLDriver.DRIVER_VENDOR;
     }
 
+    @Override
+    public final ServerMode serverMode() throws JdbdException {
+        return ServerMode.REMOTE;
+    }
+
+    @Override
+    public final String supportProductFamily() {
+        return MySQLDriver.MY_SQL;
+    }
 
 }

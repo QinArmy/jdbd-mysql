@@ -65,7 +65,6 @@ public abstract class MySQLBinds extends JdbdBinds {
                 type = MySQLType.DECIMAL;
                 break;
             case FLOAT:
-            case REAL:
                 type = MySQLType.FLOAT;
                 break;
             case DOUBLE:
