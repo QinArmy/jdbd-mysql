@@ -426,7 +426,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final boolean isClosed() {
-        return this.sessionClosed.get() || this.protocol.isClosed();
+        return this.sessionClosed.get();
     }
 
     @Override
