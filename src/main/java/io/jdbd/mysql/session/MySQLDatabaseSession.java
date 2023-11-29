@@ -50,17 +50,24 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     static final String ROLLBACK = "ROLLBACK";
 
+    private final String name;
+
     final MySQLDatabaseSessionFactory factory;
 
     private final AtomicInteger savePointIndex = new AtomicInteger(0);
 
     private final AtomicBoolean sessionClosed = new AtomicBoolean(false);
 
-    MySQLDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
+    MySQLDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
         super(protocol);
+        this.name = name;
         this.factory = factory;
     }
 
+    @Override
+    public final String name() {
+        return this.name;
+    }
 
     @Override
     public final String factoryName() {
@@ -426,7 +433,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final boolean isClosed() {
-        return this.sessionClosed.get();
+        return this.sessionClosed.get() || this.protocol.isClosed();
     }
 
     @Override
@@ -444,7 +451,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final StringBuilder builder = new StringBuilder(290);
 
         builder.append(getClass().getName())
-                .append("[ sessionIdentifier : ")
+                .append("[ name : ")
+                .append(this.name)
+                .append(", sessionIdentifier : ")
                 .append(this.protocol.sessionIdentifier())
                 .append(" , factoryName : ")
                 .append(this.factory.name())

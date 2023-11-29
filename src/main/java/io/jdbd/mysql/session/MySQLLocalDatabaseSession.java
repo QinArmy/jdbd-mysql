@@ -34,12 +34,12 @@ import java.util.function.Function;
 class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSession> implements LocalDatabaseSession {
 
 
-    static LocalDatabaseSession create(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-        return new MySQLLocalDatabaseSession(factory, protocol);
+    static LocalDatabaseSession create(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+        return new MySQLLocalDatabaseSession(factory, protocol, name);
     }
 
-    static PoolLocalDatabaseSession forPoolVendor(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-        return new MySQLPoolLocalDatabaseSession(factory, protocol);
+    static PoolLocalDatabaseSession forPoolVendor(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+        return new MySQLPoolLocalDatabaseSession(factory, protocol, name);
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLLocalDatabaseSession.class);
@@ -54,8 +54,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     /**
      * private constructor
      */
-    private MySQLLocalDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-        super(factory, protocol);
+    private MySQLLocalDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, final String name) {
+        super(factory, protocol, name);
         protocol.addSessionCloseListener(this::onSessionClose);
         protocol.addTransactionEndListener(this::onTransactionEnd);
     }
@@ -353,8 +353,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     private static final class MySQLPoolLocalDatabaseSession extends MySQLLocalDatabaseSession
             implements PoolLocalDatabaseSession {
 
-        private MySQLPoolLocalDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-            super(factory, protocol);
+        private MySQLPoolLocalDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+            super(factory, protocol, name);
         }
 
 

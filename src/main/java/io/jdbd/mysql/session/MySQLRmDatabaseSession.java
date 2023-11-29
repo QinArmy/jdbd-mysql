@@ -41,12 +41,12 @@ import java.util.function.Function;
  */
 class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> implements RmDatabaseSession {
 
-    static RmDatabaseSession create(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-        return new MySQLRmDatabaseSession(factory, protocol);
+    static RmDatabaseSession create(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+        return new MySQLRmDatabaseSession(factory, protocol, name);
     }
 
-    static PoolRmDatabaseSession forPoolVendor(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-        return new MySQLPoolRmDatabaseSession(factory, protocol);
+    static PoolRmDatabaseSession forPoolVendor(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+        return new MySQLPoolRmDatabaseSession(factory, protocol, name);
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLRmDatabaseSession.class);
@@ -63,8 +63,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     /**
      * private constructor
      */
-    private MySQLRmDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-        super(factory, protocol);
+    private MySQLRmDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+        super(factory, protocol, name);
         protocol.addSessionCloseListener(this::onSessionClose);
         protocol.addTransactionEndListener(this::onTransactionEnd);
     }
@@ -396,6 +396,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         return (TM_START_RSCAN | TM_END_RSCAN | TM_NO_FLAGS);
     }
 
+    @Override
+    public final int commitSupportFlags() {
+        return TM_ONE_PHASE;
+    }
 
     /**
      * @see #transactionInfo()
@@ -580,8 +584,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     private static final class MySQLPoolRmDatabaseSession extends MySQLRmDatabaseSession
             implements PoolRmDatabaseSession {
 
-        private MySQLPoolRmDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol) {
-            super(factory, protocol);
+        private MySQLPoolRmDatabaseSession(MySQLDatabaseSessionFactory factory, MySQLProtocol protocol, String name) {
+            super(factory, protocol, name);
         }
 
 

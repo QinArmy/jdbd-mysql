@@ -2,6 +2,7 @@ package io.jdbd.mysql.session;
 
 import io.jdbd.DriverVersion;
 import io.jdbd.JdbdException;
+import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.env.MySQLUrlParser;
@@ -72,7 +73,7 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     private final boolean forPoolVendor;
 
-    private final String name;
+    private final String factoryName;
 
     private final AtomicBoolean factoryClosed = new AtomicBoolean(false);
 
@@ -84,33 +85,42 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     private MySQLDatabaseSessionFactory(MySQLProtocolFactory protocolFactory, boolean forPoolVendor) {
         this.protocolFactory = protocolFactory;
         this.forPoolVendor = forPoolVendor;
-        this.name = this.protocolFactory.factoryName();
+        this.factoryName = this.protocolFactory.factoryName();
     }
 
     @Override
     public String name() {
-        return this.name;
+        return this.factoryName;
     }
 
     @Override
     public Publisher<LocalDatabaseSession> localSession() {
+        return this.localSession(null);
+    }
+
+    @Override
+    public Publisher<LocalDatabaseSession> localSession(final @Nullable String name) {
         if (this.factoryClosed.get()) {
-            return Mono.error(MySQLExceptions.factoryClosed(this.name));
+            return Mono.error(MySQLExceptions.factoryClosed(this.factoryName));
         }
         return Mono.defer(this.protocolFactory::createProtocol)
-                .map(this::createLocalSession);
+                .map(protocol -> createLocalSession(protocol, name));
     }
 
 
     @Override
-    public Mono<RmDatabaseSession> rmSession() {
-        if (this.factoryClosed.get()) {
-            return Mono.error(MySQLExceptions.factoryClosed(this.name));
-        }
-        return Mono.defer(this.protocolFactory::createProtocol)
-                .map(this::createRmSession);
+    public Publisher<RmDatabaseSession> rmSession() {
+        return rmSession(null);
     }
 
+    @Override
+    public Publisher<RmDatabaseSession> rmSession(final @Nullable String name) {
+        if (this.factoryClosed.get()) {
+            return Mono.error(MySQLExceptions.factoryClosed(this.factoryName));
+        }
+        return Mono.defer(this.protocolFactory::createProtocol)
+                .map(protocol -> createRmSession(protocol, name));
+    }
 
     @Override
     public String productFamily() {
@@ -176,9 +186,9 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
         final Mono<T> mono;
         if (this.factoryClosed.compareAndSet(false, true)) {
             final String className = getClass().getName();
-            LOG.debug("close {}[{}] ...", className, this.name);
+            LOG.debug("close {}[{}] ...", className, this.factoryName);
             mono = this.protocolFactory.close()
-                    .doOnSuccess(v -> LOG.debug("close {}[{}] success", className, this.name))
+                    .doOnSuccess(v -> LOG.debug("close {}[{}] success", className, this.factoryName))
                     .then(Mono.empty());
         } else {
             mono = Mono.empty();
@@ -189,12 +199,14 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     /**
      * @see #localSession()
      */
-    private LocalDatabaseSession createLocalSession(final MySQLProtocol protocol) {
+    private LocalDatabaseSession createLocalSession(final MySQLProtocol protocol, final @Nullable String name) {
+        final String sessionName = name == null ? "unnamed" : name;
+
         final LocalDatabaseSession session;
         if (this.forPoolVendor) {
-            session = MySQLLocalDatabaseSession.forPoolVendor(this, protocol);
+            session = MySQLLocalDatabaseSession.forPoolVendor(this, protocol, sessionName);
         } else {
-            session = MySQLLocalDatabaseSession.create(this, protocol);
+            session = MySQLLocalDatabaseSession.create(this, protocol, sessionName);
         }
         return session;
     }
@@ -202,12 +214,13 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     /**
      * @see #rmSession()
      */
-    private RmDatabaseSession createRmSession(final MySQLProtocol protocol) {
+    private RmDatabaseSession createRmSession(final MySQLProtocol protocol, final @Nullable String name) {
+        final String sessionName = name == null ? "unnamed" : name;
         final RmDatabaseSession session;
         if (this.forPoolVendor) {
-            session = MySQLRmDatabaseSession.forPoolVendor(this, protocol);
+            session = MySQLRmDatabaseSession.forPoolVendor(this, protocol, sessionName);
         } else {
-            session = MySQLRmDatabaseSession.create(this, protocol);
+            session = MySQLRmDatabaseSession.create(this, protocol, sessionName);
         }
         return session;
     }
