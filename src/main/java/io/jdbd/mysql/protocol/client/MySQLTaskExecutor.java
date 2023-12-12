@@ -46,7 +46,7 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
 
     private MySQLTaskExecutor(Connection connection, ClientProtocolFactory factory) {
-        super(connection, factory.factoryTaskQueueSize);
+        super(connection);
         this.factory = factory;
     }
 

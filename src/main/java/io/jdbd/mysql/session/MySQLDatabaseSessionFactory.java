@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 
 /**
@@ -95,11 +96,11 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public Publisher<LocalDatabaseSession> localSession() {
-        return this.localSession(null);
+        return this.localSession(null, Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
-    public Publisher<LocalDatabaseSession> localSession(final @Nullable String name) {
+    public Publisher<LocalDatabaseSession> localSession(final @Nullable String name, Function<Option<?>, ?> optionFunc) {
         if (this.factoryClosed.get()) {
             return Mono.error(MySQLExceptions.factoryClosed(this.factoryName));
         }
@@ -110,11 +111,11 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
 
     @Override
     public Publisher<RmDatabaseSession> rmSession() {
-        return rmSession(null);
+        return rmSession(null, Option.EMPTY_OPTION_FUNC);
     }
 
     @Override
-    public Publisher<RmDatabaseSession> rmSession(final @Nullable String name) {
+    public Publisher<RmDatabaseSession> rmSession(final @Nullable String name, Function<Option<?>, ?> optionFunc) {
         if (this.factoryClosed.get()) {
             return Mono.error(MySQLExceptions.factoryClosed(this.factoryName));
         }

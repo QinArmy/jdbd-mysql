@@ -40,6 +40,7 @@ io/jdbd/mysql/simple/HowToStartTests.java ,[java class url](https://github.com/Q
 ### How to use native transport ?
 
 maven
+
 ```xml
 
 <dependencies>
@@ -58,7 +59,9 @@ maven
 </dependencies>
 
 ```
+
 ### How to use unix domain socket ?
+
 ```java
 public class UnixDomainSocketTests {
     @Test
@@ -98,7 +101,6 @@ Core properties
 | name                 | default                           | description                                                                                                           |
 |----------------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | factoryName          | unnamed                           | DatabaseSessionFactory name                                                                                           |
-| factoryTaskQueueSize | 18                                | The task queue size of each session.                                                                                  |
 | factoryWorkerCount   | 30                                | session factory netty worker count.                                                                                   |
 | factorySelectCount   | same with factoryWorkerCount      | session factory netty select count if use java NIO,if native ignore.                                                  |
 | connectionProvider   | ConnectionProvider::newConnection | reactor netty ConnectionProvider                                                                                      |

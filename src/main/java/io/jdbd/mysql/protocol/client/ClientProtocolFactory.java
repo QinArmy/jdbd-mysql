@@ -81,8 +81,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
 
     final MySQLHostInfo mysqlHost;
 
-    final int factoryTaskQueueSize;
-
     final ConcurrentMap<String, JdbdSoftReference<MySQLStatement>> statementMap = MySQLCollections.concurrentHashMap();
 
     private final boolean forPoolVendor;
@@ -101,7 +99,6 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
         this.forPoolVendor = forPoolVendor;
 
         final Environment env = this.env;
-        this.factoryTaskQueueSize = env.getInRange(MySQLKey.FACTORY_TASK_QUEUE_SIZE, 3, 4096);
         this.connectionProvider = env.get(MySQLKey.CONNECTION_PROVIDER, ConnectionProvider::newConnection);
         this.loopResources = createEventLoopGroup(env);
         this.executor = Executors.newScheduledThreadPool(2, this::newScheduledThread);
