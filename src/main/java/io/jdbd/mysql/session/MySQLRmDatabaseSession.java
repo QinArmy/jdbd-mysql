@@ -200,9 +200,17 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                     .map(states -> {
                         final TransactionInfo endInfo;
                         final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+
                         map.put(Option.XID, infoXid);
                         map.put(Option.XA_STATES, XaStates.IDLE);
                         map.put(Option.XA_FLAGS, flags);
+                        map.put(Option.START_MILLIS, info.nonNullOf(Option.START_MILLIS));
+
+                        final Integer timeoutMillis;
+                        timeoutMillis = info.valueOf(Option.TIMEOUT_MILLIS);
+                        if (timeoutMillis != null) {
+                            map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
+                        }
 
                         endInfo = TransactionInfo.info(states.inTransaction(), info.isolation(), info.isReadOnly(), map::get);
                         TRANSACTION_INFO.set(this, endInfo);

@@ -250,8 +250,24 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                     final Optional<TransactionInfo> optional;
                     if (states.inTransaction()) {
                         assert Boolean.TRUE.equals(chain) : "ResultStates bug";
-                        TRANSACTION_INFO.set(this, info); // record old value. NOTE : this occur after this.onTransactionEnd().
-                        optional = Optional.of(info);
+
+                        final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+                        map.put(Option.START_MILLIS, System.currentTimeMillis());
+                        final Integer timeoutMillis;
+                        timeoutMillis = info.valueOf(Option.TIMEOUT_MILLIS);
+                        if (timeoutMillis != null) {
+                            map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
+                        }
+
+                        final Boolean consistentSnapshot;
+                        consistentSnapshot = info.valueOf(Option.WITH_CONSISTENT_SNAPSHOT);
+                        if (consistentSnapshot != null) {
+                            map.put(Option.WITH_CONSISTENT_SNAPSHOT, consistentSnapshot);
+                        }
+                        final TransactionInfo newInfo;
+                        newInfo = TransactionInfo.info(true, info.isolation(), info.isReadOnly(), map::get);
+                        TRANSACTION_INFO.set(this, newInfo); // record old value. NOTE : this occur after this.onTransactionEnd().
+                        optional = Optional.of(newInfo);
                     } else {
                         TRANSACTION_INFO.set(this, null);
                         optional = Optional.empty();
@@ -396,19 +412,6 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
     }// MySQLPoolLocalDatabaseSession
 
-
-    private static final class LocalTxOption {
-
-        private final Isolation isolation;
-
-        private final Boolean consistentSnapshot;
-
-        private LocalTxOption(@Nullable Isolation isolation, @Nullable Boolean consistentSnapshot) {
-            this.isolation = isolation;
-            this.consistentSnapshot = consistentSnapshot;
-        }
-
-    }// CurrentTxOption
 
 
 }
