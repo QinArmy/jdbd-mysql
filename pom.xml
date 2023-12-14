@@ -6,7 +6,7 @@
 
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.11.1</version><!-- jdbd-mysql maven version-->
+    <version>0.11.2</version><!-- jdbd-mysql maven version-->
 
     <name>jdbd-mysql</name>
     <description>jdbd-mysql is a implementation of the JDBD SPI with MySQL client protocol.</description>

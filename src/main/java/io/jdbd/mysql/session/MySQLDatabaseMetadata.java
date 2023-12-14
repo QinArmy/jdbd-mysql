@@ -275,7 +275,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
             map.put(VendorOptions.INDEX_TYPE, firstRow.getNonNull("INDEX_TYPE", String.class));
             map.put(VendorOptions.KEY_TYPE, keyType);
-            map.put(Option.UNIQUE, keyType.isUnique());
+            map.put(Option.UNIQUE, keyType.isUnique() || !firstRow.getNonNull("NON_UNIQUE", Boolean.class));
             map.put(VendorOptions.COMMENT, firstRow.get("INDEX_COMMENT", String.class));
 
             return VendorTableIndexMeta.from(tableMeta, firstRow.getNonNull("INDEX_NAME", String.class), columnList, map::get);
