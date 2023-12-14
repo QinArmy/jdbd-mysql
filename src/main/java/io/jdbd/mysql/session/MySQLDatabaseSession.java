@@ -16,6 +16,7 @@ import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.statement.StaticStatement;
 import io.jdbd.util.NameMode;
+import io.jdbd.util.SqlLogger;
 import io.jdbd.vendor.result.MultiResults;
 import io.jdbd.vendor.result.NamedSavePoint;
 import io.jdbd.vendor.stmt.Stmts;
@@ -50,7 +51,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     static final String ROLLBACK = "ROLLBACK";
 
-    private final String name;
+    final String name;
 
     final MySQLDatabaseSessionFactory factory;
 
@@ -178,13 +179,21 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         } else {
             builder.append("READ WRITE");
         }
-        return this.protocol.update(Stmts.stmt(builder.toString()))
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, option::valueOf);
+        return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
 
-
     @Override
     public final Publisher<TransactionInfo> transactionInfo() {
+        return transactionInfo(Option.EMPTY_OPTION_FUNC);
+    }
+
+    @Override
+    public final Publisher<TransactionInfo> transactionInfo(final Function<Option<?>, ?> optionFunc) {
         final ServerVersion version = this.protocol.serverVersion();
         final StringBuilder builder = new StringBuilder(139);
         if (version.meetsMinimum(8, 0, 3)
@@ -195,7 +204,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
             builder.append("SELECT @@session.tx_isolation AS txLevel")
                     .append(",@@session.tx_read_only AS txReadOnly");
         }
-        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(builder.toString())))
+
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, optionFunc);
+        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
                 .filter(ResultItem::isRowOrStatesItem)
                 .collectList()
                 .flatMap(this::mapTransactionStatus);
@@ -285,7 +299,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if ((error = MySQLStrings.appendMySqlIdentifier(name, builder)) != null) {
             return Mono.error(error);
         }
-        return this.protocol.update(Stmts.stmt(builder.toString()))
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, optionFunc);
+        return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn(NamedSavePoint.fromName(name));
     }
 
@@ -316,7 +334,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if ((error = MySQLStrings.appendMySqlIdentifier(name, builder)) != null) {
             return Mono.error(error);
         }
-        return this.protocol.update(Stmts.stmt(builder.toString()))
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, optionFunc);
+        return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
 
@@ -347,7 +369,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if ((error = MySQLStrings.appendMySqlIdentifier(name, builder)) != null) {
             return Mono.error(error);
         }
-        return this.protocol.update(Stmts.stmt(builder.toString()))
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, optionFunc);
+        return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
 
@@ -489,6 +515,26 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         if (this.protocol.isClosed()) {
             this.sessionClosed.set(true);
         }
+    }
+
+
+    final void printSqlIfNeed(final String sql, Function<Option<?>, ?> optionFunc) {
+        final Object sqlLogger;
+        if (optionFunc == Option.EMPTY_OPTION_FUNC) {
+            sqlLogger = null;
+        } else {
+            sqlLogger = optionFunc.apply(Option.SQL_LOGGER);
+        }
+        if (sqlLogger instanceof SqlLogger) {
+
+            try {
+                ((SqlLogger) sqlLogger).logSql(this.name, System.identityHashCode(this), sql);
+            } catch (Exception e) {
+                // ignore
+            }
+
+        }
+
     }
 
 

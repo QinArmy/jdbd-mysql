@@ -11,6 +11,7 @@ import io.jdbd.result.ResultItem;
 import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
+import io.jdbd.util.SqlLogger;
 import io.jdbd.vendor.session.JdbdTransactionInfo;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
@@ -118,8 +119,16 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                     .append("WITH CONSISTENT SNAPSHOT");
         }
 
+        final String sql;
+        sql = builder.toString();
+        final SqlLogger sqlLogger;
+        sqlLogger = option.valueOf(Option.SQL_LOGGER);
+        if (sqlLogger != null) {
+            sqlLogger.logSql(this.name, System.identityHashCode(this), sql);
+        }
+
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
-        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(builder.toString())))
+        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
                 .doOnNext(item -> handleStartTransactionResult(item, isolationHolder, consistentSnapshot))
                 .then(Mono.defer(this::getTransactionInfoAfterStart))
                 .doOnError(e -> TRANSACTION_INFO.set(this, null));
@@ -229,8 +238,15 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             }
             builder.append(" RELEASE");
         }
+
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, optionFunc);
+
+
         final TransactionInfo info = this.transactionInfo;
-        return this.protocol.update(Stmts.stmt(builder.toString()))
+        return this.protocol.update(Stmts.stmt(sql))
                 .flatMap(states -> {
                     final Optional<TransactionInfo> optional;
                     if (states.inTransaction()) {

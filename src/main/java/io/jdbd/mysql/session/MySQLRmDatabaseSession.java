@@ -141,8 +141,13 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             return Mono.error(MySQLExceptions.wrap(e));
         }
 
+        final String sql;
+        sql = builder.toString();
+
+        printSqlIfNeed(sql, option::valueOf);
+
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
-        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(builder.toString())))
+        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
                 .doOnNext(item -> handleXaStart(item, isolationHolder, xid, flags))
                 .then(Mono.defer(this::getTransactionInfoAfterStart))
                 .doOnError(e -> TRANSACTION_INFO.set(this, null));
@@ -188,7 +193,13 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             if ((flags & TM_SUSPEND) != 0) {
                 builder.append(" SUSPEND");
             }
-            mono = this.protocol.update(Stmts.stmt(builder.toString()))
+
+            final String sql;
+            sql = builder.toString();
+
+            printSqlIfNeed(sql, optionFunc);
+
+            mono = this.protocol.update(Stmts.stmt(sql))
                     .map(states -> {
                         final XaTransactionInfo endInfo;
                         endInfo = new XaTransactionInfo(info, XaStates.IDLE, flags);
@@ -228,7 +239,13 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else if ((error = xidToString(builder, info.xid)) != null) { // here use xaTxOption.xid
             mono = Mono.error(error);
         } else {
-            mono = this.protocol.update(Stmts.stmt(builder.toString()))
+
+            final String sql;
+            sql = builder.toString();
+
+            printSqlIfNeed(sql, optionFunc);
+
+            mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> {
                         TRANSACTION_INFO.set(this, null);  // here , couldn't compareAndSet() , because of this.onTransactionEnd();
                         if ((info.flags & TM_FAIL) != 0) { // store  rollback-only.
@@ -280,7 +297,13 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 mono = Mono.error(error);
             } else {
                 builder.append(" ONE PHASE");
-                mono = this.protocol.update(Stmts.stmt(builder.toString()))
+
+                final String sql;
+                sql = builder.toString();
+
+                printSqlIfNeed(sql, optionFunc);
+
+                mono = this.protocol.update(Stmts.stmt(sql))
                         .doOnSuccess(states -> TRANSACTION_INFO.set(this, null)) // here , couldn't compareAndSet() , because of this.onTransactionEnd();
                         .thenReturn(this);
             }
@@ -291,7 +314,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else if ((error = xidToString(builder, xid)) != null) { // here use xid
             mono = Mono.error(error);
         } else {
-            mono = this.protocol.update(Stmts.stmt(builder.toString()))
+            final String sql;
+            sql = builder.toString();
+
+            printSqlIfNeed(sql, optionFunc);
+
+            mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> PREPARED_XA_MAP.remove(xid))
                     .thenReturn(this);
         }
@@ -321,7 +349,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         if ((error = xidToString(builder, xid)) != null) { // here use xid
             mono = Mono.error(error);
         } else {
-            mono = this.protocol.update(Stmts.stmt(builder.toString()))
+            final String sql;
+            sql = builder.toString();
+
+            printSqlIfNeed(sql, optionFunc);
+            mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> PREPARED_XA_MAP.remove(xid))
                     .thenReturn(this);
         }
@@ -368,7 +400,10 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else if ((flags & TM_START_RSCAN) != 0) {
             flux = Flux.empty();
         } else {
-            flux = this.protocol.query(Stmts.stmt("XA RECOVER CONVERT XID"), this::mapRecoverResult,
+            final String sql = "XA RECOVER CONVERT XID";
+
+            printSqlIfNeed(sql, optionFunc);
+            flux = this.protocol.query(Stmts.stmt(sql), this::mapRecoverResult,
                     ResultStates.IGNORE_STATES);
         }
         return flux;
