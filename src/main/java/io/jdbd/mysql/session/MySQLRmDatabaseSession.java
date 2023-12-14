@@ -2,7 +2,6 @@ package io.jdbd.mysql.session;
 
 
 import io.jdbd.JdbdException;
-import io.jdbd.lang.NonNull;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
@@ -17,7 +16,6 @@ import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.util.JdbdUtils;
-import io.jdbd.vendor.session.JdbdTransactionInfo;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
 import org.reactivestreams.Publisher;
@@ -28,8 +26,8 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
@@ -51,13 +49,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLRmDatabaseSession.class);
 
-    private static final AtomicReferenceFieldUpdater<MySQLRmDatabaseSession, XaTransactionInfo> TRANSACTION_INFO =
-            AtomicReferenceFieldUpdater.newUpdater(MySQLRmDatabaseSession.class, XaTransactionInfo.class, "transactionInfo");
-
-    private static final ConcurrentMap<Xid, XaTransactionInfo> PREPARED_XA_MAP = MySQLCollections.concurrentHashMap();
+    private static final AtomicReferenceFieldUpdater<MySQLRmDatabaseSession, TransactionInfo> TRANSACTION_INFO =
+            AtomicReferenceFieldUpdater.newUpdater(MySQLRmDatabaseSession.class, TransactionInfo.class, "transactionInfo");
 
 
-    private volatile XaTransactionInfo transactionInfo;
+    private volatile TransactionInfo transactionInfo;
 
 
     /**
@@ -148,7 +144,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
         return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
-                .doOnNext(item -> handleXaStart(item, isolationHolder, xid, flags))
+                .doOnNext(item -> handleXaStart(option, item, isolationHolder, xid, flags))
                 .then(Mono.defer(this::getTransactionInfoAfterStart))
                 .doOnError(e -> TRANSACTION_INFO.set(this, null));
     }
@@ -174,20 +170,21 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     @Override
     public final Publisher<TransactionInfo> end(final Xid xid, final int flags, Function<Option<?>, ?> optionFunc) {
 
-        final XaTransactionInfo info = this.transactionInfo;
+        final TransactionInfo info = this.transactionInfo;
 
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA END");
 
         final Mono<TransactionInfo> mono;
         final XaException error;
-        if (info == null || !info.xid.equals(xid)) {
+        final Xid infoXid;
+        if (info == null || !(infoXid = info.nonNullOf(Option.XID)).equals(xid)) {
             mono = Mono.error(MySQLExceptions.xaNonCurrentTransaction(xid)); // here use xid
-        } else if (info.xaStates != XaStates.ACTIVE) {
-            mono = Mono.error(MySQLExceptions.xaTransactionDontSupportEndCommand(info.xid, info.xaStates));
+        } else if (info.nonNullOf(Option.XA_STATES) != XaStates.ACTIVE) {
+            mono = Mono.error(MySQLExceptions.xaTransactionDontSupportEndCommand(infoXid, info.nonNullOf(Option.XA_STATES)));
         } else if (((~endSupportFlags()) & flags) != 0) {
             mono = Mono.error(MySQLExceptions.xaInvalidFlagForEnd(flags));
-        } else if ((error = xidToString(builder, info.xid)) != null) { // here use xaTxOption.xid
+        } else if ((error = xidToString(builder, infoXid)) != null) { // here use xaTxOption.xid
             mono = Mono.error(error);
         } else {
             if ((flags & TM_SUSPEND) != 0) {
@@ -201,8 +198,13 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .map(states -> {
-                        final XaTransactionInfo endInfo;
-                        endInfo = new XaTransactionInfo(info, XaStates.IDLE, flags);
+                        final TransactionInfo endInfo;
+                        final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+                        map.put(Option.XID, infoXid);
+                        map.put(Option.XA_STATES, XaStates.IDLE);
+                        map.put(Option.XA_FLAGS, flags);
+
+                        endInfo = TransactionInfo.info(states.inTransaction(), info.isolation(), info.isReadOnly(), map::get);
                         TRANSACTION_INFO.set(this, endInfo);
                         return endInfo;
                     });
@@ -225,18 +227,21 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     @Override
     public final Publisher<Integer> prepare(final Xid xid, final Function<Option<?>, ?> optionFunc) {
 
-        final XaTransactionInfo info = this.transactionInfo;
+        final TransactionInfo info = this.transactionInfo;
 
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA PREPARE");
 
         final Mono<Integer> mono;
         final XaException error;
-        if (info == null || !info.xid.equals(xid)) {
+        final Xid infoXid;
+        if (info == null || !(infoXid = info.nonNullOf(Option.XID)).equals(xid)) {
             mono = Mono.error(MySQLExceptions.xaNonCurrentTransaction(xid)); // here use xid
-        } else if (info.xaStates != XaStates.IDLE) {
-            mono = Mono.error(MySQLExceptions.xaStatesDontSupportPrepareCommand(info.xid, info.xaStates));
-        } else if ((error = xidToString(builder, info.xid)) != null) { // here use xaTxOption.xid
+        } else if (info.nonNullOf(Option.XA_STATES) != XaStates.IDLE) {
+            mono = Mono.error(MySQLExceptions.xaStatesDontSupportPrepareCommand(infoXid, info.nonNullOf(Option.XA_STATES)));
+        } else if ((info.nonNullOf(Option.XA_FLAGS) & TM_FAIL) != 0) { // rollback only
+            mono = Mono.error(MySQLExceptions.xaTransactionRollbackOnly(infoXid));
+        } else if ((error = xidToString(builder, infoXid)) != null) { // here use xaTxOption.xid
             mono = Mono.error(error);
         } else {
 
@@ -248,9 +253,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> {
                         TRANSACTION_INFO.set(this, null);  // here , couldn't compareAndSet() , because of this.onTransactionEnd();
-                        if ((info.flags & TM_FAIL) != 0) { // store  rollback-only.
-                            PREPARED_XA_MAP.put(info.xid, new XaTransactionInfo(info, XaStates.PREPARED, info.flags));
-                        }
                     })
                     .thenReturn(XA_OK);
         }
@@ -278,22 +280,22 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
     public final Publisher<RmDatabaseSession> commit(final @Nullable Xid xid, final int flags,
                                                      Function<Option<?>, ?> optionFunc) {
 
-        final XaTransactionInfo info;
+        final TransactionInfo info;
 
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA COMMIT");
 
         final Mono<RmDatabaseSession> mono;
         final XaException error;
-
+        final Xid infoXid;
         if (flags == TM_ONE_PHASE) {
-            if ((info = this.transactionInfo) == null || !info.xid.equals(xid)) {
+            if ((info = this.transactionInfo) == null || !(infoXid = info.nonNullOf(Option.XID)).equals(xid)) {
                 mono = Mono.error(MySQLExceptions.xaNonCurrentTransaction(xid)); // here use xid
-            } else if (info.xaStates != XaStates.IDLE) {
-                mono = Mono.error(MySQLExceptions.xaStatesDontSupportCommitCommand(info.xid, info.xaStates));
-            } else if ((info.flags & TM_FAIL) != 0) {
+            } else if (info.nonNullOf(Option.XA_STATES) != XaStates.IDLE) {
+                mono = Mono.error(MySQLExceptions.xaStatesDontSupportCommitCommand(infoXid, info.nonNullOf(Option.XA_STATES)));
+            } else if ((info.nonNullOf(Option.XA_FLAGS) & TM_FAIL) != 0) {
                 mono = Mono.error(MySQLExceptions.xaTransactionRollbackOnly(xid));
-            } else if ((error = xidToString(builder, info.xid)) != null) { // here use xaTxOption.xid
+            } else if ((error = xidToString(builder, infoXid)) != null) { // here use xaTxOption.xid
                 mono = Mono.error(error);
             } else {
                 builder.append(" ONE PHASE");
@@ -309,8 +311,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             }
         } else if (flags != TM_NO_FLAGS) {
             mono = Mono.error(MySQLExceptions.xaInvalidFlagForEnd(flags));
-        } else if ((info = PREPARED_XA_MAP.get(xid)) != null && (info.flags & TM_FAIL) != 0) {
-            mono = Mono.error(MySQLExceptions.xaTransactionRollbackOnly(xid));
         } else if ((error = xidToString(builder, xid)) != null) { // here use xid
             mono = Mono.error(error);
         } else {
@@ -320,7 +320,6 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             printSqlIfNeed(sql, optionFunc);
 
             mono = this.protocol.update(Stmts.stmt(sql))
-                    .doOnSuccess(states -> PREPARED_XA_MAP.remove(xid))
                     .thenReturn(this);
         }
         return mono;
@@ -344,9 +343,22 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final StringBuilder builder = new StringBuilder(140);
         builder.append("XA ROLLBACK");
 
+        final TransactionInfo info = this.transactionInfo;
+
         final XaException error;
         final Mono<RmDatabaseSession> mono;
-        if ((error = xidToString(builder, xid)) != null) { // here use xid
+
+        final boolean onePhaseRollback;
+        final Xid infoXid, actualXid;
+        if (info != null && (infoXid = info.nonNullOf(Option.XID)).equals(xid)) {  // one phase rollback
+            onePhaseRollback = true;
+            actualXid = infoXid;
+        } else {
+            onePhaseRollback = false;
+            actualXid = xid;
+        }
+
+        if ((error = xidToString(builder, actualXid)) != null) { // here use xid
             mono = Mono.error(error);
         } else {
             final String sql;
@@ -354,7 +366,11 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
             printSqlIfNeed(sql, optionFunc);
             mono = this.protocol.update(Stmts.stmt(sql))
-                    .doOnSuccess(states -> PREPARED_XA_MAP.remove(xid))
+                    .doOnSuccess(states -> {
+                        if (onePhaseRollback) {
+                            TRANSACTION_INFO.set(this, null); // here , couldn't compareAndSet() , because of this.onTransactionEnd();
+                        }
+                    })
                     .thenReturn(this);
         }
         return mono;
@@ -445,14 +461,14 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final ResultStates states;
         row = (ResultRow) list.get(0);
         states = (ResultStates) list.get(1);
-        final XaTransactionInfo info;
+        final TransactionInfo info;
 
         final Mono<TransactionInfo> mono;
         if (!states.inTransaction()) {
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(JdbdTransactionInfo.txInfo(isolation, row.getNonNull(1, Boolean.class), false));
+            mono = Mono.just(TransactionInfo.info(false, isolation, row.getNonNull(1, Boolean.class), Option.EMPTY_OPTION_FUNC));
         } else if ((info = this.transactionInfo) == null) {
             String m = "Not found cache current transaction info,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new XaException(m, null, 0, XaException.XAER_PROTO));
@@ -464,23 +480,23 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     @Override
     final void printTransactionInfo(final StringBuilder builder) {
-        final XaTransactionInfo info = this.transactionInfo;
+        final TransactionInfo info = this.transactionInfo;
         if (info != null) {
             builder.append(" , currentTransactionXid : ")
-                    .append(info.xid)
+                    .append(info.valueOf(Option.XID))
                     .append(" , currentTransactionXaStates : ")
-                    .append(info.xaStates.name())
+                    .append(info.nonNullOf(Option.XA_STATES).name())
                     .append(" , currentTransactionIsolation : ")
-                    .append(info.isolation.name())
+                    .append(info.isolation().name())
                     .append(" , currentTransactionFlags : ")
-                    .append(info.flags);
+                    .append(info.valueOf(Option.XA_FLAGS));
         }
     }
 
     /**
      * @see #start(Xid, int, TransactionOption)
      */
-    private void handleXaStart(final ResultItem item, final AtomicReference<Isolation> isolationHolder,
+    private void handleXaStart(final TransactionOption option, final ResultItem item, final AtomicReference<Isolation> isolationHolder,
                                final Xid xid, final int flags) {
         if (item instanceof ResultRow) {
             isolationHolder.set(((ResultRow) item).getNonNull(0, Isolation.class));
@@ -488,8 +504,22 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final ResultStates states = (ResultStates) item;
             if (states.inTransaction()) {
                 final boolean readOnly = states.nonNullOf(Option.READ_ONLY);
-                final XaTransactionInfo info;
-                info = new XaTransactionInfo(isolationHolder.get(), readOnly, xid, flags);
+
+                final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+
+                map.put(Option.XID, xid);
+                map.put(Option.XA_STATES, XaStates.ACTIVE);
+                map.put(Option.XA_FLAGS, flags);
+                map.put(Option.START_MILLIS, System.currentTimeMillis());
+
+                final Integer timeoutMillis;
+                timeoutMillis = option.valueOf(Option.TIMEOUT_MILLIS);
+                if (timeoutMillis != null) {
+                    map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
+                }
+
+                final TransactionInfo info;
+                info = TransactionInfo.info(true, isolationHolder.get(), readOnly, map::get);
                 TRANSACTION_INFO.set(this, info); // NOTE : here occur after this.onTransactionEnd();
             } else {
                 TRANSACTION_INFO.set(this, null);
@@ -502,8 +532,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see #start(Xid, int, TransactionOption)
      */
     private Mono<TransactionInfo> getTransactionInfoAfterStart() {
-        final TransactionInfo info;
-        info = TRANSACTION_INFO.get(this);
+        final TransactionInfo info = this.transactionInfo;
         Mono<TransactionInfo> mono;
         if (info == null) {
             mono = Mono.error(MySQLExceptions.concurrentStartTransaction());
@@ -644,107 +673,5 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
 
     }// MySQLPoolRmDatabaseSession
 
-
-    private static final class XaTransactionInfo implements TransactionInfo {
-
-        private final Isolation isolation;
-
-        private final boolean readOnly;
-
-        private final Xid xid;
-
-        private final int flags;
-
-        private final XaStates xaStates;
-
-        private XaTransactionInfo(Isolation isolation, boolean readOnly, Xid xid, int flags) {
-            this.isolation = isolation;
-            this.readOnly = readOnly;
-            this.xid = xid;
-            this.flags = flags;
-            this.xaStates = XaStates.ACTIVE;
-        }
-
-        private XaTransactionInfo(XaTransactionInfo info, XaStates states, int flags) {
-            assert states != XaStates.ACTIVE;
-            this.isolation = info.isolation;
-            this.readOnly = info.readOnly;
-            this.xid = info.xid;
-
-            this.xaStates = states;
-            this.flags = flags;
-        }
-
-        @NonNull
-        @Override
-        public Isolation isolation() {
-            return this.isolation;
-        }
-
-        @Override
-        public boolean isReadOnly() {
-            return this.readOnly;
-        }
-
-        @Override
-        public boolean inTransaction() {
-            final boolean in;
-            switch (this.xaStates) {
-                case ACTIVE:
-                case IDLE:
-                    in = true;
-                    break;
-                case PREPARED:
-                default:
-                    in = false;
-            }
-            return in;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> T valueOf(final Option<T> option) {
-            final Object value;
-            if (option == Option.XID) {
-                value = this.xid;
-            } else if (option == Option.XA_STATES) {
-                value = this.xaStates;
-            } else if (option == Option.XA_FLAGS) {
-                value = this.flags;
-            } else if (option == Option.ISOLATION) {
-                value = this.isolation;
-            } else if (option == Option.READ_ONLY) {
-                value = this.readOnly;
-            } else if (option == Option.IN_TRANSACTION) {
-                value = inTransaction();
-            } else {
-                value = null;
-            }
-            return (T) value;
-        }
-
-
-        @Override
-        public String toString() {
-            return MySQLStrings.builder(68)
-                    .append(getClass().getName())
-                    .append("[ xid : ")
-                    .append(this.xid)
-                    .append(" , xaStates : ")
-                    .append(this.xaStates.name())
-                    .append(" , flags : ")
-                    .append(this.flags)
-                    .append(" , isolation : ")
-                    .append(this.isolation.name())
-                    .append(" , readOnly : ")
-                    .append(this.readOnly)
-                    .append(" , inTransaction : ")
-                    .append(this.inTransaction())
-                    .append(" ]")
-                    .toString();
-        }
-
-
-    }// MySqlXaTransactionInfo
 
 }

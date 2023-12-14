@@ -12,7 +12,6 @@ import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.util.SqlLogger;
-import io.jdbd.vendor.session.JdbdTransactionInfo;
 import io.jdbd.vendor.stmt.Stmts;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -129,7 +128,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
         return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
-                .doOnNext(item -> handleStartTransactionResult(item, isolationHolder, consistentSnapshot))
+                .doOnNext(item -> handleStartTransactionResult(option, item, isolationHolder, consistentSnapshot))
                 .then(Mono.defer(this::getTransactionInfoAfterStart))
                 .doOnError(e -> TRANSACTION_INFO.set(this, null));
     }
@@ -177,7 +176,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(JdbdTransactionInfo.txInfo(isolation, row.getNonNull(1, Boolean.class), false));
+            mono = Mono.just(TransactionInfo.info(false, isolation, row.getNonNull(1, Boolean.class), Option.EMPTY_OPTION_FUNC));
         } else if ((info = this.transactionInfo) == null) {
             String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new JdbdException(m));
@@ -291,7 +290,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     /**
      * @see #startTransaction(TransactionOption, HandleMode)
      */
-    private void handleStartTransactionResult(final ResultItem item, final AtomicReference<Isolation> isolationHolder,
+    private void handleStartTransactionResult(final TransactionOption option, final ResultItem item,
+                                              final AtomicReference<Isolation> isolationHolder,
                                               final @Nullable Boolean consistentSnapshot) {
         if (item instanceof ResultRow) {
             isolationHolder.compareAndSet(null, ((ResultRow) item).getNonNull(0, Isolation.class));
@@ -300,7 +300,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             if (states.inTransaction()) {
                 final boolean readOnly = states.nonNullOf(Option.READ_ONLY);
                 final TransactionInfo info;
-                info = createTransactionInfoAfterStart(isolationHolder, readOnly, consistentSnapshot);
+                info = createTransactionInfoAfterStart(option, isolationHolder, readOnly, consistentSnapshot);
                 TRANSACTION_INFO.set(this, info);
             } else {
                 TRANSACTION_INFO.set(this, null);
@@ -325,23 +325,24 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     /**
-     * @see #handleStartTransactionResult(ResultItem, AtomicReference, Boolean)
+     * @see #handleStartTransactionResult(TransactionOption, ResultItem, AtomicReference, Boolean)
      */
-    private TransactionInfo createTransactionInfoAfterStart(final AtomicReference<Isolation> isolationHolder,
+    private TransactionInfo createTransactionInfoAfterStart(final TransactionOption option,
+                                                            final AtomicReference<Isolation> isolationHolder,
                                                             final boolean readOnly,
                                                             final @Nullable Boolean consistentSnapshot) {
-        final TransactionInfo info;
-        if (consistentSnapshot == null) {
-            info = JdbdTransactionInfo.txInfo(isolationHolder.get(), readOnly, true);
-        } else {
-            final Map<Option<?>, Object> map = MySQLCollections.hashMap(7);
-            map.put(Option.ISOLATION, isolationHolder.get());
-            map.put(Option.READ_ONLY, readOnly);
-            map.put(Option.IN_TRANSACTION, Boolean.TRUE);
+        final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
+        map.put(Option.START_MILLIS, System.currentTimeMillis());
+
+        if (consistentSnapshot != null) {
             map.put(Option.WITH_CONSISTENT_SNAPSHOT, consistentSnapshot);
-            info = JdbdTransactionInfo.fromMap(map);
         }
-        return info;
+        final Integer timeoutMillis;
+        timeoutMillis = option.valueOf(Option.TIMEOUT_MILLIS);
+        if (timeoutMillis != null) {
+            map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
+        }
+        return TransactionInfo.info(true, isolationHolder.get(), readOnly, map::get);
     }
 
 
