@@ -421,12 +421,9 @@ final class QueryCommandWriter extends BinaryWriter {
                     packet.writeBytes(v.getBytes(this.clientCharset));
                 }
                 break;
-                case BIT: {
-                    packet.writeByte('0');
-                    packet.writeByte('b');
-                    packet.writeBytes(bindToBit(batchIndex, paramValue).getBytes(this.clientCharset));
-                }
-                break;
+                case BIT:
+                    Packets.writeInt8(packet, bindToBit(batchIndex, paramValue));
+                    break;
                 case CHAR:
                 case VARCHAR:
                 case ENUM:
@@ -627,30 +624,30 @@ final class QueryCommandWriter extends BinaryWriter {
     }
 
 
-    private static String bindToBit(final int batchIndex, final Value paramValue) {
-        final Object nonNull = paramValue.get();
-        final String value;
+    private static long bindToBit(final int batchIndex, final Value paramValue) {
+        final Object source = paramValue.get();
+        final long value;
 
-        if (nonNull instanceof Long) {
-            value = Long.toBinaryString((Long) nonNull);
-        } else if (nonNull instanceof Integer) {
-            value = Integer.toBinaryString((Integer) nonNull);
-        } else if (nonNull instanceof Short) {
-            value = Integer.toBinaryString(((Short) nonNull) & 0xFFFF);
-        } else if (nonNull instanceof Byte) {
-            value = Integer.toBinaryString(((Byte) nonNull) & 0xFF);
-        } else if (nonNull instanceof BitSet) {
-            final BitSet v = (BitSet) nonNull;
+        if (source instanceof Long) {
+            value = (Long) source;
+        } else if (source instanceof Integer) {
+            value = ((Integer) source) & 0xFFFF_FFFFL;
+        } else if (source instanceof Short) {
+            value = ((Short) source) & 0xFFFFL;
+        } else if (source instanceof Byte) {
+            value = ((Byte) source) & 0xFFL;
+        } else if (source instanceof BitSet) {
+            final BitSet v = (BitSet) source;
             if (v.length() > 64) {
                 throw JdbdExceptions.outOfTypeRange(batchIndex, paramValue);
             }
-            value = MySQLStrings.bitSetToBitString(v, true);
-        } else if (nonNull instanceof String) {
-            final String v = (String) nonNull;
+            value = v.toLongArray()[0];
+        } else if (source instanceof String) {
+            final String v = (String) source;
             if (v.length() > 64 || !MySQLStrings.isBinaryString(v)) {
                 throw JdbdExceptions.outOfTypeRange(batchIndex, paramValue);
             }
-            value = v;
+            value = Long.parseUnsignedLong(v, 2);
         } else {
             throw JdbdExceptions.nonSupportBindSqlTypeError(batchIndex, paramValue);
         }
