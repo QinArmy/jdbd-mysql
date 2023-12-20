@@ -769,7 +769,11 @@ abstract class MySQLResultSetReader implements ResultSetReader {
             final MySQLColumnMeta meta = rowMeta.columnMetaArray[indexBasedZero];
             final Object value;
             if (columnClass == String.class && source instanceof byte[]) {
-                value = new String((byte[]) source, rowMeta.columnCharset(meta.columnCharset));
+                if (meta.collationIndex == Charsets.MYSQL_COLLATION_INDEX_binary) {
+                    value = new String((byte[]) source, rowMeta.clientCharset);
+                } else {
+                    value = new String((byte[]) source, rowMeta.columnCharset(meta.columnCharset));
+                }
             } else if (columnClass == String.class && source instanceof BlobPath) {
                 try {
                     if (Files.size(((BlobPath) source).value()) > (Integer.MAX_VALUE - 128)) {

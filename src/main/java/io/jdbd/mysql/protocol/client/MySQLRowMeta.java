@@ -145,6 +145,8 @@ final class MySQLRowMeta extends VendorResultRowMeta {
 
     final Charset resultSetCharset;
 
+    final Charset clientCharset;
+
     final ZoneOffset serverZone;
 
     final Set<Integer> unknownCollationSet;
@@ -160,7 +162,7 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         this.columnMetaArray = columnMetaArray;
         this.customCollationMap = Collections.emptyMap();
         this.serverZone = PSEUDO_SERVER_ZONE;
-        this.resultSetCharset = null;
+        this.clientCharset = this.resultSetCharset = null;
 
         this.unknownCollationSet = unknownCollationSet;
         if (columnMetaArray.length < 6) {
@@ -180,8 +182,9 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         final TaskAdjutant adjutant = stmtTask.adjutant();
         this.customCollationMap = adjutant.obtainCustomCollationMap();
         this.serverZone = adjutant.serverZone();
-        this.resultSetCharset = adjutant.getCharsetResults();
 
+        this.resultSetCharset = adjutant.getCharsetResults();
+        this.clientCharset = adjutant.charsetClient();
         this.unknownCollationSet = unknownCollationSet;
         if (columnMetaArray.length < 6) {
             this.labelToIndexMap = null;
