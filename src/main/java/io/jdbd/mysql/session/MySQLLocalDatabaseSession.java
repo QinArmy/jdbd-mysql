@@ -358,6 +358,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         if (timeoutMillis != null) {
             map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
         }
+        map.put(Option.DEFAULT_ISOLATION, option.isolation() == null);
         return TransactionInfo.info(true, isolationHolder.get(), readOnly, map::get);
     }
 
@@ -411,7 +412,6 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
 
     }// MySQLPoolLocalDatabaseSession
-
 
 
 }
