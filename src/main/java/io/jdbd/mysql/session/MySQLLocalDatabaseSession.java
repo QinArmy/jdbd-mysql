@@ -20,7 +20,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
-import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.pool.PoolLocalDatabaseSession;
 import io.jdbd.result.ResultItem;
@@ -36,7 +35,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -192,7 +190,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(TransactionInfo.info(false, isolation, row.getNonNull(1, Boolean.class), Option.EMPTY_OPTION_FUNC));
+            mono = Mono.just(TransactionInfo.notInTransaction(isolation, row.getNonNull(1, Boolean.class)));
         } else if ((info = this.transactionInfo) == null) {
             String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new JdbdException(m));
@@ -266,22 +264,9 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                     final Optional<TransactionInfo> optional;
                     if (states.inTransaction()) {
                         assert Boolean.TRUE.equals(chain) : "ResultStates bug";
-
-                        final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
-                        map.put(Option.START_MILLIS, System.currentTimeMillis());
-                        final Integer timeoutMillis;
-                        timeoutMillis = info.valueOf(Option.TIMEOUT_MILLIS);
-                        if (timeoutMillis != null) {
-                            map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
-                        }
-
-                        final Boolean consistentSnapshot;
-                        consistentSnapshot = info.valueOf(Option.WITH_CONSISTENT_SNAPSHOT);
-                        if (consistentSnapshot != null) {
-                            map.put(Option.WITH_CONSISTENT_SNAPSHOT, consistentSnapshot);
-                        }
                         final TransactionInfo newInfo;
-                        newInfo = TransactionInfo.info(true, info.isolation(), info.isReadOnly(), map::get);
+                        newInfo = TransactionInfo.forChain(info);
+
                         TRANSACTION_INFO.set(this, newInfo); // record old value. NOTE : this occur after this.onTransactionEnd().
                         optional = Optional.of(newInfo);
                     } else {
@@ -363,19 +348,14 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                                                             final AtomicReference<Isolation> isolationHolder,
                                                             final boolean readOnly,
                                                             final @Nullable Boolean consistentSnapshot) {
-        final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
-        map.put(Option.START_MILLIS, System.currentTimeMillis());
+        final TransactionInfo.InfoBuilder builder;
+        builder = TransactionInfo.infoBuilder(true, isolationHolder.get(), readOnly);
+        builder.option(option);
 
         if (consistentSnapshot != null) {
-            map.put(Option.WITH_CONSISTENT_SNAPSHOT, consistentSnapshot);
+            builder.option(Option.WITH_CONSISTENT_SNAPSHOT, consistentSnapshot);
         }
-        final Integer timeoutMillis;
-        timeoutMillis = option.valueOf(Option.TIMEOUT_MILLIS);
-        if (timeoutMillis != null) {
-            map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
-        }
-        map.put(Option.DEFAULT_ISOLATION, option.isolation() == null);
-        return TransactionInfo.info(true, isolationHolder.get(), readOnly, map::get);
+        return builder.build();
     }
 
 

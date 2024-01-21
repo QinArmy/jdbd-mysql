@@ -21,7 +21,6 @@ import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.Constants;
 import io.jdbd.mysql.protocol.MySQLProtocol;
-import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.mysql.util.MySQLNumbers;
 import io.jdbd.mysql.util.MySQLStrings;
@@ -42,7 +41,6 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -215,21 +213,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             mono = this.protocol.update(Stmts.stmt(sql))
                     .map(states -> {
                         final TransactionInfo endInfo;
-                        final Map<Option<?>, Object> map = MySQLCollections.hashMap(8);
-
-                        map.put(Option.XID, infoXid);
-                        map.put(Option.XA_STATES, XaStates.IDLE);
-                        map.put(Option.XA_FLAGS, flags);
-                        map.put(Option.START_MILLIS, info.nonNullOf(Option.START_MILLIS));
-
-                        map.put(Option.DEFAULT_ISOLATION, info.nonNullOf(Option.DEFAULT_ISOLATION));
-                        final Integer timeoutMillis;
-                        timeoutMillis = info.valueOf(Option.TIMEOUT_MILLIS);
-                        if (timeoutMillis != null) {
-                            map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
-                        }
-
-                        endInfo = TransactionInfo.info(states.inTransaction(), info.isolation(), info.isReadOnly(), map::get);
+                        endInfo = TransactionInfo.forXaEnd(flags, info);
                         TRANSACTION_INFO.set(this, endInfo);
                         return endInfo;
                     });
@@ -493,7 +477,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             // session transaction characteristic
             final Isolation isolation;
             isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(TransactionInfo.info(false, isolation, row.getNonNull(1, Boolean.class), Option.EMPTY_OPTION_FUNC));
+            mono = Mono.just(TransactionInfo.notInTransaction(isolation, row.getNonNull(1, Boolean.class)));
         } else if ((info = this.transactionInfo) == null) {
             String m = "Not found cache current transaction info,you dont use jdbd-spi to control transaction.";
             mono = Mono.error(new XaException(m, null, 0, XaException.XAER_PROTO));
@@ -528,24 +512,12 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else if (item instanceof ResultStates && !((ResultStates) item).hasMoreResult()) {
             final ResultStates states = (ResultStates) item;
             if (states.inTransaction()) {
-                final boolean readOnly = states.nonNullOf(Option.READ_ONLY);
-
-                final Map<Option<?>, Object> map = MySQLCollections.hashMap(12);
-
-                map.put(Option.XID, xid);
-                map.put(Option.XA_STATES, XaStates.ACTIVE);
-                map.put(Option.XA_FLAGS, flags);
-                map.put(Option.START_MILLIS, System.currentTimeMillis());
-
-                final Integer timeoutMillis;
-                timeoutMillis = option.valueOf(Option.TIMEOUT_MILLIS);
-                if (timeoutMillis != null) {
-                    map.put(Option.TIMEOUT_MILLIS, timeoutMillis);
-                }
-                map.put(Option.DEFAULT_ISOLATION, option.isolation() == null);
+                final TransactionInfo.InfoBuilder builder;
+                builder = TransactionInfo.infoBuilder(true, isolationHolder.get(), states.nonNullOf(Option.READ_ONLY));
+                builder.option(xid, flags, XaStates.ACTIVE, option);
 
                 final TransactionInfo info;
-                info = TransactionInfo.info(true, isolationHolder.get(), readOnly, map::get);
+                info = builder.build();
                 TRANSACTION_INFO.set(this, info); // NOTE : here occur after this.onTransactionEnd();
             } else {
                 TRANSACTION_INFO.set(this, null);
