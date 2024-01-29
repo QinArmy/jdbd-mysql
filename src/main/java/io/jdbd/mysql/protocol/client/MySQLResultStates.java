@@ -17,9 +17,14 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.lang.Nullable;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.result.ResultStates;
 import io.jdbd.result.Warning;
 import io.jdbd.session.Option;
+import io.jdbd.vendor.result.JdbdWarning;
+
+import java.util.Collections;
+import java.util.Set;
 
 abstract class MySQLResultStates implements ResultStates {
 
@@ -72,7 +77,7 @@ abstract class MySQLResultStates implements ResultStates {
             throw new IllegalArgumentException(String.format("terminator isn't %s or %s",
                     OkPacket.class.getName(), EofPacket.class.getName()));
         } else if ((count = terminator.getWarnings()) > 0) {
-            this.warning = new WarningCount(count);
+            this.warning = JdbdWarning.create("warning count : " + count, Collections.singletonMap(Option.WARNING_COUNT, count));
         } else {
             this.warning = null;
         }
@@ -209,9 +214,40 @@ abstract class MySQLResultStates implements ResultStates {
     }
 
     @Override
+    public final Set<Option<?>> optionSet() {
+        return OptionSetHolder.OPTION_SET;
+    }
+
+
+    @Override
     public final Warning warning() {
         return this.warning;
     }
+
+
+    private static Set<Option<?>> resultStateOptionSet() {
+        final Set<Option<?>> set = MySQLCollections.hashSet();
+
+        set.add(Option.AUTO_COMMIT);
+        set.add(Option.IN_TRANSACTION);
+        set.add(SERVER_MORE_QUERY_EXISTS);
+        set.add(SERVER_MORE_RESULTS_EXISTS);
+
+        set.add(SERVER_QUERY_NO_GOOD_INDEX_USED);
+        set.add(SERVER_QUERY_NO_INDEX_USED);
+        set.add(SERVER_STATUS_CURSOR_EXISTS);
+        set.add(SERVER_STATUS_LAST_ROW_SENT);
+
+        set.add(SERVER_STATUS_DB_DROPPED);
+        set.add(SERVER_STATUS_METADATA_CHANGED);
+        set.add(SERVER_QUERY_WAS_SLOW);
+        set.add(SERVER_PS_OUT_PARAMS);
+
+        set.add(SERVER_SESSION_STATE_CHANGED);
+
+        return MySQLCollections.unmodifiableSet(set);
+    }
+
 
     private static final class UpdateResultStates extends MySQLResultStates {
 
@@ -253,33 +289,9 @@ abstract class MySQLResultStates implements ResultStates {
     }// QueryResultStates
 
 
-    private static final class WarningCount implements Warning {
+    private static abstract class OptionSetHolder {
+        private static final Set<Option<?>> OPTION_SET = resultStateOptionSet();
 
-        private final int warningCount;
-
-        private final String msg;
-
-        private WarningCount(int warningCount) {
-            assert warningCount > 0;
-            this.warningCount = warningCount;
-            this.msg = "warning count : " + warningCount;
-
-        }
-
-        @Override
-        public String message() {
-            return this.msg;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> T valueOf(Option<T> option) {
-            if (option != Option.WARNING_COUNT) {
-                return null;
-            }
-            return (T) Integer.valueOf(this.warningCount);
-        }
-
-    }// WarningCount
+    } // OptionSetHolder
 
 }

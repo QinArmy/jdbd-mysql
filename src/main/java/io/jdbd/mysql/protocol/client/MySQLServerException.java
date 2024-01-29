@@ -22,7 +22,8 @@ import io.jdbd.session.Option;
 import io.netty.buffer.ByteBuf;
 
 import java.nio.charset.Charset;
-import java.util.function.Function;
+import java.util.Collections;
+import java.util.Map;
 
 
 /**
@@ -72,27 +73,21 @@ final class MySQLServerException extends ServerException {
         cumulateBuffer.readerIndex(limitIndex); // avoid tailor filler
 
 
-        final Function<Option<?>, ?> optionFunc;
+        final Map<Option<?>, ?> optionMap;
         if (sqlStateMarker == null) {
-            optionFunc = Option.EMPTY_OPTION_FUNC;
+            optionMap = Collections.emptyMap();
         } else {
-            final String finalSqlStateMarker = sqlStateMarker;
-            optionFunc = option -> {
-                if (SQL_STATE_MARKER.equals(option)) {
-                    return finalSqlStateMarker;
-                }
-                return null;
-            };
+            optionMap = Collections.singletonMap(SQL_STATE_MARKER, sqlStateMarker);
         }
-        return new MySQLServerException(errorMessage, sqlState, errorCode, optionFunc);
+        return new MySQLServerException(errorMessage, sqlState, errorCode, optionMap);
     }
 
 
     private static final Option<String> SQL_STATE_MARKER = Option.from("SQL_STATE_MARKER", String.class);
 
     private MySQLServerException(String message, @Nullable String sqlState, int vendorCode,
-                                 Function<Option<?>, ?> optionFunc) {
-        super(message, sqlState, vendorCode, optionFunc);
+                                 Map<Option<?>, ?> optionMap) {
+        super(message, sqlState, vendorCode, optionMap);
     }
 
 

@@ -437,9 +437,12 @@ final class QueryCommandWriter extends BinaryWriter {
                     packet.writeBytes(v.getBytes(this.clientCharset));
                 }
                 break;
-                case BIT:
-                    Packets.writeInt8(packet, bindToBit(batchIndex, paramValue));
-                    break;
+                case BIT: {
+                    final long value;
+                    value = bindToBit(batchIndex, paramValue);
+                    packet.writeBytes(Long.toString(value).getBytes(this.clientCharset));
+                }
+                break;
                 case CHAR:
                 case VARCHAR:
                 case ENUM:

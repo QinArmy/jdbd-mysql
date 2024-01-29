@@ -39,6 +39,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
@@ -174,6 +175,11 @@ public final class MySQLDatabaseSessionFactory implements DatabaseSessionFactory
     @Override
     public <T> T valueOf(Option<T> option) {
         return this.protocolFactory.valueOf(option);
+    }
+
+    @Override
+    public Set<Option<?>> optionSet() {
+        return this.protocolFactory.optionSet();
     }
 
     @Override

@@ -18,6 +18,7 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.lang.Nullable;
 import io.jdbd.mysql.protocol.MySQLProtocol;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.result.*;
 import io.jdbd.session.Option;
@@ -27,6 +28,7 @@ import io.jdbd.vendor.task.PrepareTask;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -260,6 +262,11 @@ final class ClientProtocol implements MySQLProtocol {
         return (T) value;
     }
 
+    @Override
+    public Set<Option<?>> optionSet() {
+        return OptionSetHolder.OPTION_SET;
+    }
+
 
     @Override
     public void addSessionCloseListener(Runnable listener) {
@@ -327,6 +334,29 @@ final class ClientProtocol implements MySQLProtocol {
         }
         return mono;
     }
+
+
+    private static Set<Option<?>> sessionOptionSet() {
+        final Set<Option<?>> set = MySQLCollections.hashSet();
+
+        set.add(Option.AUTO_COMMIT);
+        set.add(Option.IN_TRANSACTION);
+        set.add(Option.READ_ONLY);
+
+        set.add(Option.BACKSLASH_ESCAPES);
+        set.add(Option.BINARY_HEX_ESCAPES);
+        set.add(Option.CLIENT_ZONE);
+        set.add(Option.SERVER_ZONE);
+
+        set.add(Option.CLIENT_CHARSET);
+
+        return MySQLCollections.unmodifiableSet(set);
+    }
+
+    private static abstract class OptionSetHolder {
+        private static final Set<Option<?>> OPTION_SET = sessionOptionSet();
+
+    } // OptionSetHolder
 
 
 }

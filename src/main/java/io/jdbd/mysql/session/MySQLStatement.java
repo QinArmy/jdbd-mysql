@@ -39,10 +39,7 @@ import io.jdbd.vendor.util.JdbdStrings;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 import static io.jdbd.mysql.MySQLDriver.MY_SQL;
@@ -265,6 +262,11 @@ abstract class MySQLStatement<S extends Statement> implements Statement, StmtOpt
     @Override
     public final <T> T valueOf(Option<T> option) {
         return this.session.protocol.valueOf(option);
+    }
+
+    @Override
+    public Set<Option<?>> optionSet() {
+        return this.session.optionSet();
     }
 
     @Override

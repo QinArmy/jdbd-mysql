@@ -143,6 +143,11 @@ public final class ClientProtocolFactory extends FixedEnv implements MySQLProtoc
     }
 
     @Override
+    public Set<Option<?>> optionSet() {
+        return Collections.emptySet();
+    }
+
+    @Override
     public <T> Mono<T> close() {
         // io.jdbd.session.DatabaseSessionFactory is responsible for parallel.
         if (this.loopResources.isDisposed()) {

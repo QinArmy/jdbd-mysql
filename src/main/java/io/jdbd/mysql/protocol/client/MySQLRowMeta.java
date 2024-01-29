@@ -21,6 +21,7 @@ import io.jdbd.meta.BooleanMode;
 import io.jdbd.meta.DataType;
 import io.jdbd.meta.JdbdType;
 import io.jdbd.meta.KeyType;
+import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.mysql.util.MySQLTimes;
 import io.jdbd.result.FieldType;
@@ -298,6 +299,11 @@ final class MySQLRowMeta extends VendorResultRowMeta {
     }
 
     @Override
+    public Set<Option<?>> optionSet() {
+        return OptionSetHolder.OPTION_SET;
+    }
+
+    @Override
     public String getCatalogName(final int indexBasedZero) throws JdbdException {
         return this.columnMetaArray[checkIndex(indexBasedZero)].catalogName;
     }
@@ -427,6 +433,27 @@ final class MySQLRowMeta extends VendorResultRowMeta {
         final Charset resultSetCharset = this.resultSetCharset;
         return resultSetCharset == null ? columnCharset : resultSetCharset;
     }
+
+    private static Set<Option<?>> rowMetaOptionSet() {
+        final Set<Option<?>> set = MySQLCollections.hashSet();
+
+        set.add(Option.SERVER_ZONE);
+        set.add(Option.PRECISION);
+        set.add(COLLATION_INDEX);
+        set.add(CHARSET);
+
+        set.add(FIXED_LENGTH);
+        set.add(LENGTH);
+        set.add(FLAGS);
+        set.add(TABLE_LABEL);
+
+        return MySQLCollections.unmodifiableSet(set);
+    }
+
+    private static abstract class OptionSetHolder {
+        private static final Set<Option<?>> OPTION_SET = rowMetaOptionSet();
+
+    } // OptionSetHolder
 
 
 }

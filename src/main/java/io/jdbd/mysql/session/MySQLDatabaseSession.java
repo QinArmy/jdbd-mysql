@@ -42,6 +42,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -460,6 +461,11 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         return this.protocol.valueOf(option);
     }
 
+
+    @Override
+    public final Set<Option<?>> optionSet() {
+        return this.protocol.optionSet();
+    }
 
     @Override
     public final boolean isSameFactory(DatabaseSession session) {

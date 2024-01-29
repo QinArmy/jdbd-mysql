@@ -130,4 +130,5 @@ abstract class MySQLSessionMetaSpec implements DatabaseMetaSpec {
         return MySQLDriver.MY_SQL;
     }
 
+
 }

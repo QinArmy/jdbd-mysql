@@ -33,6 +33,7 @@ import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.Option;
+import io.jdbd.util.SqlLogger;
 import io.jdbd.vendor.VendorOptions;
 import io.jdbd.vendor.meta.*;
 import io.jdbd.vendor.stmt.Stmts;
@@ -48,7 +49,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-import static io.jdbd.vendor.meta.VendorTableColumnMeta.EMPTY_ENUMS_FUNC;
 
 final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements DatabaseMetaData {
 
@@ -205,9 +205,12 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             final Function<Class<?>, Set<?>> enumSetFunc;
             enumSetFunc = createEnumSetFunc(dataType, row);
 
-            return VendorTableColumnMeta.from(tableMeta, enumSetFunc, map::get);
+            return VendorTableColumnMeta.from(tableMeta, enumSetFunc, map);
         };
-        return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);
+
+        final String sql = builder.toString();
+        SqlLogger.printLog(this.session, optionFunc, sql);
+        return this.protocol.query(Stmts.stmt(sql), function, ResultStates.IGNORE_STATES);
     }
 
     /**
@@ -294,10 +297,12 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             map.put(Option.UNIQUE, keyType.isUnique() || !firstRow.getNonNull("NON_UNIQUE", Boolean.class));
             map.put(VendorOptions.COMMENT, firstRow.get("INDEX_COMMENT", String.class));
 
-            return VendorTableIndexMeta.from(tableMeta, firstRow.getNonNull("INDEX_NAME", String.class), columnList, map::get);
+            return VendorTableIndexMeta.from(tableMeta, firstRow.getNonNull("INDEX_NAME", String.class), columnList, map);
         };
 
-        return this.protocol.query(Stmts.stmt(builder.toString()), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES)
+        final String sql = builder.toString();
+        SqlLogger.printLog(this.session, optionFunc, sql);
+        return this.protocol.query(Stmts.stmt(sql), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES)
                 .bufferUntil(bufferPredicate, true)
                 .map(mapBufferToIndexMetaFunc);
     }
@@ -358,6 +363,11 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     }
 
     @Override
+    public Set<Option<?>> optionSet() {
+        return Collections.emptySet();
+    }
+
+    @Override
     public DatabaseSession getSession() {
         return this.session;
     }
@@ -376,7 +386,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
      * @see #queryTableMeta(SchemaMeta, Function)
      */
     private SchemaMeta mapSchema(CurrentRow row) {
-        return VendorSchemaMeta.fromSchema(this, "def", row.getNonNull(0, String.class), Option.EMPTY_OPTION_FUNC);
+        return VendorSchemaMeta.fromSchema(this, "def", row.getNonNull(0, String.class), Collections.emptyMap());
     }
 
 
@@ -448,11 +458,13 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
 
             return VendorTableMeta.from(schemaMetaOfTable, row.getNonNull(1, String.class),
-                    row.getNonNull(3, String.class), optionMap::get
+                    row.getNonNull(3, String.class), optionMap
             );
         };
 
-        return this.protocol.query(Stmts.stmt(builder.toString()), function, ResultStates.IGNORE_STATES);
+        final String sql = builder.toString();
+        SqlLogger.printLog(this.session, optionFunc, sql);
+        return this.protocol.query(Stmts.stmt(sql), function, ResultStates.IGNORE_STATES);
     }
 
 
@@ -770,7 +782,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             }
             break;
             default:
-                enumSetFunc = EMPTY_ENUMS_FUNC;
+                enumSetFunc = clazz -> Collections.emptySet();
         }
         return enumSetFunc;
     }
@@ -832,7 +844,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         }
 
         map.put(VendorOptions.VISIBLE, row.getOrDefault("IS_VISIBLE", BooleanMode.class, BooleanMode.UNKNOWN));
-        return VendorIndexColumnMeta.from(row.getNonNull("COLUMN_NAME", String.class), map::get);
+        return VendorIndexColumnMeta.from(row.getNonNull("COLUMN_NAME", String.class), map);
     }
 
     /**

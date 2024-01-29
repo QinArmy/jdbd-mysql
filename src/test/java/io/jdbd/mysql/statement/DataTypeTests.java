@@ -482,10 +482,10 @@ public class DataTypeTests extends SessionTestSupport {
     @Test(invocationCount = 3, dataProvider = "setStmtProvider")
     public void setType(final BindSingleStatement insertStmt, final BindSingleStatement queryInsert) {
         final Set<City> citySet;
-        citySet = MySQLArrays.asSet(City.BEIJING, City.SHANGHAI);
+        citySet = MySQLArrays.asUnmodifiableSet(City.BEIJING, City.SHANGHAI);
 
         final Set<String> cityNameSet;
-        cityNameSet = MySQLArrays.asSet(City.TAIBEI.name(), City.XIANGGANG.name());
+        cityNameSet = MySQLArrays.asUnmodifiableSet(City.TAIBEI.name(), City.XIANGGANG.name());
 
         final String cityNameSetString;
         cityNameSetString = City.AOMENG.name() + ',' + City.SHANGHAI.name();
@@ -512,7 +512,7 @@ public class DataTypeTests extends SessionTestSupport {
                     Assert.assertEquals(row.getSet(1, String.class), cityNameSet);
                     break;
                 case 4:
-                    Assert.assertEquals(row.getSet(1, City.class), MySQLArrays.asSet(City.AOMENG, City.SHANGHAI));
+                    Assert.assertEquals(row.getSet(1, City.class), MySQLArrays.asUnmodifiableSet(City.AOMENG, City.SHANGHAI));
                     break;
                 default:
                     throw new RuntimeException("unknown row");

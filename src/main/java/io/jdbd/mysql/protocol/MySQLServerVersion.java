@@ -20,8 +20,10 @@ import io.jdbd.JdbdException;
 import io.jdbd.session.Option;
 import io.jdbd.session.ServerVersion;
 
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * <p>
@@ -50,6 +52,11 @@ public final class MySQLServerVersion implements Comparable<MySQLServerVersion>,
     @Override
     public <T> T valueOf(Option<T> option) {
         return null;
+    }
+
+    @Override
+    public Set<Option<?>> optionSet() {
+        return Collections.emptySet();
     }
 
     /**
