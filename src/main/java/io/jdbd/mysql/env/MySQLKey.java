@@ -1326,6 +1326,14 @@ public final class MySQLKey<T> extends Key<T> {
     public static final MySQLKey<Integer> FACTORY_SELECT_COUNT_COUNT = new MySQLKey<>("factorySelectCount", Integer.class, -1);
 
     /**
+     * The task queue size of each session.
+     * <p>
+     * see {@code io.jdbd.mysql.protocol.client.MySQLTaskExecutor#taskQueue}
+     * <br/>
+     */
+    public static final MySQLKey<Integer> FACTORY_TASK_QUEUE_SIZE = new MySQLKey<>("factoryTaskQueueSize", Integer.class, 18);
+
+    /**
      * @see DatabaseSessionFactory#name()
      */
     public static final MySQLKey<String> FACTORY_NAME = new MySQLKey<>(Driver.FACTORY_NAME, String.class, "unnamed");

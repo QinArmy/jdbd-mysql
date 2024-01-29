@@ -28,7 +28,7 @@ a humane client library to delegate to.
 <dependency>
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.11.5</version><!-- jdbd-mysql maven version-->
+    <version>0.11.6-SNAPSHOT</version><!-- jdbd-mysql maven version-->
 </dependency>
 ```
 
@@ -101,6 +101,7 @@ Core properties
 | name                 | default                           | description                                                                                                           |
 |----------------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | factoryName          | unnamed                           | DatabaseSessionFactory name                                                                                           |
+| factoryTaskQueueSize | 18                                | The task queue size of each session.                                                                                  |
 | factoryWorkerCount   | 30                                | session factory netty worker count.                                                                                   |
 | factorySelectCount   | same with factoryWorkerCount      | session factory netty select count if use java NIO,if native ignore.                                                  |
 | connectionProvider   | ConnectionProvider::newConnection | reactor netty ConnectionProvider                                                                                      |
