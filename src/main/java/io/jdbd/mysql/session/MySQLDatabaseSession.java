@@ -199,7 +199,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, option::valueOf);
+        SqlLogger.printLog(this, option::valueOf, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
@@ -211,6 +211,28 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
     @Override
     public final Publisher<TransactionInfo> transactionInfo(final Function<Option<?>, ?> optionFunc) {
+        final TransactionInfo info;
+        info = obtainTransactionInfo();
+        if (info != null) {
+            return Mono.just(info);
+        }
+        return sessionTransactionCharacteristics(optionFunc)
+                .doOnSuccess(v -> {
+                    if (this.protocol.inTransaction()) {
+                        String m = "Not found cache current transaction info,you don't use jdbd-spi to control transaction.";
+                        throw new JdbdException(m);
+                    }
+                });
+    }
+
+
+    @Override
+    public final Publisher<TransactionInfo> sessionTransactionCharacteristics() {
+        return sessionTransactionCharacteristics(Option.EMPTY_OPTION_FUNC);
+    }
+
+    @Override
+    public final Mono<TransactionInfo> sessionTransactionCharacteristics(final Function<Option<?>, ?> optionFunc) {
         final ServerVersion version = this.protocol.serverVersion();
         final StringBuilder builder = new StringBuilder(139);
         if (version.meetsMinimum(8, 0, 3)
@@ -225,11 +247,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, optionFunc);
-        return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
-                .filter(ResultItem::isRowOrStatesItem)
-                .collectList()
-                .flatMap(this::mapTransactionStatus);
+        SqlLogger.printLog(this, optionFunc, sql);
+        return Flux.from(this.protocol.query(Stmts.stmt(sql), this::mapToSessioinTransactionInfo, ResultStates.IGNORE_STATES))
+                .last();
     }
 
     @Override
@@ -319,7 +339,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, optionFunc);
+        SqlLogger.printLog(this, optionFunc, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn(NamedSavePoint.fromName(name));
     }
@@ -354,7 +374,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, optionFunc);
+        SqlLogger.printLog(this, optionFunc, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
@@ -389,7 +409,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, optionFunc);
+        SqlLogger.printLog(this, optionFunc, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
@@ -524,9 +544,12 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
 
 
     /**
+     * <p>Get current transaction session
+     *
      * @see #transactionInfo()
      */
-    abstract Mono<TransactionInfo> mapTransactionStatus(final List<ResultItem> list);
+    @Nullable
+    abstract TransactionInfo obtainTransactionInfo();
 
     /**
      * @see #toString()
@@ -540,30 +563,20 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     }
 
 
-    final void printSqlIfNeed(final String sql, Function<Option<?>, ?> optionFunc) {
-        final Object sqlLogger;
-        if (optionFunc == Option.EMPTY_OPTION_FUNC) {
-            sqlLogger = null;
-        } else {
-            sqlLogger = optionFunc.apply(Option.SQL_LOGGER);
-        }
-        if (sqlLogger instanceof SqlLogger) {
-
-            try {
-                ((SqlLogger) sqlLogger).logSql(this.name, System.identityHashCode(this), sql);
-            } catch (Exception e) {
-                // ignore
-            }
-
-        }
-
-    }
 
 
     /*################################## blow private method ##################################*/
 
     private PreparedStatement createPreparedStatement(final PrepareTask task) {
         return MySQLPreparedStatement.create(this, task);
+    }
+
+
+    /**
+     * @see #sessionTransactionCharacteristics(Function)
+     */
+    private TransactionInfo mapToSessioinTransactionInfo(final CurrentRow row) {
+        return TransactionInfo.notInTransaction(row.getNonNull(0, Isolation.class), row.getNonNull(1, Boolean.class));
     }
 
 

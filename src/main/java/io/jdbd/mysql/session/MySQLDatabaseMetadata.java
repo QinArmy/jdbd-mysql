@@ -86,8 +86,10 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     }
 
     @Override
-    public Publisher<SchemaMeta> currentSchema() {
-        return this.protocol.query(Stmts.stmt("SELECT DATABASE() AS cs"), this::mapSchema, ResultStates.IGNORE_STATES)
+    public Publisher<SchemaMeta> currentSchema(final Function<Option<?>, ?> optionFunc) {
+        final String sql = "SELECT DATABASE() AS cs";
+        SqlLogger.printLog(this.session, optionFunc, sql);
+        return this.protocol.query(Stmts.stmt(sql), this::mapSchema, ResultStates.IGNORE_STATES)
                 .last();
     }
 
@@ -382,7 +384,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
 
     /**
-     * @see #currentSchema()
+     * @see #currentSchema(Function)
      * @see #queryTableMeta(SchemaMeta, Function)
      */
     private SchemaMeta mapSchema(CurrentRow row) {

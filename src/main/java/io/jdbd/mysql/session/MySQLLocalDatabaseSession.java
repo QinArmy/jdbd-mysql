@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -177,29 +176,10 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
     /**
      * @see #transactionInfo()
      */
-    final Mono<TransactionInfo> mapTransactionStatus(final List<ResultItem> list) {
-        final ResultRow row;
-        final ResultStates states;
-        row = (ResultRow) list.get(0);
-        states = (ResultStates) list.get(1);
-
-        final TransactionInfo info;
-
-        final Mono<TransactionInfo> mono;
-        if (!states.inTransaction()) {
-            // session transaction characteristic
-            final Isolation isolation;
-            isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(TransactionInfo.notInTransaction(isolation, row.getNonNull(1, Boolean.class)));
-        } else if ((info = this.transactionInfo) == null) {
-            String m = "Not found cache current transaction option,you dont use jdbd-spi to control transaction.";
-            mono = Mono.error(new JdbdException(m));
-        } else {
-            mono = Mono.just(info);
-        }
-        return mono;
+    @Override
+    final TransactionInfo obtainTransactionInfo() {
+        return this.transactionInfo;
     }
-
 
     @Override
     final void printTransactionInfo(final StringBuilder builder) {
@@ -255,7 +235,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, optionFunc);
+        SqlLogger.printLog(this, optionFunc, sql);
 
 
         final TransactionInfo info = this.transactionInfo;

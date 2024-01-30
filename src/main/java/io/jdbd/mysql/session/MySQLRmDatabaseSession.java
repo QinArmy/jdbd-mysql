@@ -31,6 +31,7 @@ import io.jdbd.result.ResultRow;
 import io.jdbd.result.ResultStates;
 import io.jdbd.session.*;
 import io.jdbd.util.JdbdUtils;
+import io.jdbd.util.SqlLogger;
 import io.jdbd.vendor.stmt.Stmts;
 import io.jdbd.vendor.util.JdbdExceptions;
 import org.reactivestreams.Publisher;
@@ -40,7 +41,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -154,7 +154,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final String sql;
         sql = builder.toString();
 
-        printSqlIfNeed(sql, option::valueOf);
+        SqlLogger.printLog(this, option::valueOf, sql);
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
         return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
@@ -208,7 +208,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            printSqlIfNeed(sql, optionFunc);
+            SqlLogger.printLog(this, optionFunc, sql);
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .map(states -> {
@@ -257,7 +257,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            printSqlIfNeed(sql, optionFunc);
+            SqlLogger.printLog(this, optionFunc, sql);
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> {
@@ -312,7 +312,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 final String sql;
                 sql = builder.toString();
 
-                printSqlIfNeed(sql, optionFunc);
+                SqlLogger.printLog(this, optionFunc, sql);
 
                 mono = this.protocol.update(Stmts.stmt(sql))
                         .doOnSuccess(states -> TRANSACTION_INFO.set(this, null)) // here , couldn't compareAndSet() , because of this.onTransactionEnd();
@@ -326,7 +326,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            printSqlIfNeed(sql, optionFunc);
+            SqlLogger.printLog(this, optionFunc, sql);
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .thenReturn(this);
@@ -373,7 +373,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            printSqlIfNeed(sql, optionFunc);
+            SqlLogger.printLog(this, optionFunc, sql);
             mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> {
                         if (onePhaseRollback) {
@@ -427,7 +427,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else {
             final String sql = "XA RECOVER CONVERT XID";
 
-            printSqlIfNeed(sql, optionFunc);
+            SqlLogger.printLog(this, optionFunc, sql);
             flux = this.protocol.query(Stmts.stmt(sql), this::mapRecoverResult,
                     ResultStates.IGNORE_STATES);
         }
@@ -465,26 +465,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
      * @see #transactionInfo()
      */
     @Override
-    final Mono<TransactionInfo> mapTransactionStatus(final List<ResultItem> list) {
-        final ResultRow row;
-        final ResultStates states;
-        row = (ResultRow) list.get(0);
-        states = (ResultStates) list.get(1);
-        final TransactionInfo info;
-
-        final Mono<TransactionInfo> mono;
-        if (!states.inTransaction()) {
-            // session transaction characteristic
-            final Isolation isolation;
-            isolation = row.getNonNull(0, Isolation.class);
-            mono = Mono.just(TransactionInfo.notInTransaction(isolation, row.getNonNull(1, Boolean.class)));
-        } else if ((info = this.transactionInfo) == null) {
-            String m = "Not found cache current transaction info,you dont use jdbd-spi to control transaction.";
-            mono = Mono.error(new XaException(m, null, 0, XaException.XAER_PROTO));
-        } else {
-            mono = Mono.just(info);
-        }
-        return mono;
+    final TransactionInfo obtainTransactionInfo() {
+        return this.transactionInfo;
     }
 
     @Override

@@ -48,12 +48,12 @@ public class DatabaseMetadataTests extends SessionTestSupport {
 
 
     /**
-     * @see DatabaseMetaData#currentSchema()
+     * @see DatabaseMetaData#currentSchema(Function)
      */
     @Test
     public void currentSchema(final DatabaseMetaData metaData) {
         final SchemaMeta schemaMeta;
-        schemaMeta = Mono.from(metaData.currentSchema())
+        schemaMeta = Mono.from(metaData.currentSchema(Option.EMPTY_OPTION_FUNC))
                 .block();
         Assert.assertTrue(schemaMeta instanceof VendorSchemaMeta);
         LOG.info("currentSchema test result {}", schemaMeta);
