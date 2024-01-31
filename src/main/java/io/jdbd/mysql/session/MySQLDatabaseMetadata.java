@@ -88,7 +88,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
     @Override
     public Publisher<SchemaMeta> currentSchema(final Function<Option<?>, ?> optionFunc) {
         final String sql = "SELECT DATABASE() AS cs";
-        SqlLogger.printLog(this.session, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.query(Stmts.stmt(sql), this::mapSchema, ResultStates.IGNORE_STATES)
                 .last();
     }
@@ -116,7 +116,9 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             backslashEscapes = this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES);
             appendNamePredicate((String) nameValue, backslashEscapes, builder, UnaryOperator.identity());
         }
-        return this.protocol.query(Stmts.stmt(builder.toString()), this::mapSchema, ResultStates.IGNORE_STATES);
+        final String sql = builder.toString();
+        SqlLogger.printLog(optionFunc, sql);
+        return this.protocol.query(Stmts.stmt(sql), this::mapSchema, ResultStates.IGNORE_STATES);
     }
 
     /**
@@ -211,7 +213,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         };
 
         final String sql = builder.toString();
-        SqlLogger.printLog(this.session, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.query(Stmts.stmt(sql), function, ResultStates.IGNORE_STATES);
     }
 
@@ -303,7 +305,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         };
 
         final String sql = builder.toString();
-        SqlLogger.printLog(this.session, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.query(Stmts.stmt(sql), CurrentRow.AS_RESULT_ROW, ResultStates.IGNORE_STATES)
                 .bufferUntil(bufferPredicate, true)
                 .map(mapBufferToIndexMetaFunc);
@@ -465,7 +467,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
         };
 
         final String sql = builder.toString();
-        SqlLogger.printLog(this.session, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.query(Stmts.stmt(sql), function, ResultStates.IGNORE_STATES);
     }
 

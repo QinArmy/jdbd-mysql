@@ -199,7 +199,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, option::valueOf, sql);
+        SqlLogger.printLog(option::valueOf, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
@@ -247,7 +247,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return Flux.from(this.protocol.query(Stmts.stmt(sql), this::mapToSessioinTransactionInfo, ResultStates.IGNORE_STATES))
                 .last();
     }
@@ -339,7 +339,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn(NamedSavePoint.fromName(name));
     }
@@ -374,7 +374,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }
@@ -409,7 +409,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
         return this.protocol.update(Stmts.stmt(sql))
                 .thenReturn((S) this);
     }

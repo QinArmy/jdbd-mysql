@@ -154,7 +154,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, option::valueOf, sql);
+        SqlLogger.printLog(option::valueOf, sql);
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
         return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
@@ -208,7 +208,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            SqlLogger.printLog(this, optionFunc, sql);
+            SqlLogger.printLog(optionFunc, sql);
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .map(states -> {
@@ -257,7 +257,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            SqlLogger.printLog(this, optionFunc, sql);
+            SqlLogger.printLog(optionFunc, sql);
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> {
@@ -312,7 +312,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
                 final String sql;
                 sql = builder.toString();
 
-                SqlLogger.printLog(this, optionFunc, sql);
+                SqlLogger.printLog(optionFunc, sql);
 
                 mono = this.protocol.update(Stmts.stmt(sql))
                         .doOnSuccess(states -> TRANSACTION_INFO.set(this, null)) // here , couldn't compareAndSet() , because of this.onTransactionEnd();
@@ -326,7 +326,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            SqlLogger.printLog(this, optionFunc, sql);
+            SqlLogger.printLog(optionFunc, sql);
 
             mono = this.protocol.update(Stmts.stmt(sql))
                     .thenReturn(this);
@@ -373,7 +373,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final String sql;
             sql = builder.toString();
 
-            SqlLogger.printLog(this, optionFunc, sql);
+            SqlLogger.printLog(optionFunc, sql);
             mono = this.protocol.update(Stmts.stmt(sql))
                     .doOnSuccess(states -> {
                         if (onePhaseRollback) {
@@ -427,7 +427,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         } else {
             final String sql = "XA RECOVER CONVERT XID";
 
-            SqlLogger.printLog(this, optionFunc, sql);
+            SqlLogger.printLog(optionFunc, sql);
             flux = this.protocol.query(Stmts.stmt(sql), this::mapRecoverResult,
                     ResultStates.IGNORE_STATES);
         }

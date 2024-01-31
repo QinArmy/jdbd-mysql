@@ -133,11 +133,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
 
         final String sql;
         sql = builder.toString();
-        final SqlLogger sqlLogger;
-        sqlLogger = option.valueOf(Option.SQL_LOGGER);
-        if (sqlLogger != null) {
-            sqlLogger.logSql(this.name, System.identityHashCode(this), sql);
-        }
+        SqlLogger.printLog(option::valueOf, sql);
 
         final AtomicReference<Isolation> isolationHolder = new AtomicReference<>(isolation);
         return Flux.from(this.protocol.staticMultiStmtAsFlux(Stmts.multiStmt(sql)))
@@ -235,7 +231,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         final String sql;
         sql = builder.toString();
 
-        SqlLogger.printLog(this, optionFunc, sql);
+        SqlLogger.printLog(optionFunc, sql);
 
 
         final TransactionInfo info = this.transactionInfo;
