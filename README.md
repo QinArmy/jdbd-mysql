@@ -22,6 +22,10 @@ a humane client library to delegate to.
 5. If meets MySQL 8.0.26 ,then INSTALL COMPONENT "file://component_query_attributes" ;
 6. mvn test
 
+#### the persistence frameworks that use jdbd-spi :
+
+1. [Army](https://github.com/QinArmy/army)
+
 #### more jdbd-spi document see [jdbd](https://github.com/QinArmy/jdbd "more jdbd-spi document")
 
 ### How to start ?
