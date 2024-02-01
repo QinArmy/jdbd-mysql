@@ -1,4 +1,9 @@
-# Reactive Relational Database Driver MySQL Implementation [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.jdbd.mysql/jdbd-mysql/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.jdbd.mysql/jdbd-mysql) [![Java support](https://img.shields.io/badge/Java-8+-green?logo=java&logoColor=white)](https://openjdk.java.net/)
+# Reactive Relational Database Driver MySQL Implementation
+
+[![Sonatype Nexus (Snapshots)](https://img.shields.io/nexus/s/https/s01.oss.sonatype.org/io.jdbd.mysql/jdbd-mysql.svg)](https://s01.oss.sonatype.org/content/repositories/snapshots/io/jdbd/mysql/jdbd-mysql/)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.jdbd.mysql/jdbd-mysql/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.jdbd.mysql/jdbd-mysql)
+[![Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Java support](https://img.shields.io/badge/Java-8+-green?logo=java&logoColor=white)](https://openjdk.java.net/)
 
 This project contains the [MySQL client protocol][m] implementation of the [JDBD SPI][j].
 This implementation is not intended to be used directly, but rather to be used as the backing implementation for
