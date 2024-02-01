@@ -374,8 +374,12 @@ final class MySQLTaskExecutor extends CommunicationTaskExecutor<TaskAdjutant> {
 
         @Override
         public MySQLStatement parse(final String singleSql) throws JdbdException {
+            if (singleSql.length() > (1 << 16)) { // TODO optimizing me
+                return this.stmtParser.parse(singleSql);
+            }
+
             final ConcurrentMap<String, JdbdSoftReference<MySQLStatement>> stmtMap;
-            stmtMap = this.taskExecutor.factory.statementMap;
+            stmtMap = this.taskExecutor.factory.statementMap; // TODO optimizing me
 
             JdbdSoftReference<MySQLStatement> ref;
             ref = stmtMap.compute(singleSql, this.stmtComputeFunc);

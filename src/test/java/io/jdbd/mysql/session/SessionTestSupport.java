@@ -17,15 +17,14 @@
 package io.jdbd.mysql.session;
 
 import io.jdbd.Driver;
-import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.mysql.ClientTestUtils;
 import io.jdbd.mysql.TestKey;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.result.DataRow;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.session.DatabaseSessionFactory;
+import io.jdbd.session.SessionHolderSpec;
 import io.jdbd.statement.BindSingleStatement;
-import io.jdbd.statement.Statement;
 import io.jdbd.type.Blob;
 import io.jdbd.type.Clob;
 import io.jdbd.type.TextPath;
@@ -36,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
+import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
@@ -46,7 +46,6 @@ import reactor.core.publisher.Mono;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
@@ -99,43 +98,33 @@ public abstract class SessionTestSupport {
 
 
     @AfterMethod
-    public final void closeSessionAfterTest(final Method method, final ITestContext context) {
-        boolean match = false;
-        for (Class<?> parameterType : method.getParameterTypes()) {
-            if (DatabaseSession.class.isAssignableFrom(parameterType)
-                    || Statement.class.isAssignableFrom(parameterType)
-                    || DatabaseMetaData.class.isAssignableFrom(parameterType)) {
-                match = true;
-                break;
+    public final void closeSessionAfterTest(final ITestResult testResult) {
+        final ITestNGMethod targetMethod = testResult.getMethod();
+
+        final int invocationCount, currentInvocationCount;
+        invocationCount = targetMethod.getInvocationCount();
+        currentInvocationCount = targetMethod.getCurrentInvocationCount();
+
+        for (Object parameter : testResult.getParameters()) {
+            if (parameter instanceof DatabaseSession) {
+                Mono.from(((DatabaseSession) parameter).close())
+                        .block();
+            } else if (parameter instanceof SessionHolderSpec && currentInvocationCount == invocationCount) {
+                Mono.from(((SessionHolderSpec) parameter).getSession().close())
+                        .block();
             }
-        }
-        if (!match) {
-            return;
-        }
 
-        final String key;
-        key = method.getDeclaringClass().getName() + '.' + method.getName() + "#session";
-
-        final Object value;
-        value = context.getAttribute(key);
-        if (value instanceof DatabaseSession) {
-            context.removeAttribute(key);
-            Mono.from(((DatabaseSession) value).close())
-                    .block();
-        } else if (value instanceof TestSessionHolder && ((TestSessionHolder) value).close) {
-            Mono.from(((TestSessionHolder) value).session.close())
-                    .block();
         }
     }
 
     @DataProvider(name = "localSessionProvider", parallel = true)
-    public final Object[][] createLocalSession(final ITestNGMethod targetMethod, final ITestContext context) {
-        return createDatabaseSession(true, targetMethod, context);
+    public final Object[][] createLocalSession(final ITestNGMethod targetMethod) {
+        return createDatabaseSession(true, targetMethod);
     }
 
     @DataProvider(name = "rmSessionProvider", parallel = true)
-    public final Object[][] createRmSession(final ITestNGMethod targetMethod, final ITestContext context) {
-        return createDatabaseSession(false, targetMethod, context);
+    public final Object[][] createRmSession(final ITestNGMethod targetMethod) {
+        return createDatabaseSession(false, targetMethod);
     }
 
     @DataProvider(name = "databaseMetadataProvider", parallel = true)
@@ -207,22 +196,17 @@ public abstract class SessionTestSupport {
                 Assert.assertNotNull(statement);
 
         }
-        final boolean closeSession;
-        closeSession = currentInvocationCount == targetMethod.getInvocationCount();
 
-        context.setAttribute(keyOfSession, new TestSessionHolder(session, closeSession));
         return statement;
     }
 
 
-    private Object[][] createDatabaseSession(final boolean local, final ITestNGMethod targetMethod,
-                                             final ITestContext context) {
+    private Object[][] createDatabaseSession(final boolean local, final ITestNGMethod targetMethod) {
 
         final int currentInvocationCount = targetMethod.getCurrentInvocationCount() + 1;
 
-        final String methodName, keyOfSession;
+        final String methodName;
         methodName = targetMethod.getMethodName();
-        keyOfSession = keyNameOfSession(targetMethod);
 
         final DatabaseSession session;
         if (local) {
@@ -233,8 +217,6 @@ public abstract class SessionTestSupport {
                     .block();
         }
         Assert.assertNotNull(session);
-
-        context.setAttribute(keyOfSession, session);
 
         final Class<?>[] parameterTypeArray;
         parameterTypeArray = targetMethod.getParameterTypes();
@@ -363,9 +345,7 @@ public abstract class SessionTestSupport {
 
     /*-------------------below static class  -------------------*/
 
-    /**
-     * for {@link #closeSessionAfterTest(Method, ITestContext)}
-     */
+
     protected static final class TestSessionHolder {
 
         public final DatabaseSession session;
