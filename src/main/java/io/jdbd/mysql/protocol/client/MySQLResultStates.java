@@ -36,6 +36,15 @@ abstract class MySQLResultStates implements ResultStates {
         return new QueryResultStates(resultIndex, terminator, rowCount);
     }
 
+    static ResultStates forBatchUpdateNonLastItem(int resultNo, Terminator terminator) {
+        return new BatchUpdateResultStates(resultNo, terminator);
+    }
+
+
+    static ResultStates forBatchQueryNonLastItem(int resultNo, Terminator terminator, long rowCount) {
+        return new BatchQueryResultStates(resultNo, terminator, rowCount);
+    }
+
 
     private static final Option<Boolean> SERVER_MORE_QUERY_EXISTS = Option.from("SERVER_MORE_QUERY_EXISTS", Boolean.class);
 
@@ -63,7 +72,7 @@ abstract class MySQLResultStates implements ResultStates {
 
     private final int resultNo;
 
-    private final Terminator terminator;
+    final Terminator terminator;
 
     private final Warning warning;
 
@@ -135,11 +144,6 @@ abstract class MySQLResultStates implements ResultStates {
         return info;
     }
 
-
-    @Override
-    public final boolean hasMoreResult() {
-        return (this.terminator.statusFags & Terminator.SERVER_MORE_RESULTS_EXISTS) != 0;
-    }
 
     @Override
     public final boolean hasMoreFetch() {
@@ -248,8 +252,25 @@ abstract class MySQLResultStates implements ResultStates {
         return MySQLCollections.unmodifiableSet(set);
     }
 
+    /**
+     * <p>Simple(non-batch) {@link ResultStates}
+     */
+    private static abstract class SimpleResultStates extends MySQLResultStates {
 
-    private static final class UpdateResultStates extends MySQLResultStates {
+        private SimpleResultStates(int resultNo, Terminator terminator) {
+            super(resultNo, terminator);
+        }
+
+        @Override
+        public final boolean hasMoreResult() {
+            return (this.terminator.statusFags & Terminator.SERVER_MORE_RESULTS_EXISTS) != 0;
+        }
+
+
+    } // SimpleResultStates
+
+
+    private static final class UpdateResultStates extends SimpleResultStates {
 
         private UpdateResultStates(int resultIndex, Terminator terminator) {
             super(resultIndex, terminator);
@@ -265,9 +286,9 @@ abstract class MySQLResultStates implements ResultStates {
             return false;
         }
 
-    }// UpdateResultStates
+    } // UpdateResultStates
 
-    private static final class QueryResultStates extends MySQLResultStates {
+    private static final class QueryResultStates extends SimpleResultStates {
 
         private final long rowCount;
 
@@ -287,6 +308,61 @@ abstract class MySQLResultStates implements ResultStates {
         }
 
     }// QueryResultStates
+
+
+    private static abstract class BatchResultStates extends MySQLResultStates {
+
+        private BatchResultStates(int resultNo, Terminator terminator) {
+            super(resultNo, terminator);
+        }
+
+
+        @Override
+        public final boolean hasMoreResult() {
+            return true; // not last batch item
+        }
+
+    } // BatchResultStates
+
+
+    private static final class BatchUpdateResultStates extends BatchResultStates {
+
+        private BatchUpdateResultStates(int resultNo, Terminator terminator) {
+            super(resultNo, terminator);
+        }
+
+        @Override
+        public boolean hasColumn() {
+            return false;
+        }
+
+        @Override
+        public long rowCount() {
+            return 0L;
+        }
+
+    } // BatchUpdateResultStates
+
+    private static final class BatchQueryResultStates extends BatchResultStates {
+
+        private final long rowCount;
+
+        private BatchQueryResultStates(int resultNo, Terminator terminator, long rowCount) {
+            super(resultNo, terminator);
+            this.rowCount = rowCount;
+        }
+
+        @Override
+        public boolean hasColumn() {
+            return true;
+        }
+
+        @Override
+        public long rowCount() {
+            return this.rowCount;
+        }
+
+    } // BatchQueryResultStates
 
 
     private static abstract class OptionSetHolder {

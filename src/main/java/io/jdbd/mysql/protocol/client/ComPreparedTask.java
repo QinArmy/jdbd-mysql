@@ -677,7 +677,7 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
     }
 
     @Override
-    boolean hasMoreGroup() {
+    public boolean hasMoreGroup() {
         final ParamSingleStmt stmt = getActualStmt();
         final boolean moreGroup;
         if (stmt instanceof ParamBatchStmt) {

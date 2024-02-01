@@ -40,4 +40,7 @@ interface StmtTask extends MetaAdjutant {
     int nextResultNo();
 
 
+    boolean hasMoreGroup();
+
+
 }

@@ -613,7 +613,7 @@ final class ComQueryTask extends MySQLCommandTask {
     }
 
     @Override
-    boolean hasMoreGroup() {
+    public boolean hasMoreGroup() {
         // always false
         return false;
     }

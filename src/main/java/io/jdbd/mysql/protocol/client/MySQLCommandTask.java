@@ -171,10 +171,6 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
     abstract ResultSetReader createResultSetReader();
 
-    /**
-     * @return true: will invoke {@link #executeNextGroup()}
-     */
-    abstract boolean hasMoreGroup();
 
     /**
      * @return true : send failure,task end.
@@ -263,14 +259,21 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
             taskEnd = !hasMoreResult;
         } else {
             // emit update result.
-            this.sink.next(MySQLResultStates.fromUpdate(resultIndex, ok));
+            final boolean moreGroup = hasMoreGroup();
+            if (moreGroup) {
+                this.sink.next(MySQLResultStates.forBatchUpdateNonLastItem(resultIndex, ok));
+            } else {
+                this.sink.next(MySQLResultStates.fromUpdate(resultIndex, ok));
+            }
+
             if (hasMoreResult) {
                 taskEnd = false;
-            } else if (hasMoreGroup()) {
+            } else if (moreGroup) {
                 taskEnd = executeNextGroup();
             } else {
                 taskEnd = true;
             }
+
         }
         return taskEnd;
     }
