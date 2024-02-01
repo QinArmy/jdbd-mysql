@@ -6,7 +6,7 @@
 
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.11.6-SNAPSHOT</version><!-- jdbd-mysql maven version-->
+    <version>0.11.6</version><!-- jdbd-mysql maven version-->
     <!-- SNAPSHOT  -->
 
     <name>jdbd-mysql</name>
@@ -44,7 +44,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jdbd.spi.version>0.12.5-SNAPSHOT</jdbd.spi.version>
+        <jdbd.spi.version>0.12.5</jdbd.spi.version>
     </properties>
 
 
@@ -60,9 +60,9 @@
             <version>${jdbd.spi.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-core</artifactId>
-            <version>3.5.10</version>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-core</artifactId>
+            <version>1.1.15</version>
         </dependency>
 
         <dependency>
