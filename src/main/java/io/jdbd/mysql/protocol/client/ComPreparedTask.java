@@ -676,8 +676,14 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         return BinaryResultSetReader.create(this);
     }
 
+
     @Override
-    public boolean hasMoreGroup() {
+    public boolean isBatchStmt() {
+        return getActualStmt() instanceof ParamBatchStmt;
+    }
+
+    @Override
+    public boolean hasMoreBatchGroup() {
         final ParamSingleStmt stmt = getActualStmt();
         final boolean moreGroup;
         if (stmt instanceof ParamBatchStmt) {

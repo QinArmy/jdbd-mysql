@@ -476,12 +476,11 @@ abstract class MySQLResultSetReader implements ResultSetReader {
                     serverStatesConsumer.accept(terminator);
 
                     if (!task.isCancelled()) {
-                        if (task.hasMoreGroup()) {
-                            task.next(MySQLResultStates.forBatchQueryNonLastItem(currentRow.getResultNo(), terminator, currentRow.rowCount));
+                        if (task.isBatchStmt()) {
+                            task.next(MySQLResultStates.forBatchQuery(currentRow.getResultNo(), terminator, currentRow.rowCount, task.hasMoreBatchGroup()));
                         } else {
                             task.next(MySQLResultStates.fromQuery(currentRow.getResultNo(), terminator, currentRow.rowCount));
                         }
-
                     }
                     if (terminator.hasMoreFetch()) {
                         states = States.MORE_FETCH;

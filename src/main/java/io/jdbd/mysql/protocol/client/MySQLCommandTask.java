@@ -174,7 +174,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
 
     /**
      * @return true : send failure,task end.
-     * @see #hasMoreGroup()
+     * @see #hasMoreBatchGroup()
      */
     abstract boolean executeNextGroup();
 
@@ -218,7 +218,7 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
                 break;
             case NO_MORE_RESULT: {
                 handleReadResultSetEnd();
-                if (hasMoreGroup()) {
+                if (hasMoreBatchGroup()) {
                     taskEnd = executeNextGroup();
                 } else {
                     taskEnd = true;
@@ -251,24 +251,25 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
         ok = OkPacket.readCumulate(cumulateBuffer, payloadLength, this.capability);
         serverStatusConsumer.accept(ok);
 
-        final int resultIndex = nextResultNo(); // must increment result index.
-        final boolean hasMoreResult = ok.hasMoreResult();
+        final int resultNo = nextResultNo(); // must increment result no.
 
         final boolean taskEnd;
         if (this.isCancelled()) {
-            taskEnd = !hasMoreResult;
+            taskEnd = !ok.hasMoreResult();
         } else {
             // emit update result.
-            final boolean moreGroup = hasMoreGroup();
-            if (moreGroup) {
-                this.sink.next(MySQLResultStates.forBatchUpdateNonLastItem(resultIndex, ok));
+            final boolean moreBatchGroup;
+            if (isBatchStmt()) {
+                moreBatchGroup = hasMoreBatchGroup();
+                this.sink.next(MySQLResultStates.forBatchUpdate(resultNo, ok, moreBatchGroup));
             } else {
-                this.sink.next(MySQLResultStates.fromUpdate(resultIndex, ok));
+                moreBatchGroup = false;
+                this.sink.next(MySQLResultStates.fromUpdate(resultNo, ok));
             }
 
-            if (hasMoreResult) {
+            if (ok.hasMoreResult()) {
                 taskEnd = false;
-            } else if (moreGroup) {
+            } else if (moreBatchGroup) {
                 taskEnd = executeNextGroup();
             } else {
                 taskEnd = true;

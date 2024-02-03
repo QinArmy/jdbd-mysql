@@ -613,7 +613,12 @@ final class ComQueryTask extends MySQLCommandTask {
     }
 
     @Override
-    public boolean hasMoreGroup() {
+    public boolean isBatchStmt() {
+        return this.stmt instanceof BatchStmt;
+    }
+
+    @Override
+    public boolean hasMoreBatchGroup() {
         // always false
         return false;
     }
