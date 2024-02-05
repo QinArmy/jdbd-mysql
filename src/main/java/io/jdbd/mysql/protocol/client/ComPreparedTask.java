@@ -697,6 +697,22 @@ final class ComPreparedTask extends MySQLCommandTask implements PrepareStmtTask,
         return moreGroup;
     }
 
+    @Override
+    public int batchSize() {
+        final ParamSingleStmt stmt = getActualStmt();
+        final int size;
+        if (stmt instanceof ParamBatchStmt) {
+            size = ((ParamBatchStmt) stmt).getGroupList().size();
+        } else {
+            size = 0;
+        }
+        return size;
+    }
+
+    @Override
+    public int batchNo() {
+        return this.batchIndex;
+    }
 
     /**
      * @return true : task end.

@@ -624,6 +624,18 @@ final class ComQueryTask extends MySQLCommandTask {
     }
 
     @Override
+    public int batchSize() {
+        // currently,non-batch
+        return 0;
+    }
+
+    @Override
+    public int batchNo() {
+        // currently,non-batch
+        return 0;
+    }
+
+    @Override
     boolean executeNextGroup() {
         // here bug.
         throw new IllegalStateException("No next group.");

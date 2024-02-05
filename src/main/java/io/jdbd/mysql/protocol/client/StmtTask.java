@@ -45,5 +45,9 @@ interface StmtTask extends MetaAdjutant {
 
     boolean hasMoreBatchGroup();
 
+    int batchSize();
+
+    int batchNo();
+
 
 }

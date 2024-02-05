@@ -36,13 +36,13 @@ abstract class MySQLResultStates implements ResultStates {
         return new QueryResultStates(resultIndex, terminator, rowCount);
     }
 
-    static ResultStates forBatchUpdate(int resultNo, Terminator terminator, boolean moreBatchGroup) {
-        return new BatchUpdateResultStates(resultNo, terminator, moreBatchGroup);
+    static ResultStates forBatchUpdate(int resultNo, Terminator terminator, int batchSize, int batchNo) {
+        return new BatchUpdateResultStates(resultNo, terminator, batchSize, batchNo);
     }
 
 
-    static ResultStates forBatchQuery(int resultNo, Terminator terminator, long rowCount, boolean moreBatchGroup) {
-        return new BatchQueryResultStates(resultNo, terminator, rowCount, moreBatchGroup);
+    static ResultStates forBatchQuery(int resultNo, Terminator terminator, long rowCount, int batchSize, int batchNo) {
+        return new BatchQueryResultStates(resultNo, terminator, rowCount, batchSize, batchNo);
     }
 
 
@@ -267,11 +267,16 @@ abstract class MySQLResultStates implements ResultStates {
         }
 
         @Override
-        public final boolean isBatch() {
+        public final int batchSize() {
             // non-batch
-            return false;
+            return 0;
         }
 
+        @Override
+        public final int batchNo() {
+            // non-batch
+            return 0;
+        }
 
     } // SimpleResultStates
 
@@ -318,33 +323,39 @@ abstract class MySQLResultStates implements ResultStates {
 
     private static abstract class BatchResultStates extends MySQLResultStates {
 
-        private final boolean moreBatchGroup;
+        private final int batchSize;
 
-        private BatchResultStates(int resultNo, Terminator terminator, boolean moreBatchGroup) {
+        private final int batchNo;
+
+        private BatchResultStates(int resultNo, Terminator terminator, int batchSize, int batchNo) {
             super(resultNo, terminator);
-            this.moreBatchGroup = moreBatchGroup;
+            this.batchSize = batchSize;
+            this.batchNo = batchNo;
         }
 
+        @Override
+        public final int batchSize() {
+            return this.batchSize;
+        }
+
+        @Override
+        public final int batchNo() {
+            return this.batchNo;
+        }
 
         @Override
         public final boolean hasMoreResult() {
-            return this.moreBatchGroup || this.terminator.hasMoreResult();
+            return this.batchNo < this.batchSize || this.terminator.hasMoreResult();
         }
-
-        @Override
-        public final boolean isBatch() {
-            // this is batch result
-            return true;
-        }
-
 
     } // BatchResultStates
 
 
     private static final class BatchUpdateResultStates extends BatchResultStates {
 
-        private BatchUpdateResultStates(int resultNo, Terminator terminator, boolean moreBatchGroup) {
-            super(resultNo, terminator, moreBatchGroup);
+
+        private BatchUpdateResultStates(int resultNo, Terminator terminator, int batchSize, int batchNo) {
+            super(resultNo, terminator, batchSize, batchNo);
         }
 
         @Override
@@ -363,8 +374,8 @@ abstract class MySQLResultStates implements ResultStates {
 
         private final long rowCount;
 
-        private BatchQueryResultStates(int resultNo, Terminator terminator, long rowCount, boolean moreBatchGroup) {
-            super(resultNo, terminator, moreBatchGroup);
+        private BatchQueryResultStates(int resultNo, Terminator terminator, long rowCount, int batchSize, int batchNo) {
+            super(resultNo, terminator, batchSize, batchNo);
             this.rowCount = rowCount;
         }
 

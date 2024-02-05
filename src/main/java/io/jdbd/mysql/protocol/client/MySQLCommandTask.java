@@ -260,8 +260,11 @@ abstract class MySQLCommandTask extends MySQLTask implements StmtTask {
             // emit update result.
             final boolean moreBatchGroup;
             if (isBatchStmt()) {
-                moreBatchGroup = hasMoreBatchGroup();
-                this.sink.next(MySQLResultStates.forBatchUpdate(resultNo, ok, moreBatchGroup));
+                final int batchSize, batchNo;
+                batchSize = batchSize();
+                batchNo = batchNo();
+                moreBatchGroup = batchNo < batchSize;
+                this.sink.next(MySQLResultStates.forBatchUpdate(resultNo, ok, batchSize, batchNo));
             } else {
                 moreBatchGroup = false;
                 this.sink.next(MySQLResultStates.fromUpdate(resultNo, ok));
