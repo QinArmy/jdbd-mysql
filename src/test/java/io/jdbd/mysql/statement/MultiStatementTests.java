@@ -25,13 +25,11 @@ import io.jdbd.result.*;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.MultiStatement;
 import org.testng.Assert;
-import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
@@ -44,8 +42,8 @@ import java.util.function.Function;
  * This class is the test class of {@link MultiStatement}
  * <br/>
  * <p>
- * All test method's session parameter is created by {@link #createLocalSession(ITestNGMethod, ITestContext)},
- * and is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
+ * All test method's session parameter is created by {@link #createLocalSession(ITestNGMethod)},
+ * and is closed by {@link #closeSessionAfterTest(org.testng.ITestResult)}
  * <br/>
  */
 @Test(dataProvider = "localSessionProvider")
@@ -207,7 +205,7 @@ public class MultiStatementTests extends SessionTestSupport {
         rowList = Flux.from(statement.executeBatchAsFlux())
                 .filter(ResultItem::isRowOrStatesItem)
                 .doOnNext(item -> {
-                    switch (item.getResultNo()) {
+                    switch (item.resultNo()) {
                         case 1:
                             insertStatesHolder.set((ResultStates) item);
                             break;

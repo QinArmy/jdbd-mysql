@@ -477,9 +477,9 @@ abstract class MySQLResultSetReader implements ResultSetReader {
 
                     if (!task.isCancelled()) {
                         if (task.isBatchStmt()) {
-                            task.next(MySQLResultStates.forBatchQuery(currentRow.getResultNo(), terminator, currentRow.rowCount, task.batchSize(), task.batchNo()));
+                            task.next(MySQLResultStates.forBatchQuery(currentRow.resultNo(), terminator, currentRow.rowCount, task.batchSize(), task.batchNo()));
                         } else {
-                            task.next(MySQLResultStates.fromQuery(currentRow.getResultNo(), terminator, currentRow.rowCount));
+                            task.next(MySQLResultStates.fromQuery(currentRow.resultNo(), terminator, currentRow.rowCount));
                         }
                     }
                     if (terminator.hasMoreFetch()) {
@@ -750,7 +750,7 @@ abstract class MySQLResultSetReader implements ResultSetReader {
         }
 
         @Override
-        public final int getResultNo() {
+        public final int resultNo() {
             return this.rowMeta.resultNo;
         }
 
