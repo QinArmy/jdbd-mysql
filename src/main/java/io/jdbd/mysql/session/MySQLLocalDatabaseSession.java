@@ -325,7 +325,7 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
                                                             final boolean readOnly,
                                                             final @Nullable Boolean consistentSnapshot) {
         final TransactionInfo.InfoBuilder builder;
-        builder = TransactionInfo.infoBuilder(true, isolationHolder.get(), readOnly);
+        builder = TransactionInfo.builder(true, isolationHolder.get(), readOnly);
         builder.option(option);
 
         if (consistentSnapshot != null) {

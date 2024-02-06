@@ -495,7 +495,7 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
             final ResultStates states = (ResultStates) item;
             if (states.inTransaction()) {
                 final TransactionInfo.InfoBuilder builder;
-                builder = TransactionInfo.infoBuilder(true, isolationHolder.get(), states.nonNullOf(Option.READ_ONLY));
+                builder = TransactionInfo.builder(true, isolationHolder.get(), states.nonNullOf(Option.READ_ONLY));
                 builder.option(xid, flags, XaStates.ACTIVE, option);
 
                 final TransactionInfo info;

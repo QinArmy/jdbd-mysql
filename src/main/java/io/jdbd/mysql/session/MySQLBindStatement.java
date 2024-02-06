@@ -204,10 +204,12 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
         }
 
         final Mono<ResultStates> mono;
-        if (error == null) {
-            mono = this.session.protocol.paramUpdate(Stmts.paramStmt(this.sql, paramGroup, this), isUsePrepare());
-        } else {
+        if (error != null) {
             mono = Mono.error(MySQLExceptions.wrap(error));
+        } else if (!this.forcePrepare && (paramGroup == null || paramGroup.size() == 0)) {
+            mono = this.session.protocol.update(Stmts.stmt(this.sql, this));
+        } else {
+            mono = this.session.protocol.paramUpdate(Stmts.paramStmt(this.sql, paramGroup, this), isUsePrepare());
         }
         clearStatementToAvoidReuse();
         return mono;
