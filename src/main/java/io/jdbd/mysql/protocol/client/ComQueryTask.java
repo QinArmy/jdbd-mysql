@@ -691,18 +691,19 @@ final class ComQueryTask extends MySQLCommandTask {
 
     /**
      * @see #readExecuteResponse(ByteBuf, Consumer)
-     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html">Protocol::ERR_Packet</a>
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_local_infile_request.html">Protocol::LOCAL INFILE Request</a>
      */
     private void sendLocalFile(final ByteBuf cumulateBuffer) {
 
         final int payloadLength = Packets.readInt3(cumulateBuffer);
         updateSequenceId(Packets.readInt1AsInt(cumulateBuffer));
+        nextSequenceId(); // here ,special, because in same command, for file content package
 
         if (Packets.readInt1AsInt(cumulateBuffer) != Packets.LOCAL_INFILE) {
             throw new IllegalStateException(String.format("%s invoke sendLocalFile method error.", this));
         }
         final String localFilePath;
-        localFilePath = Packets.readStringFixed(cumulateBuffer, payloadLength, this.adjutant.charsetClient());
+        localFilePath = Packets.readStringFixed(cumulateBuffer, payloadLength - 1, this.adjutant.charsetClient());
 
         if (suspendTimeoutTaskIfNeed()) {
             return;
@@ -721,14 +722,7 @@ final class ComQueryTask extends MySQLCommandTask {
                 String message = String.format("Local file[%s] isn't readable.", path);
                 throw new JdbdException(message);
             }
-            this.packetPublisher = Flux.create(sink -> {
-                if (this.adjutant.inEventLoop()) {
-                    writeLocalFile(sink, path);
-                } else {
-                    this.adjutant.execute(() -> writeLocalFile(sink, path));
-                }
-
-            });
+            this.packetPublisher = Flux.create(sink -> this.adjutant.execute(() -> writeLocalFile(sink, path)));
         } catch (Throwable e) {
             if (e instanceof JdbdException) {
                 addError(e);
@@ -749,13 +743,7 @@ final class ComQueryTask extends MySQLCommandTask {
     private void writeLocalFile(final FluxSink<ByteBuf> sink, final Path path) {
 
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-
-            if (StandardCharsets.UTF_8.equals(this.adjutant.charsetClient())) {
-                writeLocalFileBinary(path, channel, sink);
-            } else {
-                writeLocalFileText(path, channel, sink);
-            }
-
+            writeLocalFileBinary(path, channel, sink);
         } catch (Throwable e) {
             if (e instanceof JdbdException) {
                 addError(e);
@@ -775,6 +763,7 @@ final class ComQueryTask extends MySQLCommandTask {
 
     /**
      * @see #writeLocalFile(FluxSink, Path)
+     * @see <a href="https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_local_infile_request.html">Protocol::LOCAL INFILE Request</a>
      */
     private void writeLocalFileBinary(final Path path, final FileChannel channel, final FluxSink<ByteBuf> sink)
             throws JdbdException, IOException {
@@ -792,16 +781,16 @@ final class ComQueryTask extends MySQLCommandTask {
             packet = allocator.buffer(capacity, Packets.MAX_PACKET);
             packet.writeZero(Packets.HEADER_SIZE);
 
-            while (channel.read(inputBuffer) > 0) {
+            for (int maxWritableBytes, readLength; channel.read(inputBuffer) > 0; ) {
                 inputBuffer.flip();
-                final int readLength = inputBuffer.remaining();
+                readLength = inputBuffer.remaining();
                 restFileBytes -= readLength;
-                final int maxWritableBytes = packet.maxWritableBytes();
+                maxWritableBytes = Packets.MAX_PACKET - packet.readableBytes();
                 if (readLength > maxWritableBytes) {
                     packet.writeBytes(bufferArray, 0, maxWritableBytes);
                     inputBuffer.position(maxWritableBytes); // modify position
 
-                    Packets.writeHeader(packet, this.nextSequenceId());
+                    Packets.writeHeader(packet, nextSequenceId());
                     sink.next(packet);
 
                     capacity = (int) Math.min(Packets.MAX_PACKET, Packets.HEADER_SIZE + restFileBytes + inputBuffer.remaining());
@@ -812,12 +801,12 @@ final class ComQueryTask extends MySQLCommandTask {
                 inputBuffer.clear();
             }
             if (packet.readableBytes() > Packets.HEADER_SIZE) {
-                Packets.writeHeader(packet, this.nextSequenceId());
+                Packets.writeHeader(packet, nextSequenceId());
                 sink.next(packet);
             } else {
                 packet.release();
             }
-            sink.next(Packets.createEmptyPacket(allocator, this.nextSequenceId()));
+            sink.next(Packets.createEmptyPacket(allocator, nextSequenceId()));
         } catch (Throwable e) {
             if (packet != null && packet.refCnt() > 0) {
                 packet.release();

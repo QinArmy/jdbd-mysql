@@ -56,6 +56,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -84,6 +85,7 @@ public abstract class SessionTestSupport {
 
 
         if (sessionFactory != null && !sessionFactory.isClosed()) {
+
             final String sql = "TRUNCATE TABLE mysql_types";
             Mono.from(sessionFactory.localSession())
                     .flatMap(session -> Mono.from(session.executeUpdate(sql))
@@ -304,8 +306,16 @@ public abstract class SessionTestSupport {
 
         final Driver driver;
         driver = Driver.findDriver(url);
+
+        final Map<String, Object> map;
+        map = new HashMap<>(testEnv.sourceMap());
+
+        if (!ClientTestUtils.isNotDriverDeveloperComputer()) {
+            map.put("sslMode", "DISABLED");
+        }
+
         //LOG.debug("driver {} ", driver);
-        return driver.forPoolVendor(url, testEnv.sourceMap());
+        return driver.forPoolVendor(url, map);
     }
 
 
