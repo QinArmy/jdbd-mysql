@@ -19,13 +19,11 @@ package io.jdbd.mysql.session;
 
 import io.jdbd.session.*;
 import org.testng.Assert;
-import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,8 +34,8 @@ import java.util.function.Function;
  * This class is the test class of {@link MySQLRmDatabaseSession}
  * <br/>
  * <p>
- * All test method's session parameter is created by {@link #createRmSession(ITestNGMethod, ITestContext)},
- * and is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
+ * All test method's session parameter is created by {@link #createRmSession(ITestNGMethod)},
+ * and is closed by {@link #closeSessionAfterTest(org.testng.ITestResult)}
  * <br/>
  */
 @Test(dataProvider = "rmSessionProvider")

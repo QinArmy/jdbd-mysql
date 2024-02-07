@@ -29,13 +29,11 @@ import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.Statement;
 import io.jdbd.statement.StaticStatement;
 import org.testng.Assert;
-import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +47,8 @@ import java.util.function.Function;
  * This class is the test class of {@link StaticStatement}
  * <br/>
  * <p>
- * All test method's session parameter is created by {@link #createLocalSession(ITestNGMethod, ITestContext)},
- * and is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
+ * All test method's session parameter is created by {@link #createLocalSession(ITestNGMethod)},
+ * and is closed by {@link #closeSessionAfterTest(org.testng.ITestResult)}
  * <br/>
  */
 @Test(dataProvider = "localSessionProvider")

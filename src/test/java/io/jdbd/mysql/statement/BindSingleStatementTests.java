@@ -35,7 +35,6 @@ import org.testng.annotations.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.lang.reflect.Method;
 import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +53,7 @@ import java.util.function.Function;
  *     </ul>
  * <br/>
  * <p>
- * All test method's session of  statement parameter  is closed by {@link #closeSessionAfterTest(Method, ITestContext)}
+ * All test method's session of  statement parameter  is closed by {@link #closeSessionAfterTest(org.testng.ITestResult)}
  * <br/>
  */
 
