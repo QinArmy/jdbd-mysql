@@ -442,11 +442,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @SuppressWarnings("unchecked")
     @Override
     public final S appendIdentifier(String identifier, StringBuilder builder) throws JdbdException {
-        final RuntimeException error;
-        if ((error = MySQLStrings.appendMySqlIdentifier(identifier, builder)) != null) {
-            throw error;
-        }
-        return (S) this;
+        throw new UnsupportedOperationException("currently version don't support");
     }
 
     /**
@@ -457,8 +453,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @SuppressWarnings("unchecked")
     @Override
     public final S appendTableName(String tableName, NameMode mode, StringBuilder builder) throws JdbdException {
-        MySQLStrings.appendTableNameOrColumnName(tableName, mode, builder);
-        return (S) this;
+        throw new UnsupportedOperationException("currently version don't support");
     }
 
     /**
@@ -469,8 +464,7 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
     @SuppressWarnings("unchecked")
     @Override
     public final S appendColumnName(String columnName, NameMode mode, StringBuilder builder) throws JdbdException {
-        MySQLStrings.appendTableNameOrColumnName(columnName, mode, builder);
-        return (S) this;
+        throw new UnsupportedOperationException("currently version don't support");
     }
 
     @Override
