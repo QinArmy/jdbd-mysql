@@ -6,7 +6,7 @@
 
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.11.9</version><!-- jdbd-mysql maven version-->
+    <version>0.11.10-SNAPSHOT</version><!-- jdbd-mysql maven version-->
     <!-- SNAPSHOT  -->
 
     <name>jdbd-mysql</name>
