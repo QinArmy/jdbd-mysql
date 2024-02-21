@@ -302,8 +302,8 @@ final class ClientProtocol implements MySQLProtocol {
     }
 
     @Override
-    public Mono<Void> logicallyClose() {
-        return this.adjutant.logicallyClose();
+    public Mono<Void> softClose() {
+        return this.adjutant.softClose();
     }
 
     @Override

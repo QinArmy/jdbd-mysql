@@ -377,8 +377,8 @@ class MySQLLocalDatabaseSession extends MySQLDatabaseSession<LocalDatabaseSessio
         }
 
         @Override
-        public Publisher<PoolLocalDatabaseSession> logicallyClose() {
-            return this.protocol.logicallyClose()
+        public Publisher<PoolLocalDatabaseSession> softClose() {
+            return this.protocol.softClose()
                     .thenReturn(this);
         }
 

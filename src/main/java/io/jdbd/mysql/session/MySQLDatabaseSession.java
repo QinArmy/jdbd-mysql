@@ -18,6 +18,7 @@ package io.jdbd.mysql.session;
 
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
+import io.jdbd.meta.DataType;
 import io.jdbd.meta.DatabaseMetaData;
 import io.jdbd.mysql.MySQLDriver;
 import io.jdbd.mysql.protocol.Constants;
@@ -31,6 +32,7 @@ import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.MultiStatement;
 import io.jdbd.statement.PreparedStatement;
 import io.jdbd.statement.StaticStatement;
+import io.jdbd.util.EscapeMode;
 import io.jdbd.util.NameMode;
 import io.jdbd.util.SqlLogger;
 import io.jdbd.vendor.result.MultiResults;
@@ -429,14 +431,9 @@ abstract class MySQLDatabaseSession<S extends DatabaseSession> extends MySQLSess
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-type-syntax.html">TEXT</a>
      * @see <a href="https://dev.mysql.com/doc/refman/8.1/en/string-literals.html#character-escape-sequences"> Special Character Escape Sequences</a>
      */
-    @SuppressWarnings("unchecked")
     @Override
-    public final S appendLiteral(@Nullable String text, StringBuilder builder) throws JdbdException {
-        if (isClosed()) {
-            throw MySQLExceptions.sessionHaveClosed();
-        }
-        MySQLStrings.appendLiteral(text, this.protocol.nonNullOf(Option.BACKSLASH_ESCAPES), builder);
-        return (S) this;
+    public final S appendLiteral(DataType type, @Nullable Object value, EscapeMode mode, StringBuilder builder) throws JdbdException {
+        throw new UnsupportedOperationException("currently version don't support");
     }
 
     /**

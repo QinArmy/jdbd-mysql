@@ -646,8 +646,8 @@ class MySQLRmDatabaseSession extends MySQLDatabaseSession<RmDatabaseSession> imp
         }
 
         @Override
-        public Publisher<PoolRmDatabaseSession> logicallyClose() {
-            return this.protocol.logicallyClose()
+        public Publisher<PoolRmDatabaseSession> softClose() {
+            return this.protocol.softClose()
                     .thenReturn(this);
         }
 
