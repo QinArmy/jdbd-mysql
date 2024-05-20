@@ -16,8 +16,8 @@
 
 package io.jdbd.mysql.protocol.client;
 
-import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHostInfo;
+import io.jdbd.mysql.protocol.SessionEnv;
 import io.netty.buffer.ByteBufAllocator;
 import reactor.util.annotation.Nullable;
 

@@ -6,7 +6,7 @@
 
     <groupId>io.jdbd.mysql</groupId>
     <artifactId>jdbd-mysql</artifactId>
-    <version>0.11.10-SNAPSHOT</version><!-- jdbd-mysql maven version-->
+    <version>0.12.0-SNAPSHOT</version><!-- jdbd-mysql maven version-->
     <!-- SNAPSHOT  -->
 
     <name>jdbd-mysql</name>
@@ -40,11 +40,10 @@
 
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jdbd.spi.version>0.12.7</jdbd.spi.version>
+        <jdbd.spi.version>0.13.0-SNAPSHOT</jdbd.spi.version>
     </properties>
 
 
@@ -80,13 +79,6 @@
             <scope>test</scope>
             <classifier>osx-x86_64</classifier>
         </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport-native-unix-common</artifactId>
-            <version>4.1.96.Final</version>
-            <scope>test</scope>
-            <classifier>osx-x86_64</classifier>
-        </dependency>
 
         <dependency>
             <groupId>com.alibaba.fastjson2</groupId>
@@ -98,7 +90,7 @@
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
-            <version>7.8.0</version>
+            <version>7.10.2</version>
             <exclusions>
                 <exclusion>
                     <groupId>junit</groupId>
@@ -209,7 +201,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.7.0</version>
+                <version>3.13.0</version>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
@@ -217,7 +209,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.2</version>
+                <version>3.2.5</version>
                 <configuration>
                     <argLine>-Dfile.encoding=UTF-8</argLine>
                     <suiteXmlFiles>
@@ -228,7 +220,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
+                <version>3.3.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -242,7 +234,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.4.1</version>
                 <configuration>
                     <archive>
                         <manifest>  <!-- https://maven.apache.org/shared/maven-archiver/ -->
@@ -264,7 +256,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>2.10.4</version>
+                        <version>3.6.3</version>
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>
@@ -277,7 +269,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>3.0.1</version>
+                        <version>3.2.4</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>

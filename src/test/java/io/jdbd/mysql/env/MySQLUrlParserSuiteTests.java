@@ -22,10 +22,8 @@ import io.jdbd.vendor.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.ITestContext;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
@@ -37,11 +35,6 @@ public class MySQLUrlParserSuiteTests {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySQLUrlParserSuiteTests.class);
 
-    @BeforeSuite
-    public void beforeSuite(ITestContext context) {
-        LOG.info("\n\njdbd-mysql feature test suite start\n");
-
-    }
 
 
     @BeforeClass

@@ -17,8 +17,8 @@
 package io.jdbd.mysql.syntax;
 
 import io.jdbd.JdbdException;
-import io.jdbd.mysql.SQLMode;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.mysql.protocol.SQLMode;
 import io.jdbd.mysql.util.MySQLCollections;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.vendor.util.JdbdStrings;

@@ -24,7 +24,6 @@ import io.jdbd.mysql.protocol.UnrecognizedCollationException;
 import io.jdbd.vendor.stmt.ParamValue;
 import io.jdbd.vendor.util.JdbdExceptions;
 
-import java.sql.SQLException;
 import java.util.Set;
 
 /**
@@ -192,24 +191,7 @@ public abstract class MySQLExceptions extends JdbdExceptions {
         return e;
     }
 
-    public static SQLException createTruncatedWrongValueForField(String message, @Nullable Throwable cause) {
-        return new SQLException(message
-                , MySQLCodes.ERROR_TO_SQL_STATES_MAP.get(MySQLCodes.ER_TRUNCATED_WRONG_VALUE_FOR_FIELD)
-                , MySQLCodes.ER_TRUNCATED_WRONG_VALUE_FOR_FIELD, cause);
-    }
 
-    public static SQLException createWrongArgumentsError(String message, @Nullable Throwable cause) {
-        return new SQLException(message
-                , MySQLCodes.ERROR_TO_SQL_STATES_MAP.get(MySQLCodes.ER_WRONG_ARGUMENTS)
-                , MySQLCodes.ER_WRONG_ARGUMENTS, cause);
-    }
-
-
-    public static SQLException createDataTooLongError(String message, @Nullable Throwable cause) {
-        return new SQLException(message
-                , MySQLCodes.ERROR_TO_SQL_STATES_MAP.get(MySQLCodes.ER_DATA_TOO_LONG)
-                , MySQLCodes.ER_DATA_TOO_LONG, cause);
-    }
 
     public static JdbdException netPacketTooLargeError(@Nullable Throwable cause) {
         final JdbdException e;

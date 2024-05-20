@@ -16,7 +16,7 @@
 
 package io.jdbd.mysql.protocol.client;
 
-import io.jdbd.mysql.SessionEnv;
+import io.jdbd.mysql.protocol.SessionEnv;
 import reactor.core.publisher.Mono;
 
 interface SessionResetter {

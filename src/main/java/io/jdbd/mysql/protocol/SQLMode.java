@@ -14,28 +14,35 @@
  * limitations under the License.
  */
 
-package io.jdbd.mysql;
+package io.jdbd.mysql.protocol;
 
-import reactor.util.annotation.Nullable;
+/**
+ * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html">Server SQL Modes</a>
+ */
+public enum SQLMode {
 
-import java.nio.charset.Charset;
-import java.time.ZoneOffset;
+    ALLOW_INVALID_DATES,
+    ANSI_QUOTES,
+    ERROR_FOR_DIVISION_BY_ZERO,
+    HIGH_NOT_PRECEDENCE,
 
-public interface SessionEnv {
+    IGNORE_SPACE,
+    NO_AUTO_VALUE_ON_ZERO,
+    NO_BACKSLASH_ESCAPES,
+    NO_DIR_IN_CREATE,
 
-    boolean containSqlMode(SQLMode sqlMode);
+    NO_ENGINE_SUBSTITUTION,
+    NO_UNSIGNED_SUBTRACTION,
+    NO_ZERO_DATE,
+    NO_ZERO_IN_DATE,
 
-    Charset charsetClient();
+    ONLY_FULL_GROUP_BY,
+    PAD_CHAR_TO_FULL_LENGTH,
+    PIPES_AS_CONCAT,
+    REAL_AS_FLOAT,
 
-    @Nullable
-    Charset charsetResults();
-
-    @Nullable
-    ZoneOffset connZone();
-
-    /**
-     * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/time-zone-support.html#time-zone-variables">Time Zone Variables</a>
-     */
-    ZoneOffset serverZone();
+    STRICT_ALL_TABLES,
+    STRICT_TRANS_TABLES,
+    TIME_TRUNCATE_FRACTIONAL
 
 }

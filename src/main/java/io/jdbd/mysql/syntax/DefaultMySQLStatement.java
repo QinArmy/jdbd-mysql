@@ -16,7 +16,7 @@
 
 package io.jdbd.mysql.syntax;
 
-import io.jdbd.mysql.SQLMode;
+import io.jdbd.mysql.protocol.SQLMode;
 import io.jdbd.mysql.util.MySQLCollections;
 
 import java.util.List;

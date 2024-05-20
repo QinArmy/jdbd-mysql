@@ -18,10 +18,10 @@ package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.JdbdException;
 import io.jdbd.lang.Nullable;
-import io.jdbd.mysql.SQLMode;
-import io.jdbd.mysql.SessionEnv;
 import io.jdbd.mysql.env.MySQLHostInfo;
 import io.jdbd.mysql.protocol.Constants;
+import io.jdbd.mysql.protocol.SQLMode;
+import io.jdbd.mysql.protocol.SessionEnv;
 import io.jdbd.mysql.syntax.DefaultMySQLParser;
 import io.jdbd.mysql.syntax.MySQLParser;
 import io.jdbd.mysql.syntax.MySQLStatement;

@@ -17,7 +17,7 @@
 package io.jdbd.mysql.protocol.client;
 
 import io.jdbd.mysql.MySQLType;
-import io.jdbd.mysql.SQLMode;
+import io.jdbd.mysql.protocol.SQLMode;
 import io.jdbd.mysql.type.City;
 import io.jdbd.mysql.type.TrueOrFalse;
 import io.jdbd.mysql.util.*;
