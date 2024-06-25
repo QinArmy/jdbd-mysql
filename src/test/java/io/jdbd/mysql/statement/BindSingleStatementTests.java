@@ -25,8 +25,8 @@ import io.jdbd.mysql.session.SessionTestSupport;
 import io.jdbd.result.*;
 import io.jdbd.session.DatabaseSession;
 import io.jdbd.statement.BindSingleStatement;
-import io.jdbd.statement.OutParameter;
 import io.jdbd.statement.PreparedStatement;
+import io.jdbd.statement.Statement;
 import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
@@ -175,7 +175,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
     public void executeAsFluxCallOutParameter(final BindSingleStatement statement) {
 
         statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
-                .bind(1, JdbdType.TIMESTAMP, OutParameter.out("outNow"));
+                .bind(1, JdbdType.TIMESTAMP, Statement.OUT_PARAMETER);
 
         final List<? extends Map<String, ?>> rowList;
 
@@ -312,7 +312,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
         final int batchItemCount = 3;
         for (int i = 0; i < batchItemCount; i++) {
             statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
-                    .bind(1, JdbdType.TIMESTAMP, OutParameter.out("outNow"))
+                    .bind(1, JdbdType.TIMESTAMP, Statement.OUT_PARAMETER)
 
                     .addBatch();
         }
@@ -379,7 +379,7 @@ public class BindSingleStatementTests extends SessionTestSupport {
 
         for (int i = 0; i < batchItemCount; i++) {
             statement.bind(0, JdbdType.TIMESTAMP, LocalDateTime.now())
-                    .bind(1, JdbdType.TIMESTAMP, OutParameter.out("outNow"))
+                    .bind(1, JdbdType.TIMESTAMP, Statement.OUT_PARAMETER)
 
                     .addBatch();
         }
