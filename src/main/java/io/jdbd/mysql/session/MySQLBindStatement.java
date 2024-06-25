@@ -28,7 +28,6 @@ import io.jdbd.mysql.util.MySQLStrings;
 import io.jdbd.result.*;
 import io.jdbd.statement.BindStatement;
 import io.jdbd.statement.Parameter;
-import io.jdbd.statement.Statement;
 import io.jdbd.type.Blob;
 import io.jdbd.type.Clob;
 import io.jdbd.vendor.ResultType;
@@ -116,7 +115,7 @@ final class MySQLBindStatement extends MySQLStatement<BindStatement> implements 
                 this.paramGroup = paramGroup = MySQLCollections.arrayList(firstGroupSize < 0 ? 0 : firstGroupSize);
             }
             final Object actualValue;
-            if (value == Statement.OUT_PARAMETER || value instanceof Parameter) { // TODO long string or binary or out parameter
+            if (value == void.class || value instanceof Parameter) { // TODO long string or binary or out parameter
                 this.usePrepare = true;
                 actualValue = value;
             } else if (value instanceof String && ((String) value).length() > 0xff_ff_ff) {

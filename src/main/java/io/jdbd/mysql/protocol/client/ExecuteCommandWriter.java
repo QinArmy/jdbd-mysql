@@ -21,7 +21,6 @@ import io.jdbd.mysql.MySQLType;
 import io.jdbd.mysql.util.MySQLBinds;
 import io.jdbd.mysql.util.MySQLExceptions;
 import io.jdbd.statement.Parameter;
-import io.jdbd.statement.Statement;
 import io.jdbd.type.LongParameter;
 import io.jdbd.vendor.stmt.*;
 import io.netty.buffer.ByteBuf;
@@ -231,7 +230,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
             for (int i = 0; i < anonymousParamCount; i++) {
                 paramValue = paramGroup.get(i);
                 value = paramValue.get();
-                if (value == null || value == Statement.OUT_PARAMETER) {
+                if (value == null || value == void.class) {
                     nullBitsMap[i >> 3] |= (1 << (i & 7));
                 }
                 type = decideActualType(paramValue);
@@ -255,7 +254,7 @@ final class ExecuteCommandWriter extends BinaryWriter implements CommandWriter {
                 for (int i = 0; i < anonymousParamCount; i++) {
                     paramValue = paramGroup.get(i);
                     value = paramValue.get();
-                    if (value == null || value == Statement.OUT_PARAMETER || value instanceof Parameter) {
+                    if (value == null || value == void.class || value instanceof Parameter) {
                         continue;
                     }
                     writeBinary(packet, batchIndex, paramValue, paramMetaArray[i].getScale());
