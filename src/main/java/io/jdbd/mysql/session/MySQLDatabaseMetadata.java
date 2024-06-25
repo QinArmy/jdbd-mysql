@@ -195,7 +195,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             map.put(Option.PRECISION, mapColumnPrecision(dataType, row));
 
             map.put(VendorOptions.SCALE, mapColumnScale(dataType, row));
-            map.put(VendorOptions.NULLABLE_MODE, row.getOrDefault("IS_NULLABLE", BooleanMode.class, BooleanMode.UNKNOWN));
+            map.put(VendorOptions.NOT_NULL_MODE, row.getOrDefault("IS_NULLABLE", BooleanMode.class, BooleanMode.UNKNOWN).not());
             map.put(VendorOptions.AUTO_INCREMENT_MODE, mapAutoIncrementMode(row));
             map.put(VendorOptions.GENERATED_MODE, mapGeneratedMode(row));
 
@@ -205,6 +205,7 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
             map.put(Option.COLLATION, row.get("COLLATION_NAME", String.class));
 
             map.put(Option.PRIVILEGE, row.get("PRIVILEGES", String.class));
+
 
             final Function<Class<?>, Set<?>> enumSetFunc;
             enumSetFunc = createEnumSetFunc(dataType, row);
@@ -837,14 +838,14 @@ final class MySQLDatabaseMetadata extends MySQLSessionMetaSpec implements Databa
 
         switch (row.getOrDefault("NULLABLE", String.class, "UNKNOWN").toUpperCase(Locale.ROOT)) {
             case "YES":
-                map.put(VendorOptions.NULLABLE_MODE, BooleanMode.TRUE);
+                map.put(VendorOptions.NOT_NULL_MODE, BooleanMode.FALSE);
                 break;
             case "":
             case "NO":
-                map.put(VendorOptions.NULLABLE_MODE, BooleanMode.FALSE);
+                map.put(VendorOptions.NOT_NULL_MODE, BooleanMode.TRUE);
                 break;
             default:
-                map.put(VendorOptions.NULLABLE_MODE, BooleanMode.UNKNOWN);
+                map.put(VendorOptions.NOT_NULL_MODE, BooleanMode.UNKNOWN);
         }
 
         map.put(VendorOptions.VISIBLE, row.getOrDefault("IS_VISIBLE", BooleanMode.class, BooleanMode.UNKNOWN));
